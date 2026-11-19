@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14213D">
+<title>Assistente de investimentos</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--ink:#14213d;--mut:#5b6577;--line:#d3d9e1;--up:#0f7b5f;--dn:#c2362f;--hold:#6b7488;--ac:#3a5ba0;--sf:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#10151f;--ink:#e7ebf2;--mut:#9aa4b6;--line:#26303f;--up:#3ec59b;--dn:#ff7a70;--hold:#8f99ad;--ac:#8aa8ee;--sf:#171e2b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{padding:20px 16px 8px}
+h1{font-size:20px;margin:0;font-weight:600}
+h2{font-size:17px;margin:14px 0 4px}
+main{max-width:640px;margin:0 auto}
+.row{background:var(--sf);border-top:1px solid var(--line);padding:14px 16px}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tk{font-weight:600;font-size:18px}
+.badge{font-weight:600;font-size:14px;padding:2px 10px;border-radius:99px;color:#fff}
+.COMPRAR,.SIM{background:var(--up)}.VENDER,.NAO{background:var(--dn)}.MANTER,.PARCIALMENTE{background:var(--hold)}
+.pl{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin:6px 0 2px}
+.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut);font-size:14px}
+.pot{display:flex;gap:20px;margin:8px 0;font-size:14px;font-variant-numeric:tabular-nums}
+.sug{font-weight:600;margin:6px 0}
+.bars div{position:relative;margin:6px 0;font-size:14px;height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
+.bars i{position:absolute;inset:0 auto 0 0;background:var(--ac);opacity:.28}
+.bars span{position:relative;padding:2px 8px;display:block}
+details{margin-top:8px}summary{color:var(--ac);cursor:pointer;font-weight:500}
+ul{padding-left:18px;margin:6px 0}a{color:var(--ac)}
+.btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+button,select,textarea{font:inherit;color:var(--ink)}
+button{flex:1;font-weight:500;padding:10px;border-radius:8px;border:1px solid var(--line);background:transparent}
+select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--sf)}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac)}
+#err{color:var(--dn);padding:8px 16px}
+</style>
+</head>
+<body>
+<header><h1>Assistente de investimentos</h1>
+<div class="mut">Você opera na sua corretora e anota aqui. Suas posições ficam só neste aparelho. Não é recomendação profissional.</div></header>
+<div id="err"></div>
+<main>
+<div class="row"><label class="mut" for="perfil">Seu perfil de investidor</label>
+<select id="perfil"><option value="não informado">Não informado</option><option value="conservador">Conservador</option><option value="moderado">Moderado</option><option value="arrojado">Arrojado</option></select></div>
+<div id="port"></div><div id="list"></div>
+<div class="row"><div class="btns"><button onclick="addTicker()">Adicionar ativo</button></div>
+<details><summary>Backup das posições</summary>
+<p class="mut">Se você limpar os dados do navegador, as posições somem. Gere o texto, guarde-o em um lugar seguro e cole aqui para restaurar.</p>
+<textarea id="bk" rows="4"></textarea>
+<div class="btns"><button onclick="bkGen()">Gerar backup</button><button onclick="bkRest()">Restaurar</button></div></details></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const NOME = {acao:'Ações', fii:'FIIs', exterior:'Exterior', cambio:'Dólar', renda_fixa:'Renda fixa'};
+const OKT = /^[A-Z0-9_.=-]{1,15}$/;
+const ld = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
+let pos = ld('pos', {}), extra = ld('extra', []), perfil = localStorage.getItem('perfil') || 'não informado';
+const sv = () => { localStorage.setItem('pos', JSON.stringify(pos)); localStorage.setItem('extra', JSON.stringify(extra)); localStorage.setItem('perfil', perfil); };
+let tok = localStorage.getItem('tok') || prompt('Digite a senha do app (APP_TOKEN):') || '';
+localStorage.setItem('tok', tok);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const M = (v, m = 'BRL') => v == null ? '—' : v.toLocaleString(m === 'USD' ? 'en-US' : 'pt-BR', {style:'currency', currency:m});
+const P = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + '%';
+const A = v => v == null ? '—' : v.toFixed(2).replace('.', ',') + '% a.a.';
+const cl = v => v > 0 ? 'up' : v < 0 ? 'dn' : '';
+const num = s => parseFloat(String(s || '').replace(',', '.'));
+async function api(u, body) {
+  const r = await fetch(u, {method: body ? 'POST' : 'GET', headers: {'X-Token': tok, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
+  if (r.status === 401) { localStorage.removeItem('tok'); throw new Error('Senha incorreta. Recarregue a página e digite de novo.'); }
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.detail || 'Erro');
+  return j;
+}
+const rmBtn = t => extra.includes(t) ? `<button onclick="rm('${t}')">Remover da lista</button>` : '';
+function card(a) {
+  if (a.classe === 'renda_fixa') return `<section class="row" id="r-${a.ticker}">
+    <div class="top"><span class="tk">${esc(a.nome)}</span><span class="mut">${a.pct}% ${a.ticker === 'TESOURO_SELIC' ? 'da Selic' : 'do CDI'}</span></div>
+    <div class="pl">${a.saldo ? M(a.saldo) : '<span class="mut">Sem saldo informado</span>'}</div>
+    <div class="pot"><div>Taxa estimada<br><b>${A(a.taxa)}</b></div><div>Juro real<br><b>${A(a.juro_real)}</b></div></div>
+    ${a.saldo ? `<div class="mut">Rende cerca de ${M(a.rend_mes)} por mês e ${M(a.rend_ano)} por ano, antes de IR e IOF.</div>` : ''}
+    <div class="mut">Selic ${A(a.selic)} · CDI ${A(a.cdi)} · IPCA 12m ${A(a.ipca12)}</div>
+    <div class="btns"><button onclick="edit('${a.ticker}','renda_fixa')">Editar saldo</button></div></section>`;
+  const m = a.metricas, p = a.posicao, mo = a.moeda;
+  return `<section class="row" id="r-${a.ticker}">
+    <div class="top"><span class="tk">${esc(a.ticker)}</span><span>${M(m.preco, mo)}</span>
+      <span class="badge ${a.decisao}">${a.decisao.toLowerCase()}${a.confianca != null ? ' ' + a.confianca + '%' : ''}</span></div>
+    <div class="pl ${cl(a.pl_atual)}">${p.qtd ? `${M(a.pl_atual, mo)} <span class="mut">${P(a.pl_pct)}</span>` : '<span class="mut">Sem posição</span>'}</div>
+    <div class="mut">${p.qtd ? `${p.qtd} ${a.classe === 'cambio' ? 'dólares' : 'cotas'} · médio ${M(p.pm, mo)}` : 'Use "Editar posição" para informar o que você tem'}</div>
+    <div class="sug">${esc(a.sugestao)}</div>
+    <div class="pot"><div>Ganho até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<br><b class="up">${M(a.ganho_pot, mo)}</b></div>
+      <div>Perda até o stop (${a.stop ? M(a.stop, mo) : '—'})<br><b class="dn">${M(a.perda_pot, mo)}</b></div></div>
+    <div class="mut">Valores para ${a.base_qtd} ${a.base_qtd === 1 ? 'unidade' : 'unidades'}.</div>
+    <p>${esc(a.resumo)}</p>
+    <details><summary>Indicadores, riscos e notícias</summary>
+      <p class="mut">RSI ${m.rsi14} · 1m ${P(m.ret_1m)} · 3m ${P(m.ret_3m)} · 12m ${P(m.ret_12m)}<br>Volatilidade ${m.volatilidade_anual}% · queda máx. ${m.queda_max_12m}% · dividendos 12m ${m.dividend_yield_12m}%</p>
+      <ul>${a.riscos.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
+      <ul>${a.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}</li>`).join('')}</ul>
+    </details>
+    <div class="btns"><button onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
+      <button onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
+      <button onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>${rmBtn(a.ticker)}</div></section>`;
+}
+async function load(t) {
+  const el = document.getElementById('r-' + t);
+  try { el.outerHTML = card(await api('/api/analyze', {ticker: t, pos: pos[t] || {}})); }
+  catch (e) { el.innerHTML = `<b>${esc(t)}</b> <span class="dn">${esc(e.message)}</span><div class="btns">${rmBtn(t)}</div>`; }
+}
+async function loadPort() {
+  try {
+    const p = await api('/api/portfolio', {pos, perfil});
+    if (p.vazio) { $('#port').innerHTML = '<div class="row mut">Informe suas posições em "Editar posição" para ver a carteira, as sugestões e a análise de diversificação.</div>'; return; }
+    const d = p.div, rot = {SIM:'Vale diversificar', PARCIALMENTE:'Diversificar em parte', NAO:'Não precisa diversificar'}[d.vale];
+    $('#port').innerHTML = `<section class="row"><div class="mut">Carteira (em R$)</div><div class="pl">${M(p.total)}</div>
+      <div class="mut">Ganho/perda nos ativos de mercado: <b class="${cl(p.pl)}">${M(p.pl)}</b></div>
+      <div class="bars">${Object.entries(p.classes).map(([k, v]) => `<div><i style="width:${v}%"></i><span>${NOME[k] || k} · ${v}%</span></div>`).join('')}</div>
+      ${p.alertas.map(a => `<p class="dn">Atenção: ${esc(a)}</p>`).join('')}
+      <p>${esc(p.resumo)}</p>
+      <h2>O que fazer com o que você tem</h2>
+      <ul>${p.acoes.map(a => `<li><b>${esc(a.ativo)} · ${esc(a.acao)}</b>: ${esc(a.motivo)}</li>`).join('')}</ul>
+      <h2>Diversificação ${rot ? `<span class="badge ${d.vale}">${rot}</span>` : ''}</h2>
+      <p>${esc(d.avaliacao)}</p>
+      <ul>${d.areas.map(a => `<li><b>${esc(a.area)}</b>${a.exemplos.length ? ` (exemplos para pesquisar: ${a.exemplos.map(esc).join(', ')})` : ''}: ${esc(a.motivo)}</li>`).join('')}</ul>
+      <div class="mut">Exemplos são pontos de partida para pesquisa, não recomendação de compra.</div></section>`;
+  } catch (e) { $('#port').innerHTML = `<div class="row dn">${esc(e.message)}</div>`; }
+}
+async function order(t, side, preco) {
+  const q = num(prompt(`Quantas unidades de ${t} você ${side === 'COMPRAR' ? 'comprou' : 'vendeu'}?`));
+  if (!q || q <= 0) return;
+  const pr = num(prompt('Por qual preço? (deixe como está se foi o preço atual)', preco));
+  if (!pr || pr <= 0) return;
+  const p = pos[t] || {qtd: 0, pm: 0};
+  if (side === 'VENDER' && q > p.qtd + 1e-9) return alert('Você não tem essa quantidade registrada.');
+  if (side === 'COMPRAR') { p.pm = (p.pm * p.qtd + pr * q) / (p.qtd + q); p.qtd += q; } else p.qtd -= q;
+  p.qtd = Math.round(p.qtd * 1e6) / 1e6; p.pm = Math.round(p.pm * 1e4) / 1e4;
+  pos[t] = p; sv(); await load(t); loadPort();
+}
+async function edit(t, classe) {
+  if (classe === 'renda_fixa') {
+    const saldo = num(prompt('Qual o saldo atual (R$)?'));
+    const pct = num(prompt(t === 'TESOURO_SELIC' ? 'Quantos % da Selic? (normalmente 100)' : 'Quantos % do CDI rende? (veja no app do Inter)', 100));
+    if (isNaN(saldo) || isNaN(pct)) return;
+    pos[t] = {saldo: Math.max(saldo, 0), pct: Math.max(pct, 0)};
+  } else {
+    const qtd = num(prompt(`Quantas unidades de ${t} você tem?`));
+    const pm = num(prompt('Qual o preço médio pago?'));
+    if (isNaN(qtd) || isNaN(pm)) return;
+    pos[t] = {qtd: Math.max(qtd, 0), pm: Math.max(pm, 0)};
+  }
+  sv(); await load(t); loadPort();
+}
+function addRow(t) {
+  const s = document.createElement('section'); s.className = 'row'; s.id = 'r-' + t;
+  s.innerHTML = `<b>${esc(t)}</b> <span class="mut">analisando…</span>`; $('#list').appendChild(s);
+}
+function addTicker() {
+  const t = (prompt('Código do ativo (ex.: HGLG11, WEGE3, IVVB11):') || '').trim().toUpperCase().replace(/\s+/g, '_');
+  if (!t) return;
+  if (!OKT.test(t)) return alert('Código inválido.');
+  if (document.getElementById('r-' + t)) return alert('Esse ativo já está na lista.');
+  if (!extra.includes(t)) extra.push(t);
+  sv(); addRow(t); load(t);
+}
+function rm(t) {
+  extra = extra.filter(x => x !== t); delete pos[t]; sv();
+  document.getElementById('r-' + t)?.remove(); loadPort();
+}
+const bkGen = () => { $('#bk').value = JSON.stringify({pos, extra, perfil}); $('#bk').select(); };
+function bkRest() {
+  try {
+    const b = JSON.parse($('#bk').value);
+    const okp = Object.fromEntries(Object.entries(b.pos || {}).filter(([k]) => OKT.test(k)));
+    pos = okp; extra = (b.extra || []).filter(k => OKT.test(k));
+    if (['conservador', 'moderado', 'arrojado', 'não informado'].includes(b.perfil)) perfil = b.perfil;
+    sv(); location.reload();
+  } catch { alert('Texto de backup inválido.'); }
+}
+$('#perfil').value = perfil;
+$('#perfil').onchange = e => { perfil = e.target.value; sv(); loadPort(); };
+(async () => {
+  try {
+    const w = await api('/api/watchlist');
+    const ts = [...new Set([...w.tickers, ...extra, ...Object.keys(pos)])];
+    $('#list').innerHTML = ts.map(t => `<section class="row" id="r-${t}"><b>${esc(t)}</b> <span class="mut">analisando…</span></section>`).join('');
+    await Promise.allSettled(ts.map(load));
+    loadPort();
+  } catch (e) { $('#err').textContent = e.message; }
+})();
+</script>
+</body>
+</html>
