@@ -7,3 +7,6 @@ requests
 anthropic
 python-dotenv
 psycopg[binary]
+python-multipart
+pypdf
+pywebpush
