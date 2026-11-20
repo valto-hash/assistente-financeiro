@@ -3,189 +3,1010 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14213D">
-<title>Assistente de investimentos</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#0b2a5b">
+<title>Assistente Financeiro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef1f4;--ink:#14213d;--mut:#5b6577;--line:#d3d9e1;--up:#0f7b5f;--dn:#c2362f;--hold:#6b7488;--ac:#3a5ba0;--sf:#fff}
-@media(prefers-color-scheme:dark){:root{--bg:#10151f;--ink:#e7ebf2;--mut:#9aa4b6;--line:#26303f;--up:#3ec59b;--dn:#ff7a70;--hold:#8f99ad;--ac:#8aa8ee;--sf:#171e2b}}
+:root{
+  color-scheme:light;
+  --bg:#f3f5f9;--sf:#fff;--sf2:#f7f9fc;--ink:#0f172a;--ink2:#475569;--mut:#64748b;--line:#e3e8ef;--line2:#eef2f7;
+  --brand:#0b2a5b;--brand2:#14407f;--acc:#2a78d6;--up:#0f7b5f;--dn:#c2362f;--warn:#a15c00;
+  --c-renda_fixa:#2a78d6;--c-acao:#eb6834;--c-fii:#1baf7a;--c-exterior:#eda100;--c-cambio:#e87ba4;
+  --on-renda_fixa:#fff;--on-acao:#fff;--on-fii:#fff;--on-exterior:#0b0b0b;--on-cambio:#fff;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--ref:#94a3b8;--grid:#e8ecf2;--axis:#c3cad6;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 6px 20px rgba(15,23,42,.05);--r:16px;
+}
+@media (prefers-color-scheme:dark){:root{
+  color-scheme:dark;
+  --bg:#0a1120;--sf:#131c2e;--sf2:#0f1828;--ink:#e7ecf4;--ink2:#aab5c7;--mut:#8b98ad;--line:#24314a;--line2:#1b263b;
+  --brand:#0a1a36;--brand2:#102a52;--acc:#3987e5;--up:#3ec59b;--dn:#ff7a70;--warn:#f0b44c;
+  --c-renda_fixa:#3987e5;--c-acao:#d95926;--c-fii:#199e70;--c-exterior:#c98500;--c-cambio:#d55181;--on-exterior:#fff;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--ref:#64748b;--grid:#1f2a40;--axis:#33415c;--shadow:none;
+}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
-header{padding:20px 16px 8px}
-h1{font-size:20px;margin:0;font-weight:600}
-h2{font-size:17px;margin:14px 0 4px}
-main{max-width:640px;margin:0 auto}
-.row{background:var(--sf);border-top:1px solid var(--line);padding:14px 16px}
-.top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.tk{font-weight:600;font-size:18px}
-.badge{font-weight:600;font-size:14px;padding:2px 10px;border-radius:99px;color:#fff}
-.COMPRAR,.SIM{background:var(--up)}.VENDER,.NAO{background:var(--dn)}.MANTER,.PARCIALMENTE{background:var(--hold)}
-.pl{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin:6px 0 2px}
-.up{color:var(--up)}.dn{color:var(--dn)}.mut{color:var(--mut);font-size:14px}
-.pot{display:flex;gap:20px;margin:8px 0;font-size:14px;font-variant-numeric:tabular-nums}
-.sug{font-weight:600;margin:6px 0}
-.bars div{position:relative;margin:6px 0;font-size:14px;height:24px;background:var(--bg);border-radius:6px;overflow:hidden}
-.bars i{position:absolute;inset:0 auto 0 0;background:var(--ac);opacity:.28}
-.bars span{position:relative;padding:2px 8px;display:block}
-details{margin-top:8px}summary{color:var(--ac);cursor:pointer;font-weight:500}
-ul{padding-left:18px;margin:6px 0}a{color:var(--ac)}
-.btns{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-button,select,textarea{font:inherit;color:var(--ink)}
-button{flex:1;font-weight:500;padding:10px;border-radius:8px;border:1px solid var(--line);background:transparent}
-select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--sf)}
-button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac)}
-#err{color:var(--dn);padding:8px 16px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+a{color:var(--acc)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:0 16px}
+.mut{color:var(--mut)}.ink2{color:var(--ink2)}.sm{font-size:13px}.xs{font-size:12px}.b{font-weight:600}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.tn{font-variant-numeric:tabular-nums}
+.hide{display:none!important}
+
+/* topo */
+header.top{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding-top:env(safe-area-inset-top)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;letter-spacing:-.01em;white-space:nowrap}
+@media (max-width:420px){.brand{font-size:15px}.chip-h .k{display:none}}
+.logo{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:grid;place-items:center}
+.hdr-acts{display:flex;gap:8px;align-items:center}
+.chip-h{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center}
+.icon-h{width:36px;height:36px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;display:grid;place-items:center;cursor:pointer}
+.chip-h:hover,.icon-h:hover{background:rgba(255,255,255,.16)}
+.hero{padding:8px 16px 22px}
+.hero .lbl{font-size:13px;opacity:.75}
+.hero .big{font-size:clamp(36px,9vw,52px);font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:2px 0 6px}
+.hero .sub{font-size:14px;opacity:.9;display:flex;gap:14px;flex-wrap:wrap}
+.hero .sub b.up{color:#7ee2bd}.hero .sub b.dn{color:#ffb1aa}
+.hero .thin{display:flex;gap:2px;height:8px;margin-top:14px;max-width:520px}
+.hero .thin i{border-radius:99px;display:block}
+.sk-h{display:inline-block;height:44px;width:220px;border-radius:10px;background:rgba(255,255,255,.12);animation:pulse 1.4s infinite}
+
+/* abas: barra inferior no celular, pílulas no topo no computador */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--sf);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+nav.tabs button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:11px;font-weight:500;color:var(--mut);cursor:pointer;border-radius:10px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected=true]{color:var(--acc)}
+nav.tabs button:focus-visible{outline:2px solid var(--acc)}
+@media (min-width:820px){
+  body{padding-bottom:24px}
+  nav.tabs{position:static;background:none;border:0;padding:0 16px 14px;max-width:1080px;margin:0 auto;gap:6px}
+  nav.tabs button{flex:0 0 auto;flex-direction:row;gap:8px;font-size:14px;padding:8px 14px;color:rgba(255,255,255,.78);border-radius:99px}
+  nav.tabs button svg{width:18px;height:18px}
+  nav.tabs button:hover{background:rgba(255,255,255,.1)}
+  nav.tabs button[aria-selected=true]{background:#fff;color:var(--brand)}
+}
+
+/* cartões e blocos */
+main{padding-top:6px}
+.card{background:var(--sf);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin:14px 0;box-shadow:var(--shadow)}
+.card h2{font-size:16px;margin:0 0 4px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h3{font-size:14px;margin:16px 0 8px;font-weight:600}
+.card .lead{margin:4px 0 0;color:var(--ink2)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:0 14px}
+.grid2>.card{margin:14px 0 0}
+.grid2.top{align-items:start}
+@media (min-width:900px){.sticky{position:sticky;top:14px}}
+.sect-t{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:600;margin:22px 0 -4px}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--line2);color:var(--ink2);white-space:nowrap}
+.pill svg{width:12px;height:12px}
+.pill.good{background:color-mix(in srgb,var(--up) 14%,transparent);color:var(--up)}
+.pill.bad{background:color-mix(in srgb,var(--dn) 14%,transparent);color:var(--dn)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.pill.info{background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc)}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex:0 0 auto}
+.btn{border:1px solid var(--line);background:var(--sf);border-radius:10px;padding:9px 14px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px}
+.btn:hover{background:var(--sf2)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.ghost{border-color:transparent;background:none}
+.btn.sm{min-height:34px;padding:6px 11px;font-size:13px}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.btns .btn{flex:1 1 140px}
+details>summary{cursor:pointer;color:var(--acc);font-weight:500;list-style:none;display:flex;align-items:center;gap:6px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+details[open]>summary::before{transform:rotate(45deg)}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--sf2);border:1px solid var(--line);margin:8px 0;font-size:14px}
+.note svg{flex:0 0 18px;width:18px;height:18px;margin-top:1px}
+.note.warn{border-color:color-mix(in srgb,var(--warn) 35%,transparent);background:color-mix(in srgb,var(--warn) 8%,var(--sf))}
+.note.warn svg{color:var(--warn)}
+.err-box{color:var(--dn)}
+.sk{background:linear-gradient(90deg,var(--line2),var(--line),var(--line2));background-size:200% 100%;animation:sh 1.3s infinite linear;border-radius:8px;height:14px;margin:10px 0}
+@keyframes sh{to{background-position:-200% 0}}
+@keyframes pulse{50%{opacity:.5}}
+.loading-msg{display:flex;gap:10px;align-items:center;color:var(--ink2);font-size:14px}
+.spin{width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--acc);border-radius:50%;animation:rot .8s linear infinite;flex:0 0 auto}
+@keyframes rot{to{transform:rotate(1turn)}}
+.stale{opacity:.55;transition:opacity .2s;pointer-events:none}
+
+/* tabelas */
+.tbl{width:100%;border-collapse:collapse;font-size:14px}
+.tbl th{font-size:12px;font-weight:600;color:var(--mut);text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:9px 6px;border-bottom:1px solid var(--line2);text-align:right;font-variant-numeric:tabular-nums;vertical-align:top;white-space:nowrap}
+.tbl td:first-child{white-space:normal}
+.tbl th:first-child,.tbl td:first-child{text-align:left;padding-left:0}
+.tbl th:last-child,.tbl td:last-child{padding-right:0}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .nm{display:flex;align-items:center;gap:8px}
+.scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+/* barras segmentadas */
+.seg-row{margin:12px 0}
+.seg-row .lab{display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-bottom:6px}
+.seg{display:flex;gap:2px;height:28px}
+.seg>div{border-radius:4px;display:flex;align-items:center;padding:0 6px;font-size:12px;font-weight:600;min-width:2px;overflow:hidden;white-space:nowrap;cursor:default}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--ink2);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .ln{width:16px;height:2px;border-radius:2px;display:inline-block}
+.legend .bd{width:16px;height:10px;border-radius:3px;display:inline-block}
+
+/* ações sugeridas */
+.acts-list{display:grid;gap:10px;margin-top:10px}
+.act{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--sf2)}
+.act .tk{font-weight:600}
+.act p{grid-column:1/-1;margin:0;color:var(--ink2);font-size:14px}
+
+/* plano e carteira sugerida */
+.amount{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--sf2);padding:0 14px;max-width:360px}
+.amount span{color:var(--mut);font-weight:500}
+.amount input{border:0;background:none;font-size:26px;font-weight:600;padding:10px 8px;width:100%;outline:none;font-variant-numeric:tabular-nums}
+.amount:focus-within{border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+.quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.quick button{border:1px solid var(--line);background:var(--sf);border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
+.quick button:hover{border-color:var(--acc);color:var(--acc)}
+.segctl{display:inline-flex;background:var(--line2);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.segctl button{border:0;background:none;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer}
+.segctl button[aria-pressed=true]{background:var(--sf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.segctl button:disabled{opacity:.45;cursor:not-allowed}
+.plan{margin-top:6px}
+.plan-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:11px 0;border-bottom:1px solid var(--line2);align-items:center}
+.plan-row:last-child{border-bottom:0}
+.plan-row .who{display:flex;align-items:center;gap:8px;min-width:0}
+.plan-row .who b{font-weight:600}
+.plan-row .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan-row .val{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.plan-row .val.sell{color:var(--dn)}
+.plan-row .meta{grid-column:1/-1;font-size:12.5px;color:var(--mut);display:flex;gap:8px;align-items:center}
+.meter{height:4px;border-radius:99px;background:var(--line2);flex:1;max-width:160px;overflow:hidden}
+.meter i{display:block;height:100%;border-radius:99px}
+.plan-tot{display:flex;justify-content:space-between;padding-top:12px;margin-top:4px;border-top:1px solid var(--line);font-weight:600}
+.cls-h{display:flex;align-items:center;gap:8px;margin:18px 0 6px;font-weight:600}
+.cls-h .mut{font-weight:500;margin-left:auto;font-size:13px}
+.asset{border:1px solid var(--line);border-radius:14px;padding:14px;margin:8px 0;background:var(--sf)}
+.asset .hd{display:flex;align-items:flex-start;gap:12px}
+.asset .hd .ttl{flex:1;min-width:0}
+.asset .hd .ttl b{font-size:15px}
+.asset .hd .ttl div{font-size:13px;color:var(--mut)}
+.asset .w{font-size:20px;font-weight:700;text-align:right;line-height:1.1}
+.asset .w small{display:block;font-size:11px;font-weight:500;color:var(--mut)}
+.asset p{margin:8px 0 0;font-size:14px;color:var(--ink2)}
+.kpis{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:10px;font-size:12.5px;color:var(--mut)}
+.kpis b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+
+/* simulação */
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink2);font-weight:500}
+.fld .inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--sf);padding:0 10px;min-height:42px}
+.fld .inp:focus-within{border-color:var(--acc)}
+.fld .inp i{font-style:normal;color:var(--mut);font-size:14px}
+.fld input,.fld select{border:0;background:none;padding:9px 6px;width:100%;outline:none;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.fld select{padding-left:0}
+.fld small{font-weight:400;color:var(--mut)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.toggle input{width:18px;height:18px;accent-color:var(--acc)}
+.chart{position:relative;margin-top:8px;touch-action:pan-y}
+.chart svg{display:block;width:100%;overflow:visible}
+.chart svg:focus{outline:none}
+.chart svg:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:6px}
+.chart text{fill:var(--mut);font-size:11px;font-variant-numeric:tabular-nums}
+.chart .lbl-end{fill:var(--ink2);font-size:12px;font-weight:600}
+.tip{position:absolute;top:0;pointer-events:none;background:var(--sf);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 24px rgba(0,0,0,.14);min-width:190px;z-index:5;display:none}
+.tip .t{font-weight:600;margin-bottom:4px;color:var(--ink)}
+.tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between;color:var(--ink2);margin:2px 0}
+.tip .r b{color:var(--ink);font-variant-numeric:tabular-nums}
+.tip .r span{display:flex;align-items:center;gap:6px}
+.tip .ln{width:12px;height:2px;border-radius:2px;display:inline-block}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin-top:14px}
+.tile{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sf2)}
+.tile .l{font-size:12.5px;color:var(--mut)}
+.tile .v{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:2px 0}
+.tile .d{font-size:12px;color:var(--mut)}
+.tile.main{background:color-mix(in srgb,var(--acc) 8%,var(--sf));border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
+.scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;margin-top:10px}
+.scen>div{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sf2)}
+.scen h4{margin:0 0 4px;font-size:14px;display:flex;justify-content:space-between;align-items:center}
+.scen p{margin:0 0 8px;font-size:13.5px;color:var(--ink2)}
+.probbar{height:4px;border-radius:99px;background:var(--line);margin:6px 0 8px;overflow:hidden}
+.probbar i{display:block;height:100%;background:var(--ink2);border-radius:99px}
+
+/* mercado */
+.rates{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:10px}
+.news{list-style:none;padding:0;margin:8px 0 0}
+.news li{padding:8px 0;border-top:1px solid var(--line2);font-size:13.5px}
+.news li a{color:var(--ink);text-decoration:none}
+.news li a:hover{color:var(--acc);text-decoration:underline}
+.news li small{display:block;color:var(--mut);font-size:12px}
+.view-h{display:flex;align-items:center;gap:8px;justify-content:space-between}
+
+/* ativos */
+.pos-card .row1{display:flex;align-items:center;gap:10px}
+.pos-card .row1 .ttl{flex:1;min-width:0}
+.pos-card .row1 .ttl b{font-size:17px}
+.pos-card .row1 .ttl div{font-size:13px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-card .px{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.pos-card .px small{display:block;font-weight:500;font-size:12px}
+.pos-card .pl{font-size:24px;font-weight:700;margin:10px 0 0;letter-spacing:-.01em}
+.pos-card .sug{font-weight:600;margin:10px 0 0;display:flex;align-items:center;gap:8px}
+.pot{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pot>div{background:var(--sf2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;color:var(--mut)}
+.pot b{display:block;font-size:15px;font-variant-numeric:tabular-nums}
+.spark{display:block}
+.disc{font-size:12.5px;color:var(--mut);text-align:center;margin:28px auto 10px;max-width:640px}
+
+/* diálogo e aviso */
+dialog{border:0;border-radius:18px;padding:0;width:min(440px,calc(100vw - 32px));background:var(--sf);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
+.dlg{padding:20px;display:grid;gap:14px}
+.dlg h3{margin:0;font-size:18px}
+.dlg p{margin:-6px 0 0;color:var(--ink2);font-size:14px}
+.dlg .row-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.dlg .row-btns .btn{min-width:110px}
+.dlg textarea{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--sf2);padding:10px;font:13px/1.4 ui-monospace,monospace}
+.opt-cards{display:grid;gap:8px}
+.opt-cards label{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}
+.opt-cards label:has(input:checked){border-color:var(--acc);background:color-mix(in srgb,var(--acc) 7%,var(--sf))}
+.opt-cards input{margin-top:3px;accent-color:var(--acc)}
+.opt-cards b{display:block}
+.opt-cards span{font-size:13px;color:var(--mut)}
+#dlgErr{color:var(--dn);font-size:13px;min-height:0}
+#toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100vw - 32px)}
+#toast.on{opacity:1}
+@media (min-width:820px){#toast{bottom:24px}}
+@media (forced-colors:active){.seg>div,.dot,.meter i{border:1px solid CanvasText}}
 </style>
 </head>
 <body>
-<header><h1>Assistente de investimentos</h1>
-<div class="mut">Você opera na sua corretora e anota aqui. Suas posições ficam só neste aparelho. Não é recomendação profissional.</div></header>
-<div id="err"></div>
-<main>
-<div class="row"><label class="mut" for="perfil">Seu perfil de investidor</label>
-<select id="perfil"><option value="não informado">Não informado</option><option value="conservador">Conservador</option><option value="moderado">Moderado</option><option value="arrojado">Arrojado</option></select></div>
-<div id="port"></div><div id="list"></div>
-<div class="row"><div class="btns"><button onclick="addTicker()">Adicionar ativo</button></div>
-<details><summary>Backup das posições</summary>
-<p class="mut">Se você limpar os dados do navegador, as posições somem. Gere o texto, guarde-o em um lugar seguro e cole aqui para restaurar.</p>
-<textarea id="bk" rows="4"></textarea>
-<div class="btns"><button onclick="bkGen()">Gerar backup</button><button onclick="bkRest()">Restaurar</button></div></details></div>
+<header class="top">
+  <div class="wrap bar">
+    <div class="brand"><span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>Assistente Financeiro</div>
+    <div class="hdr-acts">
+      <button class="chip-h" id="btnPerfil" type="button" aria-label="Alterar perfil de investidor"></button>
+      <button class="icon-h" id="btnCfg" type="button" aria-label="Configurações e backup"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
+    </div>
+  </div>
+  <div class="wrap hero" id="hero"><div class="lbl">Patrimônio investido</div><div class="big"><span class="sk-h"></span></div><div class="sub">&nbsp;</div></div>
+  <nav class="tabs" role="tablist" aria-label="Seções">
+    <button role="tab" data-t="resumo" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg>Resumo</button>
+    <button role="tab" data-t="investir" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>Onde investir</button>
+    <button role="tab" data-t="sim" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg>Simulação</button>
+    <button role="tab" data-t="mercado" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2"/><path d="M8 9h5M8 13h5"/></svg>Mercado</button>
+    <button role="tab" data-t="ativos" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 14.5h1"/></svg>Meus ativos</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div id="fatal" class="card err-box hide"></div>
+  <section id="t-resumo" role="tabpanel"></section>
+  <section id="t-investir" role="tabpanel" hidden></section>
+  <section id="t-sim" role="tabpanel" hidden></section>
+  <section id="t-mercado" role="tabpanel" hidden></section>
+  <section id="t-ativos" role="tabpanel" hidden>
+    <div class="card">
+      <h2>Meus ativos</h2>
+      <p class="lead sm">Você opera na sua corretora e anota aqui. As posições ficam só neste aparelho.</p>
+      <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button></div>
+    </div>
+    <div id="list" class="grid2"></div>
+  </section>
+  <p class="disc">Ferramenta educacional: sugestões e simulações são estimativas automáticas, não recomendação profissional nem garantia de resultado. Rentabilidade passada não garante rentabilidade futura. Valores antes de impostos e taxas.</p>
 </main>
+<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+
 <script>
-const $ = s => document.querySelector(s);
-const NOME = {acao:'Ações', fii:'FIIs', exterior:'Exterior', cambio:'Dólar', renda_fixa:'Renda fixa'};
+'use strict';
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const raw = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const rawSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} };
+const ld = (k, d) => { try { return JSON.parse(raw(k)) ?? d; } catch { return d; } };
 const OKT = /^[A-Z0-9_.=-]{1,15}$/;
-const ld = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
-let pos = ld('pos', {}), extra = ld('extra', []), perfil = localStorage.getItem('perfil') || 'não informado';
-const sv = () => { localStorage.setItem('pos', JSON.stringify(pos)); localStorage.setItem('extra', JSON.stringify(extra)); localStorage.setItem('perfil', perfil); };
-let tok = localStorage.getItem('tok') || prompt('Digite a senha do app (APP_TOKEN):') || '';
-localStorage.setItem('tok', tok);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const M = (v, m = 'BRL') => v == null ? '—' : v.toLocaleString(m === 'USD' ? 'en-US' : 'pt-BR', {style:'currency', currency:m});
-const P = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2).replace('.', ',') + '%';
-const A = v => v == null ? '—' : v.toFixed(2).replace('.', ',') + '% a.a.';
+const CL = ['renda_fixa', 'acao', 'fii', 'exterior', 'cambio'];
+const CLN = {renda_fixa: 'Renda fixa', acao: 'Ações Brasil', fii: 'Fundos imobiliários', exterior: 'Exterior', cambio: 'Dólar e ouro'};
+const RF = {TESOURO_SELIC: 'Tesouro Selic', PORQUINHO: 'Porquinho do Inter', TESOURO_IPCA: 'Tesouro IPCA+', CDB_CDI: 'CDB/LCI pós-fixado'};
+const FRACIONAVEL = new Set(['DOLAR', 'VOO']);
+const PERFIS = {
+  conservador: ['Conservador', 'Prioriza segurança e liquidez; aceita pouca oscilação.'],
+  moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento no longo prazo.'],
+  arrojado: ['Arrojado', 'Busca mais crescimento e aceita quedas fortes no caminho.'],
+};
+const ACAO = {AUMENTAR: ['good', 'up', 'Aumentar'], COMPRAR: ['good', 'up', 'Comprar'], MANTER: ['', 'flat', 'Manter'],
+  REDUZIR: ['bad', 'down', 'Reduzir'], VENDER: ['bad', 'down', 'Vender'], REALIZAR_LUCRO: ['warn', 'down', 'Realizar lucro']};
+const VIS = {POSITIVA: ['good', 'up', 'Positiva'], NEUTRA: ['', 'flat', 'Neutra'], NEGATIVA: ['bad', 'down', 'Negativa']};
+const ICON = {
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>',
+  flat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>',
+};
+
+let tok = raw('tok') || '';
+let pos = ld('pos', {}), extra = ld('extra', []), perfil = raw('perfil') || 'não informado';
+let aporte = ld('aporte', 5000), modo = 'aporte';
+const simCfg = Object.assign({inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'}, ld('simcfg', {}));
+const st = {uni: {}, port: null, pan: null, sim: null, an: {}, portErr: null, panErr: null, simErr: null, portBusy: false, simBusy: false, tab: 'resumo'};
+const sv = () => { rawSet('pos', JSON.stringify(pos)); rawSet('extra', JSON.stringify(extra)); rawSet('perfil', perfil);
+  rawSet('aporte', JSON.stringify(aporte)); rawSet('simcfg', JSON.stringify(simCfg)); };
+
+/* ---------- formatação ---------- */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const M = (v, m = 'BRL') => v == null || isNaN(v) ? '—' : v.toLocaleString(m === 'USD' ? 'en-US' : 'pt-BR', {style: 'currency', currency: m});
+const M0 = v => v == null || isNaN(v) ? '—' : v.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL', maximumFractionDigits: 0});
+const Mc = v => {
+  if (v == null || isNaN(v)) return '—';
+  const a = Math.abs(v);
+  if (a >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', {maximumFractionDigits: a >= 1e8 ? 0 : a >= 1e7 ? 1 : 2}) + ' mi';
+  if (a >= 1e4) return 'R$ ' + (v / 1e3).toLocaleString('pt-BR', {maximumFractionDigits: 0}) + ' mil';
+  return M0(v);
+};
+const P = (v, d = 1, sign = true) => v == null || isNaN(v) ? '—' : (sign && v > 0 ? '+' : '') + v.toLocaleString('pt-BR', {minimumFractionDigits: d, maximumFractionDigits: d}) + '%';
+const A = v => v == null || isNaN(v) ? '—' : v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '% a.a.';
+const N = (v, d = 0) => v == null || isNaN(v) ? '—' : v.toLocaleString('pt-BR', {maximumFractionDigits: d});
 const cl = v => v > 0 ? 'up' : v < 0 ? 'dn' : '';
-const num = s => parseFloat(String(s || '').replace(',', '.'));
+function num(s) {  // aceita "1.234,56", "1234,56", "1234.56" e "10.000"
+  let t = String(s ?? '').trim().replace(/[R$\s%]/g, '');
+  if (t.includes(',') && t.includes('.')) t = t.replace(/\./g, '').replace(',', '.');
+  else if (t.includes(',')) t = t.replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  return t === '' ? NaN : Number(t);
+}
+const pill = (kind, icon, txt) => `<span class="pill ${kind}">${icon ? ICON[icon] : ''}${esc(txt)}</span>`;
+const dot = c => `<span class="dot" style="background:var(--c-${c})" aria-hidden="true"></span>`;
+const nomeDe = t => st.uni[t]?.nome || RF[t] || t;
+const rot = t => t === 'DOLAR' ? 'Dólar' : RF[t] || t;  // rótulo curto: código da B3 ou nome do título
+const classeDe = t => st.uni[t]?.classe || (RF[t] ? 'renda_fixa' : t === 'DOLAR' ? 'cambio' : t === 'VOO' ? 'exterior' : t.endsWith('11') ? 'fii' : 'acao');
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 2600); }
+const sk = (n = 3) => Array.from({length: n}, (_, i) => `<div class="sk" style="width:${[92, 78, 64, 85, 70][i % 5]}%"></div>`).join('');
+const busy = msg => `<div class="loading-msg"><span class="spin" aria-hidden="true"></span><span>${esc(msg)}</span></div>`;
+
+/* ---------- API ---------- */
 async function api(u, body) {
   const r = await fetch(u, {method: body ? 'POST' : 'GET', headers: {'X-Token': tok, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
-  if (r.status === 401) { localStorage.removeItem('tok'); throw new Error('Senha incorreta. Recarregue a página e digite de novo.'); }
-  const j = await r.json();
-  if (!r.ok) throw new Error(j.detail || 'Erro');
+  if (r.status === 401) { rawSet('tok', null); tok = ''; throw new Error('Senha incorreta. Toque em "Configurações" e entre de novo.'); }
+  let j = {};
+  try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error(j.detail || `Erro ${r.status}`);
   return j;
 }
-const rmBtn = t => extra.includes(t) ? `<button onclick="rm('${t}')">Remover da lista</button>` : '';
+
+/* ---------- diálogo (substitui prompt/alert) ---------- */
+function ask({title, desc = '', fields = [], ok = 'Salvar', extraHtml = '', validate}) {
+  return new Promise(res => {
+    const d = $('#dlg');
+    d.innerHTML = `<form class="dlg" novalidate><h3 id="dlgTitle">${esc(title)}</h3>${desc ? `<p>${esc(desc)}</p>` : ''}
+      ${fields.map(f => f.type === 'radio' ? `<div class="opt-cards" role="radiogroup">${f.options.map(o => `<label><input type="radio" name="${f.name}" value="${esc(o.value)}" ${o.value === f.value ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
+        : f.type === 'textarea' ? `<label class="fld"><span>${esc(f.label)}</span><textarea name="${f.name}" rows="5">${esc(f.value ?? '')}</textarea>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</label>`
+        : `<label class="fld"><span>${esc(f.label)}</span><div class="inp">${f.prefix ? `<i>${esc(f.prefix)}</i>` : ''}<input name="${f.name}" type="${f.type || 'text'}" inputmode="${f.mode || 'text'}" value="${esc(f.value ?? '')}" ${f.list ? `list="dl-${f.name}"` : ''} autocomplete="off" ${f.upper ? 'autocapitalize="characters"' : ''} placeholder="${esc(f.ph || '')}">${f.suffix ? `<i>${esc(f.suffix)}</i>` : ''}</div>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}${f.list ? `<datalist id="dl-${f.name}">${f.list.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</datalist>` : ''}</label>`).join('')}
+      ${extraHtml}<div id="dlgErr" role="alert"></div>
+      <div class="row-btns"><button type="button" class="btn ghost" data-x>Cancelar</button><button type="submit" class="btn primary">${esc(ok)}</button></div></form>`;
+    const f = $('form', d);
+    let done = false;
+    const fin = v => { if (done) return; done = true; d.close(); res(v); };
+    $('[data-x]', d).onclick = () => fin(null);
+    d.oncancel = e => { e.preventDefault(); fin(null); };
+    f.onsubmit = e => {
+      e.preventDefault();
+      const v = Object.fromEntries(new FormData(f).entries());
+      const er = validate ? validate(v) : '';
+      if (er) { $('#dlgErr').textContent = er; return; }
+      fin(v);
+    };
+    d.showModal();
+    const first = $('input:not([type=radio]),textarea', d);
+    if (first && !matchMedia('(pointer:coarse)').matches) first.focus();
+  });
+}
+
+/* ---------- abas ---------- */
+function go(t) {
+  st.tab = t; rawSet('tab', t);
+  $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
+  $$('main>section').forEach(s => s.hidden = s.id !== 't-' + t);
+  if (t === 'sim') { if (!st.sim && !st.simBusy) runSim(); else drawChart(); }
+  window.scrollTo({top: 0});
+}
+$$('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.t));
+
+/* ---------- gráficos ---------- */
+function segBar(parts, label, right = '') {
+  const ps = CL.filter(k => parts[k] > 0).map(k => [k, parts[k]]);
+  return `<div class="seg-row"><div class="lab"><span>${esc(label)}</span><span>${right}</span></div>
+    <div class="seg" role="img" aria-label="${esc(label)}: ${ps.map(([k, v]) => `${CLN[k]} ${N(v, 1)}%`).join(', ')}">
+    ${ps.map(([k, v]) => `<div style="flex:${v} 1 0;background:var(--c-${k});color:var(--on-${k})" title="${CLN[k]}: ${N(v, 1)}%">${v >= 9 ? N(v, 0) + '%' : ''}</div>`).join('') || '<div style="flex:1;background:var(--line2)"></div>'}</div></div>`;
+}
+const legendCls = ks => `<div class="legend">${ks.map(k => `<span><i class="bd" style="background:var(--c-${k})"></i>${CLN[k]}</span>`).join('')}</div>`;
+function spark(s, w = 96, h = 30) {
+  if (!s || s.length < 3) return '';
+  const mn = Math.min(...s), mx = Math.max(...s), r = mx - mn || 1;
+  const pts = s.map((v, i) => [i / (s.length - 1) * (w - 4) + 2, h - 3 - (v - mn) / r * (h - 6)]);
+  const [lx, ly] = pts[pts.length - 1];
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.map(p => p.map(x => x.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="var(--ref)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="var(--acc)" stroke="var(--sf)" stroke-width="1.5"/></svg>`;
+}
+function niceTicks(max, n = 4) {
+  const raw = max / n, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p;
+  const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  const t = [0]; while (t[t.length - 1] < max) t.push(t.length * step);
+  return t;
+}
+
+/* ---------- topo ---------- */
+function renderPerfilChip() {
+  $('#btnPerfil').innerHTML = `<span class="k" style="opacity:.75">Perfil</span> ${esc(PERFIS[perfil]?.[0] || 'não informado')} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>`;
+}
+function renderHero() {
+  const h = $('#hero'), p = st.port;
+  if (!p) {
+    h.innerHTML = `<div class="lbl">Patrimônio investido</div><div class="big">${st.portErr ? '—' : '<span class="sk-h"></span>'}</div><div class="sub">${st.portErr ? 'Não foi possível calcular agora' : 'Calculando sua carteira…'}</div>`;
+    return;
+  }
+  if (p.vazio) {
+    h.innerHTML = `<div class="lbl">Patrimônio investido</div><div class="big">R$ 0</div><div class="sub">Informe seus investimentos em “Meus ativos” ou veja abaixo por onde começar.</div>`;
+    return;
+  }
+  const n = p.ativos.length;
+  h.innerHTML = `<div class="lbl">Patrimônio investido</div><div class="big tn">${M(p.total)}</div>
+    <div class="sub"><span>Resultado nos ativos de mercado: <b class="${cl(p.pl)}">${p.pl > 0 ? '+' : ''}${M(p.pl)}</b></span><span>${n} ${n === 1 ? 'ativo' : 'ativos'}</span></div>
+    <div class="thin" aria-hidden="true">${CL.filter(k => p.classes[k] > 0).map(k => `<i style="flex:${p.classes[k]} 1 0;background:var(--c-${k})"></i>`).join('')}</div>`;
+}
+
+/* ---------- Resumo ---------- */
+function renderResumo() {
+  const el = $('#t-resumo'), p = st.port;
+  if (!p) {
+    el.innerHTML = st.portErr ? `<div class="card"><h2>Não consegui montar sua análise</h2><p class="err-box">${esc(st.portErr)}</p><div class="btns"><button class="btn" type="button" onclick="loadPort(true)">Tentar de novo</button></div></div>`
+      : `<div class="card">${busy(portMsg())}${sk(4)}</div><div class="card">${sk(5)}</div>`;
+    return;
+  }
+  const perfilTxt = (PERFIS[p.perfil]?.[0] || p.perfil).toLowerCase();
+  const total = p.total;
+  const linhas = CL.map(k => {
+    const a = p.classes[k] || 0, b = p.alvo[k] || 0, falta = (b - a) / 100 * total;
+    return `<tr><td><span class="nm">${dot(k)}${CLN[k]}</span></td><td>${N(a, 1)}%</td><td>${N(b, 1)}%</td>
+      <td class="ink2">${p.vazio ? '—' : Math.abs(falta) < Math.max(50, total * 0.005) ? 'ok' : (falta > 0 ? 'faltam ' : 'sobram ') + Mc(Math.abs(falta))}</td></tr>`;
+  }).join('');
+  el.innerHTML = `
+  ${p.ia ? '' : `<div class="note warn">${ICON.warn}<div>A análise por IA não respondeu agora; mostrando uma recomendação padrão baseada no seu perfil. Tente atualizar em alguns minutos.</div></div>`}
+  <div class="grid2">
+    <div class="card">
+      <h2>Sua alocação</h2>
+      <p class="lead sm">${p.perfil_informado ? '' : 'Perfil não informado: usei o perfil moderado. '}Comparação com a alocação ideal para o perfil ${esc(perfilTxt)}, ajustada ao momento do mercado.</p>
+      ${p.vazio ? '' : segBar(p.classes, 'Hoje')}
+      ${segBar(p.alvo, 'Ideal', '')}
+      ${legendCls(CL.filter(k => (p.classes[k] || 0) + (p.alvo[k] || 0) > 0))}
+      <div class="scroll-x" style="margin-top:12px"><table class="tbl"><thead><tr><th>Classe</th><th>Hoje</th><th>Ideal</th><th>Para chegar lá</th></tr></thead><tbody>${linhas}</tbody></table></div>
+      ${p.alvo_motivo ? `<div class="note">${ICON.info}<div>${esc(p.alvo_motivo)}</div></div>` : ''}
+    </div>
+    <div class="card">
+      <h2>${ICON.spark.replace('<svg', '<svg width="18" height="18" style="color:var(--acc)"')}Diagnóstico</h2>
+      <p class="lead">${esc(p.resumo || (p.vazio ? 'Você ainda não informou investimentos. Veja em “Onde investir” uma carteira inicial para o seu perfil.' : 'Sem comentários da IA no momento.'))}</p>
+      ${p.alertas.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')}
+      ${p.acoes.length ? `<h3>O que fazer com o que você já tem</h3><div class="acts-list">${p.acoes.map(a => {
+        const [k, ic, tx] = ACAO[a.acao] || ['', 'flat', a.acao];
+        return `<div class="act"><span class="tk">${esc(a.ativo)}</span><span style="justify-self:end">${pill(k, ic, tx)}</span><p>${esc(a.motivo)}</p></div>`; }).join('')}</div>` : ''}
+      <div class="btns"><button class="btn primary" type="button" onclick="go('investir')">Ver onde investir</button><button class="btn" type="button" onclick="go('sim')">Simular o futuro</button></div>
+    </div>
+  </div>`;
+}
+function portMsg() {
+  const msgs = ['Lendo as notícias do mercado…', 'Calculando métricas de dezenas de ativos…', 'Comparando sua carteira com o seu perfil…', 'A IA está montando a carteira recomendada…'];
+  return msgs[Math.min(Math.floor((Date.now() - (st.portT0 || Date.now())) / 9000), msgs.length - 1)];
+}
+
+/* ---------- Onde investir ---------- */
+function plano() {
+  const p = st.port, sug = p.sugerida, atual = Object.fromEntries(p.ativos.map(a => [a.ticker, a.valor]));
+  if (modo === 'rebal') {
+    const tickers = [...new Set([...sug.map(s => s.ticker), ...Object.keys(atual)])];
+    const peso = Object.fromEntries(sug.map(s => [s.ticker, s.peso]));
+    return tickers.map(t => {
+      const alvo = (peso[t] || 0) / 100 * p.total, d = alvo - (atual[t] || 0);
+      const s = sug.find(x => x.ticker === t) || {ticker: t, nome: nomeDe(t), classe: classeDe(t)};
+      return {...s, valor: d};
+    }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003)).sort((a, b) => b.valor - a.valor);
+  }
+  const T = p.total + aporte;
+  const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual[s.ticker] || 0), 0)}));
+  const sf = linhas.reduce((a, x) => a + x.falta, 0);
+  linhas.forEach(x => x.valor = sf <= 0 ? aporte * x.peso / 100 : sf >= aporte ? aporte * x.falta / sf : x.falta + (aporte - sf) * x.peso / 100);
+  // arredonda para cotas inteiras nos ativos da B3; a sobra vai para a renda fixa de liquidez
+  let sobra = 0;
+  linhas.forEach(x => {
+    x.bruto = x.valor;
+    if (x.preco_brl && !FRACIONAVEL.has(x.ticker)) {
+      x.cotas = Math.floor(x.valor / x.preco_brl + 1e-9);
+      const ef = x.cotas * x.preco_brl;
+      sobra += x.valor - ef; x.valor = ef;
+    } else if (x.preco_brl) x.cotas = x.valor / x.preco_brl;
+  });
+  const liq = linhas.find(x => ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'].includes(x.ticker)) || linhas.find(x => x.classe === 'renda_fixa');
+  if (liq) { liq.valor += sobra; sobra = 0; }
+  st.sobra = sobra;
+  return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => b.valor - a.valor);
+}
+function planoHtml() {
+  const p = st.port, ls = plano();
+  if (!ls.length) return `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : 'Informe um valor para ver o plano.'}</p>`;
+  const max = Math.max(...ls.map(x => Math.abs(x.valor)));
+  const rows = ls.map(x => {
+    const venda = x.valor < 0, v = Math.abs(x.valor);
+    let meta = '';
+    if (modo === 'aporte' && x.preco_brl && !FRACIONAVEL.has(x.ticker)) meta = x.cotas > 0 ? `${N(x.cotas)} ${x.cotas === 1 ? 'cota' : 'cotas'} × ${M(x.preco_brl)}` : `1 cota custa ${M(x.preco_brl)}: junte com o próximo aporte`;
+    else if (modo === 'aporte' && x.ticker === 'DOLAR' && x.preco_brl) meta = `≈ US$ ${N(x.cotas, 2)} a ${M(x.preco_brl)}`;
+    else if (modo === 'aporte' && x.ticker === 'VOO' && x.preco_brl) meta = `≈ ${N(x.cotas, 2)} cotas (fração) a ${M(x.preco, 'USD')}`;
+    else if (x.classe === 'renda_fixa' && x.taxa_aa) meta = `rende cerca de ${A(x.taxa_aa)}`;
+    const lbl = x.classe === 'renda_fixa' ? x.nome : rot(x.ticker), sub = x.classe === 'renda_fixa' || x.nome === lbl || x.nome === x.ticker ? '' : x.nome;
+    return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span></div>
+      <div class="val ${venda ? 'sell' : ''}">${modo === 'rebal' ? (venda ? 'Vender ' : 'Comprar ') : ''}${modo === 'aporte' && x.cotas === 0 ? '<span class="mut">—</span>' : M(v)}</div>
+      <div class="meta"><span class="meter" aria-hidden="true"><i style="width:${(v / max * 100).toFixed(1)}%;background:var(--c-${x.classe})"></i></span><span>${meta}</span></div></div>`;
+  }).join('');
+  const tot = ls.reduce((a, x) => a + x.valor, 0);
+  return `<div class="plan">${rows}</div>
+    ${modo === 'aporte' ? `<div class="plan-tot"><span>Total</span><span class="tn">${M(tot)}</span></div>${st.sobra > 1 ? `<p class="mut sm">Sobram ${M(st.sobra)} por causa do arredondamento de cotas.</p>` : ''}`
+    : `<div class="note">${ICON.info}<div>Vender com lucro pode gerar imposto de renda (ações acima de R$ 20 mil vendidos no mês, FIIs sempre). Sempre que possível, rebalanceie direcionando os novos aportes.</div></div>`}`;
+}
+function renderInvestir() {
+  const el = $('#t-investir'), p = st.port;
+  if (!p) { el.innerHTML = st.portErr ? `<div class="card err-box">${esc(st.portErr)}</div>` : `<div class="card">${busy(portMsg())}${sk(5)}</div>`; return; }
+  const grupos = CL.map(k => [k, p.sugerida.filter(s => s.classe === k)]).filter(([, g]) => g.length);
+  el.innerHTML = `
+  <div class="grid2 top">
+    <div class="card sticky">
+      <h2>Quanto você quer investir agora?</h2>
+      <div class="segctl" role="group" aria-label="Tipo de plano" style="margin:10px 0 12px">
+        <button type="button" aria-pressed="${modo === 'aporte'}" data-m="aporte">Dinheiro novo</button>
+        <button type="button" aria-pressed="${modo === 'rebal'}" data-m="rebal" ${p.vazio ? 'disabled' : ''}>Rebalancear o que tenho</button>
+      </div>
+      <div id="aporteBox" ${modo === 'rebal' ? 'class="hide"' : ''}>
+        <label class="amount"><span>R$</span><input id="aporte" inputmode="decimal" value="${N(aporte, 2)}" aria-label="Valor a investir"></label>
+        <div class="quick">${[1000, 5000, 10000, 50000].map(v => `<button type="button" data-q="${v}">${Mc(v)}</button>`).join('')}</div>
+      </div>
+      <h3>${modo === 'rebal' ? 'Ajustes para chegar à carteira recomendada' : 'Seu plano de compra'}</h3>
+      <div id="plano">${planoHtml()}</div>
+      <div class="btns"><button class="btn" type="button" id="btnCopy">Copiar plano</button><button class="btn" type="button" onclick="go('sim')">Simular resultado</button></div>
+    </div>
+    <div class="card">
+      <h2>Carteira recomendada ${p.ia ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Padrão do perfil')}</h2>
+      <p class="lead sm">${esc(p.resumo || '')}</p>
+      ${grupos.map(([k, g]) => `<div class="cls-h">${dot(k)}${CLN[k]}<span class="mut">${N(p.alvo[k], 1)}% da carteira</span></div>
+        ${g.map(s => `<div class="asset">
+          <div class="hd"><div class="ttl"><b>${esc(s.classe === 'renda_fixa' ? s.nome : rot(s.ticker))}</b><div>${esc(s.classe === 'renda_fixa' ? 'Renda fixa' : s.nome !== rot(s.ticker) ? s.nome : CLN[s.classe])}</div></div>${spark(s.serie)}<div class="w tn">${N(s.peso, 1)}%<small>da carteira</small></div></div>
+          <div class="tags">${s.novo ? pill('info', '', 'Novo para você') : pill('good', '', 'Você já tem')}${s.tendencia ? pill('', s.tendencia === 'alta' ? 'up' : s.tendencia === 'baixa' ? 'down' : 'flat', 'Tendência ' + s.tendencia) : ''}</div>
+          <p>${esc(s.motivo || s.descricao)}</p>
+          <div class="kpis">${s.classe === 'renda_fixa' ? `<span>Rende <b>${A(s.taxa_aa)}</b></span>` :
+            `${s.preco ? `<span>Preço <b>${M(s.preco, s.moeda)}</b></span>` : ''}<span>12 meses <b>${P(s.ret_12m)}</b></span>${s.dy_12m ? `<span>Dividendos <b>${P(s.dy_12m, 1, false)}</b></span>` : ''}${s.vol_aa != null ? `<span>Oscilação <b>${P(s.vol_aa, 0, false)}</b></span>` : ''}`}</div>
+          ${s.novo ? `<div class="btns" style="margin-top:10px"><button class="btn sm" type="button" data-follow="${esc(s.ticker)}">${extra.includes(s.ticker) || st.an[s.ticker] ? 'Acompanhando ✓' : 'Acompanhar em Meus ativos'}</button></div>` : ''}
+        </div>`).join('')}`).join('')}
+      <p class="mut xs">A IA escolhe só entre ativos amplos e líquidos de uma lista fixa (ou os que você já tem), com métricas calculadas a partir do histórico real. Pesquise cada um antes de investir.</p>
+    </div>
+  </div>`;
+  $$('.segctl [data-m]', el).forEach(b => b.onclick = () => { modo = b.dataset.m; renderInvestir(); });
+  const inp = $('#aporte', el);
+  if (inp) inp.oninput = () => { const v = num(inp.value); aporte = isNaN(v) ? 0 : Math.max(v, 0); sv(); $('#plano').innerHTML = planoHtml(); simDirty(); };
+  $$('[data-q]', el).forEach(b => b.onclick = () => { aporte = +b.dataset.q; sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
+  $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
+  $('#btnCopy', el).onclick = copyPlan;
+}
+function copyPlan() {
+  const ls = plano();
+  const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(aporte)}:\n`) +
+    ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}`).join('\n');
+  (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => toast('Plano copiado'), () => ask({title: 'Copie o plano', fields: [{name: 't', label: 'Plano', type: 'textarea', value: txt}], ok: 'Fechar'}));
+}
+function follow(t, btn) {
+  if (st.an[t] || extra.includes(t)) { go('ativos'); document.getElementById('r-' + t)?.scrollIntoView({behavior: 'smooth', block: 'center'}); return; }
+  extra.push(t); sv(); addRow(t); load(t);
+  if (btn) btn.textContent = 'Acompanhando ✓';
+  toast(`${rot(t)} adicionado em Meus ativos`);
+}
+
+/* ---------- Simulação ---------- */
+const inicialAuto = () => (st.port?.total || 0) + (aporte || 0) || 10000;
+let simTimer;
+function simDirty() { if (simCfg.inicial == null && st.sim) { clearTimeout(simTimer); simTimer = setTimeout(runSim, 700); } }
+async function runSim() {
+  const p = st.port;
+  if (!p || !p.sugerida?.length) { renderSim(); return; }
+  const carteiras = {sugerida: Object.fromEntries(p.sugerida.map(s => [s.ticker, s.peso]))};
+  if (!p.vazio) carteiras.atual = Object.fromEntries(p.ativos.filter(a => a.valor > 0).map(a => [a.ticker, a.valor]));
+  if (!carteiras.atual && simCfg.foco === 'atual') simCfg.foco = 'sugerida';
+  st.simBusy = true; st.simErr = null; renderSim();
+  const my = st.simReq = Symbol();
+  try {
+    const r = await api('/api/simulate', {carteiras, pos, inicial: simCfg.inicial ?? inicialAuto(), mensal: simCfg.mensal, anos: simCfg.anos, cenario: simCfg.cenario});
+    if (my !== st.simReq) return;
+    st.sim = r;
+  } catch (e) { if (my === st.simReq) st.simErr = e.message; }
+  if (my === st.simReq) { st.simBusy = false; renderSim(); }
+}
+function renderSim() {
+  const el = $('#t-sim'), p = st.port, R = st.sim;
+  if (!p) { el.innerHTML = `<div class="card">${st.portErr ? `<p class="err-box">${esc(st.portErr)}</p>` : busy('Esperando a carteira recomendada…') + sk(4)}</div>`; return; }
+  const cens = (R?.cenarios || st.pan?.cenarios || []);
+  if (!$('#simCtrls', el)) {
+    el.innerHTML = `
+    <div class="card">
+      <h2>Simulação do futuro</h2>
+      <p class="lead sm">2.000 futuros possíveis sorteados a partir de até 20 anos de histórico real dos ativos, ajustados pelas expectativas de juros e inflação e pelos cenários montados com as notícias recentes.</p>
+      <div class="ctrls" id="simCtrls" style="margin-top:14px">
+        <label class="fld"><span>Valor inicial</span><div class="inp"><i>R$</i><input id="sIni" inputmode="decimal"></div><small id="sIniH"></small></label>
+        <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div></label>
+        <label class="fld"><span>Prazo</span><div class="inp"><select id="sAnos">${[1, 3, 5, 10, 15, 20, 30].map(a => `<option value="${a}">${a} ${a === 1 ? 'ano' : 'anos'}</option>`).join('')}</select></div></label>
+        <label class="fld"><span>Cenário das notícias</span><div class="inp"><select id="sCen"></select></div></label>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:14px">
+        <div class="segctl" role="group" aria-label="Carteira em destaque" id="sFoco"></div>
+        <label class="toggle"><input type="checkbox" id="sReal"> Em valores de hoje (descontando a inflação)</label>
+      </div>
+      <div id="simBody"></div>
+    </div>
+    <div id="simMore"></div>`;
+    const ini = $('#sIni'), men = $('#sMen');
+    ini.oninput = () => { const v = num(ini.value); simCfg.inicial = ini.value.trim() === '' || isNaN(v) ? null : Math.max(v, 0); sv(); debSim(); updIniHint(); };
+    men.oninput = () => { const v = num(men.value); simCfg.mensal = isNaN(v) ? 0 : Math.max(v, 0); sv(); debSim(); };
+    $('#sAnos').onchange = e => { simCfg.anos = +e.target.value; sv(); runSim(); };
+    $('#sCen').onchange = e => { simCfg.cenario = e.target.value; sv(); runSim(); };
+    $('#sReal').onchange = e => { simCfg.real = e.target.checked; sv(); renderSimBody(); };
+    men.value = N(simCfg.mensal, 2);
+    $('#sAnos').value = simCfg.anos;
+    $('#sReal').checked = simCfg.real;
+  }
+  const ini = $('#sIni');
+  if (document.activeElement !== ini) ini.value = N(simCfg.inicial ?? inicialAuto(), 2);
+  updIniHint();
+  $('#sCen').innerHTML = `<option value="ponderado">Todos, pelas probabilidades</option>` + cens.map(c => `<option value="${esc(c.nome)}">${esc(c.nome)} (${c.prob}%)</option>`).join('');
+  $('#sCen').value = cens.some(c => c.nome === simCfg.cenario) ? simCfg.cenario : 'ponderado';
+  const temAtual = !p.vazio;
+  $('#sFoco').innerHTML = temAtual ? ['sugerida', 'atual'].map(k => `<button type="button" aria-pressed="${simCfg.foco === k}" data-f="${k}">${k === 'sugerida' ? 'Destacar recomendada' : 'Destacar atual'}</button>`).join('') : '';
+  $('#sFoco').classList.toggle('hide', !temAtual);
+  $$('#sFoco button').forEach(b => b.onclick = () => { simCfg.foco = b.dataset.f; sv(); renderSim(); });
+  renderSimBody();
+}
+let debT; function debSim() { clearTimeout(debT); debT = setTimeout(runSim, 600); }
+function updIniHint() {
+  const h = $('#sIniH'); if (!h) return;
+  h.innerHTML = simCfg.inicial == null ? 'Patrimônio atual + valor do aporte' : `<a href="#" id="sIniReset">Usar patrimônio atual + aporte</a>`;
+  const a = $('#sIniReset'); if (a) a.onclick = e => { e.preventDefault(); simCfg.inicial = null; sv(); $('#sIni').value = N(inicialAuto(), 2); updIniHint(); runSim(); };
+}
+const SERIES = {sugerida: ['Recomendada', 'var(--s1)'], atual: ['Atual', 'var(--s2)'], cdi: ['100% do CDI', 'var(--s3)'], inv: ['Total investido', 'var(--ref)']};
+function renderSimBody() {
+  const body = $('#simBody'), more = $('#simMore'), R = st.sim;
+  if (!body) return;
+  if (st.simErr && !R) { body.innerHTML = `<div class="note warn" style="margin-top:14px">${ICON.warn}<div>${esc(st.simErr)}</div></div>`; more.innerHTML = ''; return; }
+  if (!R) { body.innerHTML = `<div style="margin-top:16px">${busy('Rodando 2.000 simulações…')}${sk(6)}</div>`; more.innerHTML = ''; return; }
+  const real = simCfg.real, defl = R.deflator[R.deflator.length - 1], dv = v => real ? v / defl : v;
+  const nomes = ['sugerida', 'atual'].filter(k => R.carteiras[k]);
+  const foco = R.carteiras[simCfg.foco] ? simCfg.foco : nomes[0];
+  const S = R.carteiras[foco].stats, anos = Math.round(R.meses[R.meses.length - 1] / 12);
+  const inv = R.investido[R.investido.length - 1];
+  const tiles = `<div class="tiles">
+    <div class="tile main"><div class="l">Valor provável em ${anos} ${anos === 1 ? 'ano' : 'anos'}</div><div class="v tn">${Mc(dv(S.p50))}</div><div class="d">Metade dos cenários termina acima disso</div></div>
+    <div class="tile"><div class="l">Se o mercado for mal</div><div class="v tn">${Mc(dv(S.p10))}</div><div class="d">Só 1 em cada 10 cenários fica abaixo</div></div>
+    <div class="tile"><div class="l">Se o mercado for bem</div><div class="v tn">${Mc(dv(S.p90))}</div><div class="d">1 em cada 10 cenários fica acima</div></div>
+    <div class="tile"><div class="l">Chance de bater o CDI</div><div class="v tn">${N(S.prob_cdi, 0)}%</div><div class="d">CDI no período: ${Mc(dv(R.cdi[R.cdi.length - 1]))}</div></div>
+    <div class="tile"><div class="l">Chance de ter menos que o investido</div><div class="v tn">${N(real ? S.prob_perda_real : S.prob_perda, 0)}%</div><div class="d">Investido: ${Mc(dv(inv))}${real ? ' (em valores de hoje)' : ''}</div></div>
+    <div class="tile"><div class="l">Queda temporária típica</div><div class="v tn">${P(S.queda_tipica, 0)}</div><div class="d">Em 1 de cada 10 cenários: ${P(S.queda_ruim, 0)}</div></div>
+  </div>`;
+  const comp = nomes.length > 1 ? `<h3>Atual × recomendada</h3><div class="scroll-x"><table class="tbl"><thead><tr><th></th><th>Atual</th><th>Recomendada</th></tr></thead><tbody>
+    ${[['Valor provável', k => Mc(dv(R.carteiras[k].stats.p50))], ['Cenário ruim (10%)', k => Mc(dv(R.carteiras[k].stats.p10))], ['Cenário bom (90%)', k => Mc(dv(R.carteiras[k].stats.p90))],
+      ['Retorno esperado ao ano', k => P(R.carteiras[k].stats.ret_aa, 1, false)], ['Oscilação ao ano', k => P(R.carteiras[k].stats.vol_aa, 1, false)],
+      ['Chance de bater o CDI', k => N(R.carteiras[k].stats.prob_cdi, 0) + '%'], ['Pior queda típica', k => P(R.carteiras[k].stats.queda_tipica, 0)],
+      ['Pior 12 meses (5% de chance)', k => P(R.carteiras[k].stats.pior_12m, 0)]].map(([l, f]) => `<tr><td>${l}</td><td>${f('atual')}</td><td>${f('sugerida')}</td></tr>`).join('')}</tbody></table></div>` : '';
+  body.innerHTML = `<div class="${st.simBusy ? 'stale' : ''}">
+    <div class="legend" style="margin-top:16px">${nomes.map(k => `<span><i class="ln" style="background:${SERIES[k][1]};height:3px"></i>${SERIES[k][0]} (mediana)</span>`).join('')}
+      <span><i class="ln" style="background:${SERIES.cdi[1]}"></i>${SERIES.cdi[0]}</span><span><i class="ln" style="background:${SERIES.inv[1]}"></i>${SERIES.inv[0]}</span>
+      <span><i class="bd" style="background:${SERIES[foco][1]};opacity:.22"></i>Faixa provável da ${SERIES[foco][0].toLowerCase()} (80% dos cenários)</span></div>
+    <div class="chart" id="chart"></div>${tiles}${comp}</div>`;
+  drawChart();
+  const cens = R.cenarios || [];
+  const est = R.estresse || [];
+  more.innerHTML = `<div class="grid2">
+    <div class="card"><h2>Cenários a partir das notícias</h2>
+      <p class="lead sm">Ajustes aplicados ao retorno de cada classe no primeiro ano; o efeito some até o terceiro ano, quando voltam a valer as premissas de longo prazo.</p>
+      <div class="scen">${cens.map(c => `<div><h4>${esc(c.nome)}<span class="tn">${c.prob}%</span></h4><div class="probbar"><i style="width:${c.prob}%"></i></div><p>${esc(c.descricao)}</p>
+        <div class="tags">${CL.filter(k => c.ajustes?.[k]).map(k => `<span class="pill">${dot(k)} ${CLN[k]} ${c.ajustes[k] > 0 ? '+' : ''}${N(c.ajustes[k], 1)} p.p.</span>`).join('') || '<span class="mut xs">Sem ajustes: premissas de longo prazo</span>'}</div></div>`).join('')}</div>
+    </div>
+    <div class="card"><h2>Testes de estresse: crises reais</h2>
+      <p class="lead sm">Quanto cada carteira teria variado durante crises que já aconteceram${est.some(e => Object.values(e.carteiras).some(x => x.estimado)) ? ' (≈ estimado com índice da classe quando o ativo ainda não existia)' : ''}.</p>
+      ${est.length ? `<div class="scroll-x"><table class="tbl"><thead><tr><th>Crise</th><th>Ibovespa</th>${nomes.includes('atual') ? '<th>Atual</th>' : ''}<th>Recomendada</th></tr></thead><tbody>
+        ${est.map(e => `<tr><td>${esc(e.nome)}<div class="mut xs">${fmtData(e.inicio)} a ${fmtData(e.fim)}</div></td><td class="${cl(e.ibov)}">${P(e.ibov)}</td>
+          ${['atual', 'sugerida'].filter(k => nomes.includes(k)).map(k => { const x = e.carteiras[k]; return x ? `<td class="${cl(x.ret)}">${x.estimado ? '≈ ' : ''}${P(x.ret)}</td>` : '<td>—</td>'; }).join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="mut">Histórico de crises indisponível agora.</p>'}
+    </div>
+  </div>
+  <div class="card"><details><summary>Premissas e como a simulação funciona</summary>
+    <div class="scroll-x" style="margin-top:12px"><table class="tbl"><thead><tr><th>Ativo</th><th>Retorno esperado</th><th>Oscilação</th></tr></thead><tbody>
+      ${Object.entries(R.premissas).sort((a, b) => CL.indexOf(a[1].classe) - CL.indexOf(b[1].classe)).map(([t, x]) => `<tr><td><span class="nm">${dot(x.classe)}${esc(rot(t))}</span></td><td>${P(x.ret_aa, 1, false)} a.a.</td><td>${x.vol_aa ? P(x.vol_aa, 0, false) : 'quase zero'}</td></tr>`).join('')}</tbody></table></div>
+    <ul class="ink2 sm" style="padding-left:18px">
+      <li><b>Padrões históricos:</b> usamos ${R.meses_historicos} meses de dados (desde ${esc(R.historico_desde)}). Os meses são sorteados em blocos de 6 seguidos, o que preserva oscilações, correlações entre ativos e sequências de crise.</li>
+      <li><b>Retorno esperado:</b> mistura o histórico do ativo (com limites) com premissas de equilíbrio: CDI médio esperado de ${P(R.cdi_medio, 2, false)} a.a. (Banco Central e boletim Focus), prêmio de risco para ações e FIIs, e inflação de ${P(R.ipca, 1, false)} a.a.</li>
+      <li><b>Notícias:</b> a IA lê manchetes da última semana e monta cenários com probabilidades. Escolha um cenário acima ou deixe “Todos” para sortear cada futuro conforme a probabilidade.</li>
+      <li>Aportes entram no fim de cada mês, na proporção da carteira. Não considera impostos, taxas, nem mudanças de estratégia no caminho.</li>
+    </ul></details></div>`;
+}
+const fmtData = s => { const [y, m, d] = s.split('-'); return `${d}/${m}/${y.slice(2)}`; };
+function drawChart() {
+  const box = $('#chart'), R = st.sim;
+  if (!box || !R || box.offsetParent === null) return;
+  const W = box.clientWidth, H = Math.round(Math.min(380, Math.max(260, W * 0.5)));
+  const m = {l: 58, r: W < 520 ? 10 : 92, t: 12, b: 26};
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const real = simCfg.real, D = R.deflator, adj = a => a.map((v, i) => real ? v / D[i] : v);
+  const nomes = ['sugerida', 'atual'].filter(k => R.carteiras[k]);
+  const foco = R.carteiras[simCfg.foco] ? simCfg.foco : nomes[0];
+  const F = Object.fromEntries(Object.entries(R.carteiras[foco].faixas).map(([k, v]) => [k, adj(v)]));
+  const med = Object.fromEntries(nomes.map(k => [k, adj(R.carteiras[k].faixas.p50)]));
+  const cdi = adj(R.cdi), inv = adj(R.investido), X = R.meses, T = X[X.length - 1];
+  const ymax = Math.max(...F.p90, ...cdi, ...Object.values(med).flat(), ...inv) * 1.04;
+  const ticks = niceTicks(ymax, H < 280 ? 3 : 4), top = ticks[ticks.length - 1];
+  const x = i => m.l + X[i] / T * iw, y = v => m.t + ih - v / top * ih;
+  const line = a => a.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const band = (lo, hi) => line(hi) + lo.map((v, i) => i).reverse().map(i => `L${x(i).toFixed(1)},${y(lo[i]).toFixed(1)}`).join('') + 'Z';
+  const ano0 = new Date().getFullYear(), passo = T <= 36 ? 12 : T <= 120 ? 24 : T <= 240 ? 60 : 120;
+  const xt = []; for (let mm = 0; mm <= T; mm += passo) xt.push(mm);
+  const xi = mm => m.l + mm / T * iw;
+  // rótulos diretos no fim das linhas (só os que não colidem)
+  const ends = [[foco, med[foco]], ...nomes.filter(k => k !== foco).map(k => [k, med[k]]), ['cdi', cdi]].map(([k, a]) => ({k, v: a[a.length - 1]}));
+  const placed = [];
+  if (m.r > 40) ends.forEach(e => { const yy = y(e.v); if (placed.every(p => Math.abs(p.y - yy) >= 15)) placed.push({...e, y: yy}); });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" tabindex="0" role="img" aria-label="Projeção do patrimônio em ${Math.round(T / 12)} anos. Mediana da carteira ${SERIES[foco][0].toLowerCase()}: ${Mc(med[foco][med[foco].length - 1])}. Use as setas para percorrer o gráfico.">
+    ${ticks.map(t => `<line x1="${m.l}" x2="${m.l + iw}" y1="${y(t)}" y2="${y(t)}" stroke="var(--grid)" stroke-width="1"/><text x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t === 0 ? '0' : Mc(t).replace('R$ ', '')}</text>`).join('')}
+    <line x1="${m.l}" x2="${m.l + iw}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)" stroke-width="1"/>
+    ${xt.map(mm => `<text x="${xi(mm)}" y="${H - 6}" text-anchor="${mm === 0 ? 'start' : mm === T ? 'end' : 'middle'}">${mm === 0 ? 'hoje' : ano0 + Math.round(mm / 12)}</text>`).join('')}
+    <path d="${band(F.p10, F.p90)}" fill="${SERIES[foco][1]}" opacity=".10"/>
+    <path d="${band(F.p25, F.p75)}" fill="${SERIES[foco][1]}" opacity=".14"/>
+    <path d="${line(inv)}" fill="none" stroke="var(--ref)" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="${line(cdi)}" fill="none" stroke="var(--s3)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${nomes.filter(k => k !== foco).map(k => `<path d="${line(med[k])}" fill="none" stroke="${SERIES[k][1]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>`).join('')}
+    <path d="${line(med[foco])}" fill="none" stroke="${SERIES[foco][1]}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${placed.map(p => `<circle cx="${m.l + iw}" cy="${p.y}" r="4" fill="${SERIES[p.k][1]}" stroke="var(--sf)" stroke-width="2"/><text class="lbl-end" x="${m.l + iw + 8}" y="${p.y + 4}">${Mc(p.v).replace('R$ ', '')}</text>`).join('')}
+    <g id="xh" style="display:none"><line y1="${m.t}" y2="${m.t + ih}" stroke="var(--axis)" stroke-width="1"/>
+      ${[foco, ...nomes.filter(k => k !== foco), 'cdi'].map(k => `<circle r="4" data-k="${k}" fill="${SERIES[k][1]}" stroke="var(--sf)" stroke-width="2"/>`).join('')}</g>
+    <rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" id="hit"/>
+  </svg><div class="tip" id="tip"></div>`;
+  const svg = $('svg', box), g = $('#xh', box), tip = $('#tip', box);
+  const vals = {cdi, ...med};
+  let cur = -1;
+  const show = i => {
+    cur = i; const xx = x(i);
+    g.style.display = ''; $('line', g).setAttribute('x1', xx); $('line', g).setAttribute('x2', xx);
+    $$('circle', g).forEach(c => { c.setAttribute('cx', xx); c.setAttribute('cy', y(vals[c.dataset.k][i])); });
+    const mm = X[i], a = Math.floor(mm / 12), r = mm % 12;
+    tip.innerHTML = `<div class="t">${mm === 0 ? 'Hoje' : `Em ${a ? a + (a === 1 ? ' ano' : ' anos') : ''}${a && r ? ' e ' : ''}${r ? r + (r === 1 ? ' mês' : ' meses') : ''}`}</div>
+      ${nomes.map(k => `<div class="r"><span><i class="ln" style="background:${SERIES[k][1]}"></i>${SERIES[k][0]}</span><b>${M0(med[k][i])}</b></div>`).join('')}
+      <div class="r"><span><i class="ln" style="background:${SERIES[foco][1]};opacity:.35;height:6px"></i>Faixa provável</span><b>${Mc(F.p10[i])} a ${Mc(F.p90[i])}</b></div>
+      <div class="r"><span><i class="ln" style="background:var(--s3)"></i>100% do CDI</span><b>${M0(cdi[i])}</b></div>
+      <div class="r"><span><i class="ln" style="background:var(--ref)"></i>Investido</span><b>${M0(inv[i])}</b></div>`;
+    tip.style.display = 'block';
+    const tw = tip.offsetWidth, left = xx + 14 + tw > W ? xx - tw - 14 : xx + 14;
+    tip.style.left = Math.max(0, left) + 'px'; tip.style.top = m.t + 'px';
+  };
+  const hide = () => { g.style.display = 'none'; tip.style.display = 'none'; cur = -1; };
+  const near = ev => { const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width, mm = (px - m.l) / iw * T;
+    let b = 0; X.forEach((v, i) => { if (Math.abs(v - mm) < Math.abs(X[b] - mm)) b = i; }); return b; };
+  svg.onpointermove = ev => show(near(ev));
+  svg.onpointerdown = ev => show(near(ev));
+  svg.onpointerleave = hide;
+  svg.onblur = hide;
+  svg.onkeydown = ev => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    ev.preventDefault();
+    show(Math.min(Math.max((cur < 0 ? X.length - 1 : cur) + (ev.key === 'ArrowRight' ? 1 : -1), 0), X.length - 1));
+  };
+}
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawChart, 150); });
+
+/* ---------- Mercado ---------- */
+function renderMercado() {
+  const el = $('#t-mercado'), p = st.pan;
+  if (!p) { el.innerHTML = st.panErr ? `<div class="card"><p class="err-box">${esc(st.panErr)}</p><div class="btns"><button class="btn" type="button" onclick="loadPan()">Tentar de novo</button></div></div>` : `<div class="card">${busy('Lendo as notícias e os indicadores…')}${sk(5)}</div>`; return; }
+  const t = p.taxas || {}, f = t.focus || {}, anos = Object.keys(f.selic || {}).sort();
+  const prox = anos.find(a => +a > new Date().getFullYear()) || anos[anos.length - 1];
+  const rates = [['Selic', A(t.selic), 'Taxa básica de juros'], ['CDI', A(t.cdi), 'Referência da renda fixa'], ['IPCA 12 meses', P(t.ipca12, 2, false), 'Inflação acumulada'],
+    ...(prox ? [[`Selic fim de ${prox}`, A(f.selic[prox]), 'Expectativa do mercado (Focus)'], [`IPCA ${prox}`, P(f.ipca?.[prox], 2, false), 'Expectativa do mercado (Focus)']] : [])];
+  el.innerHTML = `
+  ${p.ia ? '' : `<div class="note warn">${ICON.warn}<div>A leitura das notícias pela IA não está disponível agora; mostrando dados e manchetes sem análise.</div></div>`}
+  <div class="card"><h2>Indicadores</h2><div class="rates" style="margin-top:10px">${rates.map(r => `<div class="tile"><div class="l">${esc(r[0])}</div><div class="v tn">${r[1]}</div><div class="d">${esc(r[2])}</div></div>`).join('')}</div></div>
+  <div class="grid2">
+    <div class="card"><h2>${ICON.spark.replace('<svg', '<svg width="18" height="18" style="color:var(--acc)"')}Leitura do momento</h2>
+      <p class="lead">${esc(p.resumo || 'Sem análise disponível.')}</p>
+      ${p.fatores.length ? `<h3>O que mais pesa agora</h3><ul class="ink2" style="padding-left:18px;margin:0">${p.fatores.map(x => `<li style="margin:4px 0">${esc(x)}</li>`).join('')}</ul>` : ''}
+      <p class="mut xs" style="margin-top:12px">Atualizado em ${esc(new Date(p.atualizado).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'}))}. Manchetes do Google Notícias dos últimos 7 dias.</p>
+    </div>
+    <div class="card"><h2>Desempenho de referência</h2>
+      <div class="scroll-x"><table class="tbl" style="margin-top:6px"><thead><tr><th>Índice</th><th>1 mês</th><th>12 meses</th><th>Tendência</th></tr></thead><tbody>
+      ${Object.entries(p.mercado || {}).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="${cl(v.ret_1m)}">${P(v.ret_1m)}</td><td class="${cl(v.ret_12m)}">${P(v.ret_12m)}</td><td>${v.tendencia ? pill('', v.tendencia === 'alta' ? 'up' : v.tendencia === 'baixa' ? 'down' : 'flat', v.tendencia) : '—'}</td></tr>`).join('')}</tbody></table></div>
+      <p class="mut xs">Tendência compara o preço com a média dos últimos 200 pregões.</p>
+    </div>
+  </div>
+  <div class="sect-t">Visão por classe para os próximos 12 meses</div>
+  <div class="grid2">${CL.map(k => { const c = p.classes[k]; if (!c) return ''; const [kd, ic, tx] = VIS[c.visao] || VIS.NEUTRA;
+    return `<div class="card"><div class="view-h"><h2>${dot(k)}${esc(c.nome)}</h2>${pill(kd, ic, tx)}</div>
+      ${c.motivo ? `<p class="lead sm">${esc(c.motivo)}</p>` : ''}
+      ${c.ajuste ? `<p class="mut xs">Ajuste aplicado na simulação: ${c.ajuste > 0 ? '+' : ''}${N(c.ajuste, 1)} p.p. no próximo ano.</p>` : ''}
+      ${c.noticias.length ? `<details style="margin-top:8px"><summary>${c.noticias.length} manchetes</summary><ul class="news">${c.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}${n.fonte ? `<small>${esc(n.fonte)}</small>` : ''}</li>`).join('')}</ul></details>` : ''}
+    </div>`; }).join('')}</div>`;
+}
+
+/* ---------- Meus ativos ---------- */
+const rmBtn = t => extra.includes(t) ? `<button class="btn sm ghost" type="button" onclick="rm('${t}')">Remover</button>` : '';
 function card(a) {
-  if (a.classe === 'renda_fixa') return `<section class="row" id="r-${a.ticker}">
-    <div class="top"><span class="tk">${esc(a.nome)}</span><span class="mut">${a.pct}% ${a.ticker === 'TESOURO_SELIC' ? 'da Selic' : 'do CDI'}</span></div>
-    <div class="pl">${a.saldo ? M(a.saldo) : '<span class="mut">Sem saldo informado</span>'}</div>
-    <div class="pot"><div>Taxa estimada<br><b>${A(a.taxa)}</b></div><div>Juro real<br><b>${A(a.juro_real)}</b></div></div>
-    ${a.saldo ? `<div class="mut">Rende cerca de ${M(a.rend_mes)} por mês e ${M(a.rend_ano)} por ano, antes de IR e IOF.</div>` : ''}
-    <div class="mut">Selic ${A(a.selic)} · CDI ${A(a.cdi)} · IPCA 12m ${A(a.ipca12)}</div>
-    <div class="btns"><button onclick="edit('${a.ticker}','renda_fixa')">Editar saldo</button></div></section>`;
-  const m = a.metricas, p = a.posicao, mo = a.moeda;
-  return `<section class="row" id="r-${a.ticker}">
-    <div class="top"><span class="tk">${esc(a.ticker)}</span><span>${M(m.preco, mo)}</span>
-      <span class="badge ${a.decisao}">${a.decisao.toLowerCase()}${a.confianca != null ? ' ' + a.confianca + '%' : ''}</span></div>
-    <div class="pl ${cl(a.pl_atual)}">${p.qtd ? `${M(a.pl_atual, mo)} <span class="mut">${P(a.pl_pct)}</span>` : '<span class="mut">Sem posição</span>'}</div>
-    <div class="mut">${p.qtd ? `${p.qtd} ${a.classe === 'cambio' ? 'dólares' : 'cotas'} · médio ${M(p.pm, mo)}` : 'Use "Editar posição" para informar o que você tem'}</div>
-    <div class="sug">${esc(a.sugestao)}</div>
-    <div class="pot"><div>Ganho até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<br><b class="up">${M(a.ganho_pot, mo)}</b></div>
-      <div>Perda até o stop (${a.stop ? M(a.stop, mo) : '—'})<br><b class="dn">${M(a.perda_pot, mo)}</b></div></div>
-    <div class="mut">Valores para ${a.base_qtd} ${a.base_qtd === 1 ? 'unidade' : 'unidades'}.</div>
-    <p>${esc(a.resumo)}</p>
-    <details><summary>Indicadores, riscos e notícias</summary>
-      <p class="mut">RSI ${m.rsi14} · 1m ${P(m.ret_1m)} · 3m ${P(m.ret_3m)} · 12m ${P(m.ret_12m)}<br>Volatilidade ${m.volatilidade_anual}% · queda máx. ${m.queda_max_12m}% · dividendos 12m ${m.dividend_yield_12m}%</p>
-      <ul>${a.riscos.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
-      <ul>${a.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}</li>`).join('')}</ul>
+  st.an[a.ticker] = a;
+  if (a.classe === 'renda_fixa' && RF[a.ticker]) {
+    const ipca = a.ticker === 'TESOURO_IPCA';
+    return `<section class="card pos-card" id="r-${a.ticker}">
+      <div class="row1">${dot('renda_fixa')}<div class="ttl"><b>${esc(a.nome)}</b><div>${ipca ? `IPCA + ${N(a.pct, 2)}% ao ano` : `${N(a.pct, 0)}% ${a.ticker === 'TESOURO_SELIC' ? 'da Selic' : 'do CDI'}`}</div></div>${pill('', '', 'Renda fixa')}</div>
+      <div class="pl tn">${a.saldo ? M(a.saldo) : '<span class="mut" style="font-size:16px;font-weight:500">Sem saldo informado</span>'}</div>
+      <div class="pot"><div>Taxa estimada<b>${A(a.taxa)}</b></div><div>Juro real (acima da inflação)<b>${A(a.juro_real)}</b></div></div>
+      ${a.saldo ? `<p class="ink2 sm">Rende cerca de <b>${M(a.rend_mes)}</b> por mês e <b>${M(a.rend_ano)}</b> por ano, antes de IR e IOF.</p>` : ''}
+      <p class="mut xs">Selic ${A(a.selic)} · CDI ${A(a.cdi)} · IPCA 12m ${P(a.ipca12, 2, false)}</p>
+      <div class="btns"><button class="btn sm" type="button" onclick="edit('${a.ticker}','renda_fixa')">Editar saldo</button>${rmBtn(a.ticker)}</div></section>`;
+  }
+  const m = a.metricas, p = a.posicao, mo = a.moeda, [kd, ic, tx] = ACAO[a.decisao] || ['', 'flat', a.decisao];
+  return `<section class="card pos-card" id="r-${a.ticker}">
+    <div class="row1">${dot(a.classe)}<div class="ttl"><b>${esc(rot(a.ticker))}</b><div>${esc(a.nome !== a.ticker && a.nome !== rot(a.ticker) ? a.nome : CLN[a.classe])}</div></div>
+      ${spark(m.serie, 72, 28)}<div class="px">${M(m.preco, mo)}<small class="${cl(m.ret_1m)}">${P(m.ret_1m)} no mês</small></div></div>
+    <div class="pl tn ${cl(a.pl_atual)}">${p.qtd ? `${a.pl_atual > 0 ? '+' : ''}${M(a.pl_atual, mo)} <span class="mut" style="font-size:15px;font-weight:500">${P(a.pl_pct)}</span>` : '<span class="mut" style="font-size:16px;font-weight:500">Sem posição</span>'}</div>
+    <div class="mut sm">${p.qtd ? `${N(p.qtd, 4)} ${a.classe === 'cambio' && a.ticker === 'DOLAR' ? 'dólares' : 'cotas'} · preço médio ${M(p.pm, mo)} · total ${M(a.valor, mo)}` : 'Use “Editar posição” para informar o que você tem'}</div>
+    <div class="sug">${pill(kd, ic, tx + (a.confianca != null ? ` · ${N(a.confianca)}%` : ''))}<span>${esc(a.sugestao)}</span></div>
+    ${a.ia === false ? '<p class="mut xs">Análise da IA indisponível agora; mostrando só os indicadores.</p>' : ''}
+    <div class="pot"><div>Até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<b class="${cl(a.ganho_pot)}">${M(a.ganho_pot, mo)}</b></div><div>Até o stop (${a.stop ? M(a.stop, mo) : '—'})<b class="${cl(-a.perda_pot)}">${a.perda_pot != null ? M(-a.perda_pot, mo) : '—'}</b></div></div>
+    <p class="mut xs">Valores para ${N(a.base_qtd, 4)} ${a.base_qtd === 1 ? 'unidade' : 'unidades'}.</p>
+    ${a.resumo ? `<p class="ink2" style="margin:8px 0 0">${esc(a.resumo)}</p>` : ''}
+    <details style="margin-top:10px"><summary>Indicadores, riscos e notícias</summary>
+      <div class="kpis"><span>RSI <b>${N(m.rsi14, 0)}</b></span><span>3 meses <b>${P(m.ret_3m)}</b></span><span>12 meses <b>${P(m.ret_12m)}</b></span><span>Oscilação <b>${P(m.volatilidade_anual, 0, false)}</b></span><span>Queda máx. <b>${P(m.queda_max_12m, 0)}</b></span><span>Dividendos 12m <b>${P(m.dividend_yield_12m, 1, false)}</b></span></div>
+      ${a.riscos.length ? `<ul class="ink2 sm" style="padding-left:18px">${a.riscos.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
+      <ul class="news">${a.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}</li>`).join('')}</ul>
     </details>
-    <div class="btns"><button onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
-      <button onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
-      <button onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>${rmBtn(a.ticker)}</div></section>`;
+    <div class="btns"><button class="btn sm" type="button" onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
+      <button class="btn sm" type="button" onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
+      <button class="btn sm" type="button" onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>${rmBtn(a.ticker)}</div></section>`;
 }
 async function load(t) {
   const el = document.getElementById('r-' + t);
+  if (!el) return;
   try { el.outerHTML = card(await api('/api/analyze', {ticker: t, pos: pos[t] || {}})); }
-  catch (e) { el.innerHTML = `<b>${esc(t)}</b> <span class="dn">${esc(e.message)}</span><div class="btns">${rmBtn(t)}</div>`; }
-}
-async function loadPort() {
-  try {
-    const p = await api('/api/portfolio', {pos, perfil});
-    if (p.vazio) { $('#port').innerHTML = '<div class="row mut">Informe suas posições em "Editar posição" para ver a carteira, as sugestões e a análise de diversificação.</div>'; return; }
-    const d = p.div, rot = {SIM:'Vale diversificar', PARCIALMENTE:'Diversificar em parte', NAO:'Não precisa diversificar'}[d.vale];
-    $('#port').innerHTML = `<section class="row"><div class="mut">Carteira (em R$)</div><div class="pl">${M(p.total)}</div>
-      <div class="mut">Ganho/perda nos ativos de mercado: <b class="${cl(p.pl)}">${M(p.pl)}</b></div>
-      <div class="bars">${Object.entries(p.classes).map(([k, v]) => `<div><i style="width:${v}%"></i><span>${NOME[k] || k} · ${v}%</span></div>`).join('')}</div>
-      ${p.alertas.map(a => `<p class="dn">Atenção: ${esc(a)}</p>`).join('')}
-      <p>${esc(p.resumo)}</p>
-      <h2>O que fazer com o que você tem</h2>
-      <ul>${p.acoes.map(a => `<li><b>${esc(a.ativo)} · ${esc(a.acao)}</b>: ${esc(a.motivo)}</li>`).join('')}</ul>
-      <h2>Diversificação ${rot ? `<span class="badge ${d.vale}">${rot}</span>` : ''}</h2>
-      <p>${esc(d.avaliacao)}</p>
-      <ul>${d.areas.map(a => `<li><b>${esc(a.area)}</b>${a.exemplos.length ? ` (exemplos para pesquisar: ${a.exemplos.map(esc).join(', ')})` : ''}: ${esc(a.motivo)}</li>`).join('')}</ul>
-      <div class="mut">Exemplos são pontos de partida para pesquisa, não recomendação de compra.</div></section>`;
-  } catch (e) { $('#port').innerHTML = `<div class="row dn">${esc(e.message)}</div>`; }
-}
-async function order(t, side, preco) {
-  const q = num(prompt(`Quantas unidades de ${t} você ${side === 'COMPRAR' ? 'comprou' : 'vendeu'}?`));
-  if (!q || q <= 0) return;
-  const pr = num(prompt('Por qual preço? (deixe como está se foi o preço atual)', preco));
-  if (!pr || pr <= 0) return;
-  const p = pos[t] || {qtd: 0, pm: 0};
-  if (side === 'VENDER' && q > p.qtd + 1e-9) return alert('Você não tem essa quantidade registrada.');
-  if (side === 'COMPRAR') { p.pm = (p.pm * p.qtd + pr * q) / (p.qtd + q); p.qtd += q; } else p.qtd -= q;
-  p.qtd = Math.round(p.qtd * 1e6) / 1e6; p.pm = Math.round(p.pm * 1e4) / 1e4;
-  pos[t] = p; sv(); await load(t); loadPort();
-}
-async function edit(t, classe) {
-  if (classe === 'renda_fixa') {
-    const saldo = num(prompt('Qual o saldo atual (R$)?'));
-    const pct = num(prompt(t === 'TESOURO_SELIC' ? 'Quantos % da Selic? (normalmente 100)' : 'Quantos % do CDI rende? (veja no app do Inter)', 100));
-    if (isNaN(saldo) || isNaN(pct)) return;
-    pos[t] = {saldo: Math.max(saldo, 0), pct: Math.max(pct, 0)};
-  } else {
-    const qtd = num(prompt(`Quantas unidades de ${t} você tem?`));
-    const pm = num(prompt('Qual o preço médio pago?'));
-    if (isNaN(qtd) || isNaN(pm)) return;
-    pos[t] = {qtd: Math.max(qtd, 0), pm: Math.max(pm, 0)};
-  }
-  sv(); await load(t); loadPort();
+  catch (e) { el.innerHTML = `<b>${esc(t)}</b> <p class="err-box sm">${esc(e.message)}</p><div class="btns">${rmBtn(t)}</div>`; }
 }
 function addRow(t) {
-  const s = document.createElement('section'); s.className = 'row'; s.id = 'r-' + t;
-  s.innerHTML = `<b>${esc(t)}</b> <span class="mut">analisando…</span>`; $('#list').appendChild(s);
+  const s = document.createElement('section'); s.className = 'card'; s.id = 'r-' + t;
+  s.innerHTML = `<b>${esc(t)}</b>${busy('Analisando…')}${sk(3)}`; $('#list').appendChild(s);
 }
-function addTicker() {
-  const t = (prompt('Código do ativo (ex.: HGLG11, WEGE3, IVVB11):') || '').trim().toUpperCase().replace(/\s+/g, '_');
-  if (!t) return;
-  if (!OKT.test(t)) return alert('Código inválido.');
-  if (document.getElementById('r-' + t)) return alert('Esse ativo já está na lista.');
+async function order(t, side, preco) {
+  const v = await ask({title: `${side === 'COMPRAR' ? 'Registrar compra' : 'Registrar venda'} de ${t}`, desc: 'Anote aqui o que você fez na corretora.',
+    fields: [{name: 'q', label: `Quantidade ${side === 'COMPRAR' ? 'comprada' : 'vendida'}`, mode: 'decimal'},
+             {name: 'p', label: 'Preço por unidade', mode: 'decimal', value: N(preco, 2), prefix: t === 'VOO' ? 'US$' : 'R$'}],
+    ok: 'Registrar',
+    validate: v => { const q = num(v.q), p = num(v.p); if (!(q > 0)) return 'Informe uma quantidade maior que zero.'; if (!(p > 0)) return 'Informe um preço válido.';
+      if (side === 'VENDER' && q > (pos[t]?.qtd || 0) + 1e-9) return 'Você não tem essa quantidade registrada.'; }});
+  if (!v) return;
+  const q = num(v.q), pr = num(v.p), p = pos[t] || {qtd: 0, pm: 0};
+  if (side === 'COMPRAR') { p.pm = (p.pm * p.qtd + pr * q) / (p.qtd + q); p.qtd += q; } else p.qtd -= q;
+  p.qtd = Math.round(p.qtd * 1e6) / 1e6; p.pm = Math.round(p.pm * 1e4) / 1e4;
+  pos[t] = p; sv(); await load(t); posChanged();
+}
+async function edit(t, classe) {
+  let v;
+  if (classe === 'renda_fixa') {
+    const ipca = t === 'TESOURO_IPCA', cur = pos[t] || {};
+    v = await ask({title: `Editar ${RF[t] || t}`, fields: [{name: 's', label: 'Saldo atual', prefix: 'R$', mode: 'decimal', value: cur.saldo ? N(cur.saldo, 2) : ''},
+      ipca ? {name: 'p', label: 'Taxa contratada: IPCA +', suffix: '% a.a.', mode: 'decimal', value: cur.pct && cur.pct < 20 ? N(cur.pct, 2) : '', hint: 'Veja no extrato do Tesouro Direto (ex.: 6,5).'}
+           : {name: 'p', label: t === 'TESOURO_SELIC' ? '% da Selic' : '% do CDI', suffix: '%', mode: 'decimal', value: N(cur.pct ?? 100, 0), hint: t === 'PORQUINHO' ? 'Veja no app do Inter.' : 'Normalmente 100.'}],
+      validate: v => isNaN(num(v.s)) || num(v.s) < 0 ? 'Informe o saldo (pode ser 0).' : !(num(v.p) > 0) ? 'Informe a taxa.' : ''});
+    if (!v) return;
+    pos[t] = {saldo: num(v.s), pct: num(v.p)};
+  } else {
+    const cur = pos[t] || {};
+    v = await ask({title: `Editar posição em ${t === 'DOLAR' ? 'dólar' : t}`, fields: [{name: 'q', label: t === 'DOLAR' ? 'Quantos dólares você tem?' : 'Quantidade de cotas', mode: 'decimal', value: cur.qtd ? N(cur.qtd, 6) : ''},
+      {name: 'p', label: 'Preço médio pago', prefix: t === 'VOO' ? 'US$' : 'R$', mode: 'decimal', value: cur.pm ? N(cur.pm, 4) : ''}],
+      validate: v => isNaN(num(v.q)) || num(v.q) < 0 ? 'Informe a quantidade (pode ser 0).' : isNaN(num(v.p)) || num(v.p) < 0 ? 'Informe o preço médio.' : ''});
+    if (!v) return;
+    pos[t] = {qtd: num(v.q), pm: num(v.p)};
+  }
+  sv(); await load(t); posChanged();
+}
+async function addTicker() {
+  const opts = Object.entries(st.uni).map(([k, v]) => [k, v.nome]).concat(Object.entries(RF).filter(([k]) => !st.uni[k]));
+  const v = await ask({title: 'Adicionar ativo', desc: 'Código da B3 (ex.: HGLG11, WEGE3, IVVB11), VOO, DOLAR ou um título de renda fixa da lista.',
+    fields: [{name: 't', label: 'Código', upper: true, list: opts, ph: 'Ex.: WEGE3'}], ok: 'Adicionar',
+    validate: v => { const t = String(v.t || '').trim().toUpperCase().replace(/\s+/g, '_');
+      if (!OKT.test(t)) return 'Código inválido.'; if (document.getElementById('r-' + t)) return 'Esse ativo já está na lista.'; }});
+  if (!v) return;
+  const t = v.t.trim().toUpperCase().replace(/\s+/g, '_');
   if (!extra.includes(t)) extra.push(t);
   sv(); addRow(t); load(t);
 }
+$('#btnAdd').onclick = addTicker;
 function rm(t) {
-  extra = extra.filter(x => x !== t); delete pos[t]; sv();
-  document.getElementById('r-' + t)?.remove(); loadPort();
+  extra = extra.filter(x => x !== t); delete pos[t]; delete st.an[t]; sv();
+  document.getElementById('r-' + t)?.remove(); posChanged();
 }
-const bkGen = () => { $('#bk').value = JSON.stringify({pos, extra, perfil}); $('#bk').select(); };
-function bkRest() {
+let pcT; function posChanged() { clearTimeout(pcT); pcT = setTimeout(() => loadPort(true), 400); }
+
+/* ---------- perfil, configurações e backup ---------- */
+$('#btnPerfil').onclick = async () => {
+  const v = await ask({title: 'Seu perfil de investidor', desc: 'Define a alocação ideal entre renda fixa, ações, FIIs, exterior e proteção.',
+    fields: [{name: 'p', type: 'radio', value: perfil, options: Object.entries(PERFIS).map(([k, [l, d]]) => ({value: k, label: l, desc: d}))}], ok: 'Usar este perfil',
+    validate: v => v.p ? '' : 'Escolha um perfil.'});
+  if (!v || v.p === perfil) return;
+  perfil = v.p; sv(); renderPerfilChip(); loadPort(true);
+};
+$('#btnCfg').onclick = async () => {
+  const bk = JSON.stringify({pos, extra, perfil});
+  const v = await ask({title: 'Backup e acesso', desc: 'Se você limpar os dados do navegador, as posições somem. Copie o texto abaixo e guarde; para restaurar, cole um backup e toque em Restaurar.',
+    fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
+    extraHtml: `<div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
+    ok: 'Restaurar', validate: v => { if (v.bk.trim() === bk) return 'Cole um backup diferente para restaurar, ou toque em Cancelar.'; try { JSON.parse(v.bk); } catch { return 'Texto de backup inválido.'; } }});
+  if (!v) return;
   try {
-    const b = JSON.parse($('#bk').value);
-    const okp = Object.fromEntries(Object.entries(b.pos || {}).filter(([k]) => OKT.test(k)));
-    pos = okp; extra = (b.extra || []).filter(k => OKT.test(k));
+    const b = JSON.parse(v.bk);
+    pos = Object.fromEntries(Object.entries(b.pos || {}).filter(([k]) => OKT.test(k)));
+    extra = (b.extra || []).filter(k => OKT.test(k));
     if (['conservador', 'moderado', 'arrojado', 'não informado'].includes(b.perfil)) perfil = b.perfil;
     sv(); location.reload();
-  } catch { alert('Texto de backup inválido.'); }
-}
-$('#perfil').value = perfil;
-$('#perfil').onchange = e => { perfil = e.target.value; sv(); loadPort(); };
-(async () => {
+  } catch { toast('Texto de backup inválido.'); }
+};
+document.addEventListener('click', e => {
+  if (e.target.id === 'bkCopy') { const ta = $('#dlg textarea'); navigator.clipboard?.writeText(ta.value).then(() => toast('Backup copiado'), () => { ta.select(); }); }
+  if (e.target.id === 'bkOut') { rawSet('tok', null); location.reload(); }
+});
+
+/* ---------- carga ---------- */
+async function loadPort(force) {
+  if (st.portBusy && !force) return;
+  st.portBusy = true; st.portErr = null; st.portT0 = Date.now();
+  const my = st.portReq = Symbol();
+  if (!st.port) { renderHero(); renderResumo(); renderInvestir(); renderSim(); }
+  else $$('#t-resumo>*, #t-investir>*').forEach(x => x.classList.add('stale'));
+  const tick = setInterval(() => { if (!st.port) { const m = $('.loading-msg span:last-child', $('#t-resumo')); if (m) m.textContent = portMsg(); } }, 3000);
   try {
-    const w = await api('/api/watchlist');
-    const ts = [...new Set([...w.tickers, ...extra, ...Object.keys(pos)])];
-    $('#list').innerHTML = ts.map(t => `<section class="row" id="r-${t}"><b>${esc(t)}</b> <span class="mut">analisando…</span></section>`).join('');
-    await Promise.allSettled(ts.map(load));
-    loadPort();
-  } catch (e) { $('#err').textContent = e.message; }
+    const p = await api('/api/portfolio', {pos, perfil});
+    if (my !== st.portReq) return;
+    st.port = p;
+  } catch (e) { if (my === st.portReq) st.portErr = e.message; }
+  finally { clearInterval(tick); }
+  if (my !== st.portReq) return;
+  st.portBusy = false;
+  renderHero(); renderResumo(); renderInvestir();
+  st.sim = null; renderSim();
+  if (st.port) runSim();
+}
+async function loadPan() {
+  st.panErr = null; renderMercado();
+  try { st.pan = await api('/api/outlook'); } catch (e) { st.panErr = e.message; }
+  renderMercado();
+  if (st.port && $('#sCen')) renderSim();
+}
+async function login() {
+  const v = await ask({title: 'Entrar', desc: 'Digite a senha do app (a variável APP_TOKEN do servidor).', fields: [{name: 'k', label: 'Senha', type: 'password'}], ok: 'Entrar',
+    validate: v => v.k ? '' : 'Digite a senha.'});
+  if (!v) return false;
+  tok = v.k; rawSet('tok', tok); return true;
+}
+(async () => {
+  renderPerfilChip();
+  go(['resumo', 'investir', 'sim', 'mercado', 'ativos'].includes(raw('tab')) ? raw('tab') : 'resumo');
+  renderHero(); renderResumo(); renderInvestir(); renderMercado();
+  if (!tok && !(await login())) { $('#fatal').textContent = 'Recarregue a página para entrar.'; $('#fatal').classList.remove('hide'); return; }
+  let w;
+  for (let i = 0; i < 3; i++) {
+    try { w = await api('/api/watchlist'); break; }
+    catch (e) { if (!tok) { if (!(await login())) break; } else { $('#fatal').textContent = e.message; $('#fatal').classList.remove('hide'); break; } }
+  }
+  if (!w) return;
+  $('#fatal').classList.add('hide');
+  st.uni = w.universo || {};
+  const ts = [...new Set([...w.tickers, ...extra, ...Object.keys(pos)])];
+  $('#list').innerHTML = '';
+  ts.forEach(addRow);
+  loadPan();
+  loadPort();
+  await Promise.allSettled(ts.map(load));
 })();
 </script>
 </body>
