@@ -11,6 +11,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+import armazem
 import simulacao as sim
 
 load_dotenv()
@@ -19,7 +20,7 @@ TOKEN = os.getenv("APP_TOKEN", "")
 MODEL = os.getenv("MODEL", "claude-sonnet-5-5")
 client = anthropic.Anthropic()
 app = FastAPI()
-cache, fails = {}, {}  # o servidor NÃO guarda carteira: as posições vêm do celular a cada pedido
+cache, fails = {}, {}  # as posições chegam do aparelho a cada pedido; a cópia salva da carteira fica em armazem.py
 _locks, _guard = {}, threading.Lock()
 
 YF = {"DOLAR": "USDBRL=X", "VOO": "VOO"}
@@ -684,6 +685,64 @@ def simulate(req: Request, r: SimReq, x_token: str = Header("")):
         return cached(key, 1800, calc)
     except Exception as e:
         raise HTTPException(502, str(e))
+
+
+# ---------------------------------------------------------------- carteira salva no servidor
+
+class CarteiraDados(BaseModel):
+    pos: dict[str, Pos] = {}
+    extra: list[str] = []
+    perfil: str = "não informado"
+    objetivo: str = ""
+
+
+class SalvarReq(BaseModel):
+    dados: CarteiraDados
+    base: int = 0  # versão do servidor em que o aparelho se baseou
+
+
+def limpar_carteira(d):
+    """Normaliza e limita o que vai para o armazenamento (só códigos válidos e números não negativos)."""
+    pos = {}
+    for t, p in list(d.pos.items())[:300]:
+        t = norm(t)
+        if OKT.match(t):
+            pos[t] = {k: round(min(max(float(v), 0), 1e12), 6) for k, v in p.model_dump(exclude_defaults=True).items()
+                      if v == v}
+    extra = list(dict.fromkeys(t for t in (norm(x) for x in d.extra[:300]) if OKT.match(t)))
+    perfil = d.perfil if d.perfil in PERFIS else "não informado"
+    return {"pos": pos, "extra": extra, "perfil": perfil, "objetivo": " ".join(d.objetivo.split())[:600]}
+
+
+def _info():
+    return {"modo": armazem.modo(), "persistente": armazem.persistente()}
+
+
+@app.get("/api/carteira")
+def carteira_get(req: Request, x_token: str = Header("")):
+    auth(req, x_token)
+    try:
+        r = armazem.ler()
+    except Exception as e:
+        print("erro ao ler a carteira salva:", repr(e), flush=True)
+        raise HTTPException(503, "não consegui ler a carteira salva no servidor")
+    return {**(r or {"versao": 0, "atualizado": None, "dados": None}), **_info()}
+
+
+@app.put("/api/carteira")
+def carteira_put(req: Request, r: SalvarReq, x_token: str = Header("")):
+    auth(req, x_token)
+    try:
+        novo = armazem.gravar(limpar_carteira(r.dados), max(r.base, 0))
+        if novo is None:
+            atual = armazem.ler()
+            raise HTTPException(409, {"msg": "a carteira foi alterada em outro aparelho", "versao": atual["versao"] if atual else 0})
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("erro ao salvar a carteira:", repr(e), flush=True)
+        raise HTTPException(503, "não consegui salvar a carteira no servidor")
+    return {"versao": novo["versao"], "atualizado": novo["atualizado"], **_info()}
 
 
 if __name__ == "__main__":

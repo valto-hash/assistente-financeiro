@@ -149,6 +149,9 @@ details[open]>summary::before{transform:rotate(45deg)}
 .quick button{border:1px solid var(--line);background:var(--sf);border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
 .quick button:hover{border-color:var(--acc);color:var(--acc)}
 .btn:disabled{opacity:.5;cursor:default;filter:none}
+.sync{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--ink2);margin-top:12px}
+.sync svg{width:16px;height:16px;flex:0 0 16px}
+.sync .ok{color:var(--up)}.sync .bad{color:var(--dn)}.sync .wr{color:var(--warn)}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .obj-card h2 svg{width:18px;height:18px;color:var(--acc)}
 .obj-txt{width:100%;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--sf2);padding:12px 14px;font:inherit;font-size:15px;line-height:1.5;resize:vertical;min-height:92px;color:var(--ink)}
@@ -309,7 +312,8 @@ dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
   <section id="t-ativos" role="tabpanel" hidden>
     <div class="card">
       <h2>Meus ativos</h2>
-      <p class="lead sm">Você opera na sua corretora e anota aqui. As posições ficam só neste aparelho.</p>
+      <p class="lead sm">Você opera na sua corretora e anota aqui. Seus ativos ficam salvos no servidor do app (protegidos pela senha) e neste aparelho, e aparecem em qualquer aparelho em que você entrar.</p>
+      <div id="syncInfo" class="sync" aria-live="polite"></div>
       <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button></div>
     </div>
     <div id="list" class="grid2"></div>
@@ -357,7 +361,122 @@ let aporte = ld('aporte', 5000), modo = 'aporte';
 const simCfg = Object.assign({inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'}, ld('simcfg', {}));
 const st = {uni: {}, port: null, pan: null, sim: null, an: {}, portErr: null, panErr: null, simErr: null, portBusy: false, simBusy: false, tab: 'resumo'};
 const sv = () => { rawSet('pos', JSON.stringify(pos)); rawSet('extra', JSON.stringify(extra)); rawSet('perfil', perfil); rawSet('objetivo', objetivo || null);
-  rawSet('aporte', JSON.stringify(aporte)); rawSet('simcfg', JSON.stringify(simCfg)); };
+  rawSet('aporte', JSON.stringify(aporte)); rawSet('simcfg', JSON.stringify(simCfg)); agendarEnvio(); };
+
+/* ---------- sincronização da carteira com o servidor ----------
+   Cada aparelho guarda uma cópia (localStorage) e o servidor guarda a oficial. "versao" é a versão do servidor em que
+   este aparelho se baseou; "hash" é o conteúdo que foi salvo por último. Se outro aparelho salvou antes, o servidor
+   recusa (409) e o app pergunta qual versão manter, em vez de sobrescrever em silêncio. */
+let sync = Object.assign({versao: 0, hash: null, quando: null}, ld('sync', {}));
+const syncSt = {estado: 'inicio', modo: null, persistente: null, erro: null};
+function canon(d) {
+  const pp = {};
+  Object.keys(d.pos || {}).filter(t => OKT.test(t)).sort().forEach(t => {
+    const p = d.pos[t] || {}, o = {};
+    for (const [k, def] of [['qtd', 0], ['pm', 0], ['saldo', 0], ['pct', 100]]) {
+      const v = Number(p[k]);
+      if (p[k] != null && isFinite(v) && v !== def) o[k] = Math.round(Math.max(v, 0) * 1e6) / 1e6;
+    }
+    if (Object.keys(o).length) pp[t] = o;
+  });
+  return {pos: pp, extra: [...new Set((d.extra || []).filter(t => OKT.test(t)))], perfil: PERFIS[d.perfil] ? d.perfil : 'não informado',
+    objetivo: String(d.objetivo || '').replace(/\s+/g, ' ').trim().slice(0, 600)};
+}
+const dadosLocais = () => canon({pos, extra, perfil, objetivo});
+const hashDe = d => JSON.stringify(d);
+const temDados = d => Object.keys(d.pos).length > 0 || d.extra.length > 0 || !!d.objetivo || d.perfil !== 'não informado';
+const nAtivos = d => Object.values(d.pos).filter(p => p.qtd > 0 || p.saldo > 0).length;
+const salvarSync = v => { sync = v; rawSet('sync', JSON.stringify(sync)); };
+function aplicarDados(d) { pos = d.pos; extra = d.extra; perfil = d.perfil; objetivo = d.objetivo; objDraft = objetivo; }
+async function apiSync(method, body) {
+  const r = await fetch('/api/carteira', {method, headers: {'X-Token': tok, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
+  let j = {};
+  try { j = await r.json(); } catch {}
+  if (j.modo) { syncSt.modo = j.modo; syncSt.persistente = j.persistente; }
+  return {status: r.status, j};
+}
+async function sincronizarInicio() {
+  let r;
+  try { r = await apiSync('GET'); } catch { syncSt.estado = 'offline'; return renderSync(); }
+  if (r.status !== 200) { syncSt.estado = 'erro'; syncSt.erro = typeof r.j.detail === 'string' ? r.j.detail : `Erro ${r.status}`; return renderSync(); }
+  const local = dadosLocais(), hLocal = hashDe(local);
+  if (!r.j.dados) {  // servidor vazio (primeira vez, ou perdeu os dados): envia a cópia deste aparelho
+    salvarSync({...sync, versao: 0});
+    syncSt.estado = 'ok';
+    return temDados(local) ? enviar() : renderSync();
+  }
+  const remoto = canon(r.j.dados), hRem = hashDe(remoto);
+  if (hRem === hLocal) { salvarSync({versao: r.j.versao, hash: hLocal, quando: r.j.atualizado}); syncSt.estado = 'ok'; return renderSync(); }
+  if (hLocal === sync.hash || !temDados(local)) {  // nada pendente neste aparelho: adota a versão do servidor
+    salvarSync({versao: r.j.versao, hash: hRem, quando: r.j.atualizado});
+    aplicarDados(remoto); sv(); syncSt.estado = 'ok'; return renderSync();
+  }
+  if (r.j.versao === sync.versao) { syncSt.estado = 'ok'; return enviar(); }  // só este aparelho mudou
+  return resolverConflito(r.j, true);  // os dois mudaram
+}
+let envioT, retryT;
+function agendarEnvio() { clearTimeout(envioT); envioT = setTimeout(enviar, 800); }
+async function enviar() {
+  if (!tok || ['inicio', 'conflito'].includes(syncSt.estado)) return;
+  const d = dadosLocais(), h = hashDe(d);
+  if (h === sync.hash) { if (syncSt.estado !== 'ok') { syncSt.estado = 'ok'; renderSync(); } return; }
+  if (enviar.busy) { enviar.again = true; return; }
+  enviar.busy = true; syncSt.estado = 'salvando'; renderSync();
+  try {
+    const r = await apiSync('PUT', {dados: d, base: sync.versao});
+    if (r.status === 200) { salvarSync({versao: r.j.versao, hash: h, quando: r.j.atualizado}); syncSt.estado = 'ok'; }
+    else if (r.status === 409) { const g = await apiSync('GET'); enviar.busy = false; return g.status === 200 ? resolverConflito(g.j, false) : null; }
+    else { syncSt.estado = 'erro'; syncSt.erro = typeof r.j.detail === 'string' ? r.j.detail : `Erro ${r.status}`; }
+  } catch { syncSt.estado = 'offline'; }
+  enviar.busy = false; renderSync();
+  if (enviar.again) { enviar.again = false; agendarEnvio(); }
+  clearTimeout(retryT);
+  if (['offline', 'erro'].includes(syncSt.estado)) retryT = setTimeout(enviar, 60000);
+}
+addEventListener('online', () => enviar());
+async function resolverConflito(srv, inicio) {
+  const local = dadosLocais();
+  if (!srv.dados) { salvarSync({...sync, versao: 0}); syncSt.estado = 'ok'; return enviar(); }
+  const remoto = canon(srv.dados);
+  if (hashDe(remoto) === hashDe(local)) { salvarSync({versao: srv.versao, hash: hashDe(local), quando: srv.atualizado}); syncSt.estado = 'ok'; return renderSync(); }
+  syncSt.estado = 'conflito'; syncSt.srv = srv; renderSync();
+  if ($('#dlg').open) return;  // não interrompe outro diálogo: o aviso fica em "Meus ativos" com o botão para escolher
+  const quando = srv.atualizado ? new Date(srv.atualizado).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'}) : '';
+  const v = await ask({title: 'Sua carteira mudou em outro aparelho', desc: 'A versão salva no servidor é diferente da deste aparelho. Qual você quer manter?',
+    fields: [{name: 'v', type: 'radio', value: 'servidor', options: [
+      {value: 'servidor', label: 'A salva no servidor', desc: `Atualizada em ${quando} · ${nAtivos(remoto)} ${nAtivos(remoto) === 1 ? 'ativo' : 'ativos'} com posição`},
+      {value: 'local', label: 'A deste aparelho', desc: `${nAtivos(local)} ${nAtivos(local) === 1 ? 'ativo' : 'ativos'} com posição · substitui a do servidor`}]}],
+    ok: 'Continuar'});
+  if (!v) return;
+  if (v.v === 'servidor') {
+    salvarSync({versao: srv.versao, hash: hashDe(remoto), quando: srv.atualizado});
+    aplicarDados(remoto); syncSt.estado = 'ok'; sv();
+    if (!inicio) location.reload();
+    return renderSync();
+  }
+  salvarSync({...sync, versao: srv.versao}); syncSt.estado = 'ok';
+  return enviar();
+}
+async function escolherVersao() {
+  const g = await apiSync('GET').catch(() => null);
+  if (g?.status === 200) { syncSt.estado = 'ok'; await resolverConflito(g.j, false); }
+}
+function renderSync() {
+  const el = $('#syncInfo');
+  if (!el) return;
+  const hora = sync.quando ? new Date(sync.quando).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'}) : '';
+  const ok = '<svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+  const html = {
+    inicio: `<span class="spin" aria-hidden="true"></span>Verificando a cópia salva no servidor…`,
+    salvando: `<span class="spin" aria-hidden="true"></span>Salvando no servidor…`,
+    ok: `${ok}<span>Salvo no servidor${hora ? ' · ' + esc(hora) : ''}</span>`,
+    offline: `<span class="wr">${ICON.warn}</span><span>Sem conexão com o servidor: por enquanto salvo só neste aparelho. Vou tentar de novo.</span>`,
+    erro: `<span class="bad">${ICON.warn}</span><span>Não consegui salvar no servidor (${esc(syncSt.erro || '')}). Por enquanto está salvo neste aparelho.</span><button class="btn sm" type="button" onclick="enviar()">Tentar de novo</button>`,
+    conflito: `<span class="wr">${ICON.warn}</span><span>Sua carteira mudou em outro aparelho.</span><button class="btn sm" type="button" onclick="escolherVersao()">Escolher qual manter</button>`,
+  }[syncSt.estado] || '';
+  el.innerHTML = html + (syncSt.estado === 'ok' && syncSt.persistente === false
+    ? `<div class="note warn" style="width:100%">${ICON.warn}<div>O servidor está guardando em um arquivo que pode ser apagado num novo deploy. Este aparelho mantém uma cópia e reenvia se isso acontecer, mas para guardar de forma permanente configure <b>DATABASE_URL</b> (PostgreSQL) ou um disco persistente em <b>DATA_DIR</b>.</div></div>` : '');
+}
 
 /* ---------- formatação ---------- */
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -1040,7 +1159,7 @@ $('#btnPerfil').onclick = async () => {
 };
 $('#btnCfg').onclick = async () => {
   const bk = JSON.stringify({pos, extra, perfil, objetivo});
-  const v = await ask({title: 'Backup e acesso', desc: 'Se você limpar os dados do navegador, as posições somem. Copie o texto abaixo e guarde; para restaurar, cole um backup e toque em Restaurar.',
+  const v = await ask({title: 'Backup e acesso', desc: 'Seus ativos já ficam salvos no servidor do app. Este texto é uma cópia extra: guarde-o em um lugar seguro; para restaurar, cole um backup e toque em Restaurar (ele substitui a carteira salva no servidor).',
     fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
     extraHtml: `<div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
     ok: 'Restaurar', validate: v => { if (v.bk.trim() === bk) return 'Cole um backup diferente para restaurar, ou toque em Cancelar.'; try { JSON.parse(v.bk); } catch { return 'Texto de backup inválido.'; } }});
@@ -1051,7 +1170,10 @@ $('#btnCfg').onclick = async () => {
     extra = (b.extra || []).filter(k => OKT.test(k));
     if (['conservador', 'moderado', 'arrojado', 'não informado'].includes(b.perfil)) perfil = b.perfil;
     if (typeof b.objetivo === 'string') objetivo = b.objetivo.slice(0, 600);
-    sv(); location.reload();
+    sv();
+    const g = await apiSync('GET').catch(() => null);  // a restauração é uma escolha explícita: substitui a do servidor
+    if (g?.status === 200) { salvarSync({...sync, versao: g.j.versao}); syncSt.estado = 'ok'; await enviar(); }
+    location.reload();
   } catch { toast('Texto de backup inválido.'); }
 };
 document.addEventListener('click', e => {
@@ -1112,6 +1234,9 @@ async function login() {
   if (!w) return;
   $('#fatal').classList.add('hide');
   st.uni = w.universo || {};
+  renderSync();
+  await sincronizarInicio();
+  renderPerfilChip(); renderInvestir();
   const ts = [...new Set([...w.tickers, ...extra, ...Object.keys(pos)])];
   $('#list').innerHTML = '';
   ts.forEach(addRow);
