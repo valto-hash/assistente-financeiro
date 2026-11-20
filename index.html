@@ -616,7 +616,7 @@ function ask({title, desc = '', fields = [], ok = 'Salvar', extraHtml = '', vali
     d.innerHTML = `<form class="dlg" novalidate><h3 id="dlgTitle">${esc(title)}</h3>${desc ? `<p>${esc(desc)}</p>` : ''}
       ${fields.map(f => f.type === 'radio' ? `<div class="opt-cards" role="radiogroup">${f.options.map(o => `<label><input type="radio" name="${f.name}" value="${esc(o.value)}" ${o.value === f.value ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
         : f.type === 'select' ? `<label class="fld"><span>${esc(f.label)}</span><div class="inp"><select name="${f.name}">${f.options.map(o => `<option value="${esc(o[0])}" ${o[0] === f.value ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></div>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</label>`
-        : f.type === 'checks' ? `<div class="checks">${f.options.map(o => `<label><input type="checkbox" name="${f.name}" value="${esc(o.value)}" ${o.checked ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
+        : f.type === 'checks' ? `${f.label ? `<p class="b sm" style="margin:2px 0 -6px">${esc(f.label)}</p>` : ''}<div class="checks">${f.options.map(o => `<label><input type="checkbox" name="${f.name}" value="${esc(o.value)}" ${o.checked ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
         : f.type === 'textarea' ? `<label class="fld"><span>${esc(f.label)}</span><textarea name="${f.name}" rows="5">${esc(f.value ?? '')}</textarea>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</label>`
         : `<label class="fld"><span>${esc(f.label)}</span><div class="inp">${f.prefix ? `<i>${esc(f.prefix)}</i>` : ''}<input name="${f.name}" type="${f.type || 'text'}" inputmode="${f.mode || 'text'}" value="${esc(f.value ?? '')}" ${f.list ? `list="dl-${f.name}"` : ''} autocomplete="off" ${f.upper ? 'autocapitalize="characters"' : ''} placeholder="${esc(f.ph || '')}">${f.suffix ? `<i>${esc(f.suffix)}</i>` : ''}</div>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}${f.list ? `<datalist id="dl-${f.name}">${f.list.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</datalist>` : ''}</label>`).join('')}
       ${extraHtml}<div id="dlgErr" role="alert"></div>
@@ -765,10 +765,15 @@ function plano() {
       return {...s, valor: d};
     }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003) && !manter.has(x.ticker)).sort((a, b) => b.valor - a.valor);
   }
-  const T = p.total + aporte;
-  const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual[s.ticker] || 0), 0)}));
+  // 1º fica de lado o dinheiro das contas a vencer; 2º completa a reserva de emergência; 3º o resto segue a carteira recomendada
+  const inv = investivel(), orc = p.orcamento || {}, resAtivo = orc.reserva_ativo;
+  const resParte = resAtivo ? Math.min(inv, orc.reserva_falta || 0) : 0, resto = inv - resParte;
+  const atual2 = {...atual};
+  if (resParte) atual2[resAtivo] = (atual2[resAtivo] || 0) + resParte;
+  const T = p.total + inv;
+  const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual2[s.ticker] || 0), 0)}));
   const sf = linhas.reduce((a, x) => a + x.falta, 0);
-  linhas.forEach(x => x.valor = sf <= 0 ? aporte * x.peso / 100 : sf >= aporte ? aporte * x.falta / sf : x.falta + (aporte - sf) * x.peso / 100);
+  linhas.forEach(x => x.valor = resto <= 0 ? 0 : sf <= 0 ? resto * x.peso / 100 : sf >= resto ? resto * x.falta / sf : x.falta + (resto - sf) * x.peso / 100);
   // arredonda para cotas inteiras nos ativos da B3; a sobra vai para a renda fixa de liquidez
   let sobra = 0;
   linhas.forEach(x => {
@@ -782,12 +787,30 @@ function plano() {
   const liq = linhas.find(x => ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'].includes(x.ticker)) || linhas.find(x => x.classe === 'renda_fixa');
   if (liq) { liq.valor += sobra; sobra = 0; }
   st.sobra = sobra;
-  return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => b.valor - a.valor);
+  if (resParte) {
+    const l = linhas.find(x => x.ticker === resAtivo);
+    if (l) { l.valor += resParte; l.reserva = resParte; }
+    else linhas.push({ticker: resAtivo, nome: nomeDe(resAtivo), classe: 'renda_fixa', valor: resParte, reserva: resParte, bruto: resParte});
+  }
+  return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => (b.reserva ? 1 : 0) - (a.reserva ? 1 : 0) || b.valor - a.valor);
 }
 const motivoDe = t => st.port?.acoes?.find(d => d.ativo === t)?.motivo || st.port?.sugerida?.find(s => s.ticker === t)?.motivo || '';
+function antesDoPlano() {  // contas a vencer e reserva, explicadas antes das linhas do plano
+  if (modo !== 'aporte' || !st.contas) return '';
+  const cv = contasAVencer(), sep = st.fin?.separar_contas, orc = st.port?.orcamento || {}, inv = investivel();
+  const ate = cv.ate.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
+  let h = '';
+  if (cv.total > 0) h += `<div class="note">${ICON.info}<div>Contas até ${ate}${st.fin?.dia_renda ? ' (seu próximo recebimento)' : ''} ainda não pagas:
+    <b>${M(cv.total)}</b> (${cv.lista.map(c => esc(c.nome)).slice(0, 3).join(', ')}${cv.lista.length > 3 ? '…' : ''}).
+    ${sep ? 'Você marcou que já separou esse dinheiro.' : inv > 0 ? `O plano deixa esse valor de lado e investe <b>${M(inv)}</b>.` : 'Todo o valor fica para as contas.'}
+    <label class="toggle" style="margin-top:6px"><input type="checkbox" id="sepContas" ${sep ? 'checked' : ''}> Já separei o dinheiro das contas</label></div></div>`;
+  if (orc.reserva_falta > 1 && inv > 0) h += `<div class="note">${ICON.target}<div><b>Primeiro a reserva de emergência:</b> faltam ${M(orc.reserva_falta)} para cobrir
+    ${orc.reserva_meses} meses das suas contas. ${inv <= orc.reserva_falta ? 'Todo este valor vai para ela.' : `${M(orc.reserva_falta)} vão para ela e o resto segue a carteira recomendada.`}</div></div>`;
+  return h;
+}
 function planoHtml() {
   const p = st.port, ls = plano();
-  if (!ls.length) return `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : 'Informe um valor para ver o plano.'}</p>`;
+  if (!ls.length) return antesDoPlano() + `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : investivel() <= 0 && aporte > 0 ? 'Nada a investir agora.' : 'Informe um valor para ver o plano.'}</p>`;
   const max = Math.max(...ls.map(x => Math.abs(x.valor)));
   const rows = ls.map(x => {
     const venda = x.valor < 0, v = Math.abs(x.valor);
@@ -797,13 +820,14 @@ function planoHtml() {
     else if (modo === 'aporte' && x.ticker === 'VOO' && x.preco_brl) meta = `≈ ${N(x.cotas, 2)} cotas (fração) a ${M(x.preco, 'USD')}`;
     else if (modo === 'rebal') meta = motivoDe(x.ticker);
     else if (x.classe === 'renda_fixa' && x.taxa_aa) meta = `rende cerca de ${A(x.taxa_aa)}`;
+    if (modo === 'aporte' && x.reserva) meta = `${M(x.reserva)} completam a reserva de emergência${x.valor - x.reserva > 1 ? `; ${M(x.valor - x.reserva)} são da carteira` : ''}`;
     const lbl = x.classe === 'renda_fixa' ? x.nome : rot(x.ticker), sub = x.classe === 'renda_fixa' || x.nome === lbl || x.nome === x.ticker ? '' : x.nome;
-    return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span></div>
+    return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span>${x.reserva && modo === 'aporte' ? pill('info', '', 'Reserva') : ''}</div>
       <div class="val ${venda ? 'sell' : ''}">${modo === 'rebal' ? (venda ? 'Vender ' : 'Comprar ') : ''}${modo === 'aporte' && x.cotas === 0 ? '<span class="mut">—</span>' : M(v)}</div>
       <div class="meta"><span class="meter" aria-hidden="true"><i style="width:${(v / max * 100).toFixed(1)}%;background:var(--c-${x.classe})"></i></span><span>${meta}</span></div></div>`;
   }).join('');
   const tot = ls.reduce((a, x) => a + x.valor, 0);
-  return `<div class="plan">${rows}</div>
+  return `${antesDoPlano()}<div class="plan">${rows}</div>
     ${modo === 'aporte' ? `<div class="plan-tot"><span>Total</span><span class="tn">${M(tot)}</span></div>${st.sobra > 1 ? `<p class="mut sm">Sobram ${M(st.sobra)} por causa do arredondamento de cotas.</p>` : ''}`
     : `<div class="note">${ICON.info}<div>Vender com lucro pode gerar imposto de renda (ações acima de R$ 20 mil vendidos no mês, FIIs sempre). Sempre que possível, rebalanceie direcionando os novos aportes.</div></div>`}`;
 }
@@ -822,6 +846,8 @@ function renderInvestir() {
       <div id="aporteBox" ${modo === 'rebal' ? 'class="hide"' : ''}>
         <label class="amount"><span>R$</span><input id="aporte" inputmode="decimal" value="${N(aporte, 2)}" aria-label="Valor a investir"></label>
         <div class="quick">${[1000, 5000, 10000, 50000].map(v => `<button type="button" data-q="${v}">${Mc(v)}</button>`).join('')}</div>
+        ${p.orcamento?.sobra > 0 ? `<p class="mut sm" style="margin:10px 0 0">Pela sua renda e suas contas, sobram cerca de <b>${M(p.orcamento.sobra)}</b> por mês. <a href="#" id="usarSobra">Investir esse valor</a></p>`
+          : p.orcamento && !p.orcamento.renda_mensal ? `<p class="mut sm" style="margin:10px 0 0"><a href="#" onclick="go('contas');return false">Informe sua renda</a> em Contas para o app calcular quanto sobra por mês para investir.</p>` : ''}
       </div>
       <h3>${modo === 'rebal' ? 'Ajustes para chegar à carteira recomendada' : 'Seu plano de compra'}</h3>
       <div id="plano">${planoHtml()}</div>
@@ -850,6 +876,7 @@ function renderInvestir() {
   const inp = $('#aporte', el);
   if (inp) inp.oninput = () => { const v = num(inp.value); aporte = isNaN(v) ? 0 : Math.max(v, 0); sv(); $('#plano').innerHTML = planoHtml(); simDirty(); };
   $$('[data-q]', el).forEach(b => b.onclick = () => { aporte = +b.dataset.q; sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
+  $('#usarSobra', el)?.addEventListener('click', e => { e.preventDefault(); aporte = Math.round(p.orcamento.sobra); sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
   $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
   $('#btnCopy', el).onclick = copyPlan;
   bindObjetivo(el);
@@ -905,7 +932,8 @@ function bindObjetivo(el) {
 }
 function copyPlan() {
   const ls = plano();
-  const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(aporte)}:\n`) +
+  const cv = modo === 'aporte' && st.contas && !st.fin?.separar_contas ? contasAVencer().total : 0;
+  const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(investivel())}${cv ? ` (de ${M(aporte)}; ${M(cv)} ficam para as contas a vencer)` : ''}:\n`) +
     ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}${modo === 'rebal' && motivoDe(x.ticker) ? ` — ${motivoDe(x.ticker)}` : ''}`).join('\n');
   (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => toast('Plano copiado'), () => ask({title: 'Copie o plano', fields: [{name: 't', label: 'Plano', type: 'textarea', value: txt}], ok: 'Fechar'}));
 }
@@ -947,7 +975,7 @@ function renderSim() {
       <p class="lead sm">2.000 futuros possíveis sorteados a partir de até 20 anos de histórico real dos ativos, ajustados pelas expectativas de juros e inflação e pelos cenários montados com as notícias recentes.</p>
       <div class="ctrls" id="simCtrls" style="margin-top:14px">
         <label class="fld"><span>Valor inicial</span><div class="inp"><i>R$</i><input id="sIni" inputmode="decimal"></div><small id="sIniH"></small></label>
-        <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div></label>
+        <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div><small id="sMenH"></small></label>
         <label class="fld"><span>Prazo</span><div class="inp"><select id="sAnos">${[...new Set([1, 3, 5, 10, 15, 20, 30, simCfg.anos])].sort((a, b) => a - b).map(a => `<option value="${a}">${a} ${a === 1 ? 'ano' : 'anos'}</option>`).join('')}</select></div></label>
         <label class="fld"><span>Cenário das notícias</span><div class="inp"><select id="sCen"></select></div></label>
       </div>
@@ -960,7 +988,7 @@ function renderSim() {
     <div id="simMore"></div>`;
     const ini = $('#sIni'), men = $('#sMen');
     ini.oninput = () => { const v = num(ini.value); simCfg.inicial = ini.value.trim() === '' || isNaN(v) ? null : Math.max(v, 0); sv(); debSim(); updIniHint(); };
-    men.oninput = () => { const v = num(men.value); simCfg.mensal = isNaN(v) ? 0 : Math.max(v, 0); sv(); debSim(); };
+    men.oninput = () => { const v = num(men.value); simCfg.mensal = isNaN(v) ? 0 : Math.max(v, 0); sv(); debSim(); updMenHint(); };
     $('#sAnos').onchange = e => { simCfg.anos = +e.target.value; sv(); runSim(); };
     $('#sCen').onchange = e => { simCfg.cenario = e.target.value; sv(); runSim(); };
     $('#sReal').onchange = e => { simCfg.real = e.target.checked; sv(); renderSimBody(); };
@@ -980,7 +1008,15 @@ function renderSim() {
   renderSimBody();
 }
 let debT; function debSim() { clearTimeout(debT); debT = setTimeout(runSim, 600); }
+function updMenHint() {
+  const h = $('#sMenH'), sobra = st.port?.orcamento?.sobra;
+  if (!h) return;
+  h.innerHTML = !(sobra > 0) ? '' : Math.abs(simCfg.mensal - sobra) < 1 ? 'O que sobra da sua renda depois das contas'
+    : `Sobram ${M0(sobra)} da renda depois das contas. <a href="#" id="sMenUsar">Usar</a>`;
+  const a = $('#sMenUsar'); if (a) a.onclick = e => { e.preventDefault(); simCfg.mensal = Math.round(sobra); sv(); $('#sMen').value = N(simCfg.mensal, 2); updMenHint(); runSim(); };
+}
 function updIniHint() {
+  updMenHint();
   const h = $('#sIniH'); if (!h) return;
   h.innerHTML = simCfg.inicial == null ? 'Patrimônio atual + valor do aporte' : `<a href="#" id="sIniReset">Usar patrimônio atual + aporte</a>`;
   const a = $('#sIniReset'); if (a) a.onclick = e => { e.preventDefault(); simCfg.inicial = null; sv(); $('#sIni').value = N(inicialAuto(), 2); updIniHint(); runSim(); };
@@ -1458,8 +1494,68 @@ const ymDe = (a, m) => `${a}-${String(m + 1).padStart(2, '0')}`;
 const dataBR = d => d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
 const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 async function loadContas() {
-  try { st.contas = await api('/api/contas'); st.contasErr = null; } catch (e) { st.contasErr = e.message; }
+  try { [st.contas, st.fin] = await Promise.all([api('/api/contas'), api('/api/financas')]); st.contasErr = null; } catch (e) { st.contasErr = e.message; }
+  renderContas(); renderResumoContas(); if (st.port) renderInvestir();
+}
+const LIQ = ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'];
+const reservaLocal = () => LIQ.reduce((s, t) => s + (pos[t]?.saldo || 0), 0);
+function proximaRenda() {
+  const dia = st.fin?.dia_renda, h = hojeD();
+  if (!dia) return null;
+  const em = (a, m) => new Date(a, m, Math.min(dia, new Date(a, m + 1, 0).getDate()));
+  const d = em(h.getFullYear(), h.getMonth());
+  return d > h ? d : em(h.getFullYear(), h.getMonth() + 1);
+}
+function contasAVencer() {
+  // contas ainda não pagas que vencem até o próximo recebimento (ou nos próximos 30 dias), incluindo as atrasadas deste mês
+  const h = hojeD(), ate = proximaRenda() || new Date(h.getFullYear(), h.getMonth(), h.getDate() + 30);
+  const prox = new Date(h.getFullYear(), h.getMonth() + 1, 1);
+  const lista = [...contasDoMes(h.getFullYear(), h.getMonth()), ...contasDoMes(prox.getFullYear(), prox.getMonth())].filter(c => !c.pago && c.venc <= ate);
+  return {ate, lista, total: lista.reduce((s, c) => s + c.valorMes, 0)};
+}
+function investivel() { return Math.max(aporte - (st.fin?.separar_contas || !st.contas ? 0 : contasAVencer().total), 0); }
+async function salvarFin(mud) {
+  const f = {...st.fin, ...mud};
+  st.fin = await api('/api/financas', {renda_mensal: f.renda_mensal || 0, dia_renda: f.dia_renda || 0, reserva_meses: f.reserva_meses || 6,
+    separar_contas: !!f.separar_contas, renda_origem: f.renda_origem || 'manual'}, 'PUT');
   renderContas(); renderResumoContas();
+}
+async function aposMudarContas() {  // contas mensais mudam a sobra e o tamanho da reserva: atualiza e refaz a recomendação
+  try { st.fin = await api('/api/financas'); } catch {}
+  renderContas(); renderResumoContas(); posChanged();
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'sepContas') return;
+  try { await salvarFin({separar_contas: e.target.checked}); } catch (er) { toast(er.message); }
+  const pl = $('#plano'); if (pl) pl.innerHTML = planoHtml();
+});
+async function editarFinancas() {
+  const f = st.fin || {};
+  const v = await ask({title: 'Renda e reserva', desc: 'Com a sua renda e as suas contas, o app calcula quanto sobra por mês e o tamanho da reserva de emergência.',
+    fields: [{name: 'r', label: 'Renda mensal líquida (o que cai na conta)', prefix: 'R$', mode: 'decimal', value: f.renda_mensal ? N(f.renda_mensal, 2) : ''},
+      {name: 'd', label: 'Dia em que você recebe', mode: 'numeric', value: f.dia_renda || '', hint: 'As contas que vencem antes disso ficam de fora do valor a investir.'},
+      {name: 'm', label: 'Reserva de emergência', type: 'select', value: String(f.reserva_meses || 6), options: [['3', '3 meses de contas (renda bem estável)'],
+        ['6', '6 meses de contas (recomendado)'], ['9', '9 meses de contas'], ['12', '12 meses de contas (autônomo ou renda variável)']]}],
+    validate: v => v.r && isNaN(num(v.r)) ? 'Renda inválida.' : v.d && !(+v.d >= 1 && +v.d <= 31) ? 'O dia vai de 1 a 31.' : ''});
+  if (!v) return;
+  try { await salvarFin({renda_mensal: num(v.r) || 0, dia_renda: +v.d || 0, reserva_meses: +v.m, renda_origem: 'manual'}); posChanged(); toast('Orçamento atualizado'); }
+  catch (e) { toast(e.message); }
+}
+function orcamentoHtml() {
+  const f = st.fin;
+  if (!f) return '';
+  const ra = reservaLocal(), alvo = f.reserva_alvo, sobra = f.sobra;
+  return `<div class="card"><div class="view-h"><h2>Renda e orçamento</h2><button class="btn sm" type="button" id="fEd">${f.renda_mensal ? 'Editar' : 'Informar renda'}</button></div>
+    <div class="tiles"><div class="tile"><div class="l">Renda mensal</div><div class="v tn">${f.renda_mensal ? M(f.renda_mensal) : '—'}</div>
+        <div class="d">${f.renda_mensal ? `${f.dia_renda ? `recebe dia ${f.dia_renda}` : 'dia não informado'}${f.renda_origem === 'extrato' ? ' · pelo extrato' : ''}` : 'Informe ou envie o extrato'}</div></div>
+      <div class="tile"><div class="l">Contas mensais</div><div class="v tn">${M(f.contas_mensais)}</div><div class="d">${f.n_contas} ${f.n_contas === 1 ? 'conta' : 'contas'} todo mês</div></div>
+      <div class="tile main"><div class="l">Sobra por mês</div><div class="v tn ${sobra < 0 ? 'dn' : ''}">${sobra != null ? M(sobra) : '—'}</div>
+        <div class="d">${sobra == null ? 'Precisa da sua renda' : sobra > 0 ? 'Pode ir para investimentos' : 'As contas passam da renda'}</div></div></div>
+    ${alvo > 0 ? `<div style="margin-top:14px"><div class="view-h"><span class="sm ink2">Reserva de emergência: ${f.reserva_meses} meses de contas</span><b class="sm tn">${M0(ra)} de ${M0(alvo)}</b></div>
+      <div class="barra-pago"><i style="width:${Math.min(100, ra / alvo * 100).toFixed(1)}%"></i></div>
+      <p class="mut xs" style="margin:6px 0 0">${ra >= alvo ? 'Reserva completa ✓' : `Faltam ${M0(alvo - ra)}. O app coloca o dinheiro novo nela antes dos outros investimentos.`} Conta como reserva o que está em Tesouro Selic, CDB pós-fixado ou Porquinho.</p></div>` : ''}
+    ${sobra < 0 ? `<div class="note warn">${ICON.warn}<div>Suas contas mensais passam da sua renda em ${M(-sobra)}. Antes de investir, vale rever os gastos.</div></div>` : ''}
+  </div>`;
 }
 function contasDoMes(ano, mes) {
   const ym = ymDe(ano, mes), ult = new Date(ano, mes + 1, 0).getDate();
@@ -1478,6 +1574,7 @@ function renderResumoContas() {
   const falta = l.reduce((s, c) => s + c.valorMes, 0), prox = l.find(c => c.venc >= h), atras = l.filter(c => c.venc < h).length;
   el.innerHTML = `<div class="card"><div class="view-h"><h2>Contas deste mês</h2><button class="btn sm" type="button" onclick="go('contas')">Ver contas</button></div>
     <p class="lead sm">${l.length ? `Falta pagar <b>${M(falta)}</b> em ${l.length} ${l.length === 1 ? 'conta' : 'contas'}.${prox ? ` Próxima: <b>${esc(prox.nome)}</b> em ${dataBR(prox.venc)}.` : ''}` : 'Tudo pago este mês. ✓'}</p>
+    ${st.fin?.reserva_alvo ? `<p class="sm ink2" style="margin:6px 0 0">Reserva de emergência: <b>${M0(reservaLocal())}</b> de ${M0(st.fin.reserva_alvo)} (${st.fin.reserva_meses} meses de contas)${st.fin.sobra != null ? ` · sobra por mês: <b class="${st.fin.sobra < 0 ? 'dn' : ''}">${M0(st.fin.sobra)}</b>` : ''}.</p>` : ''}
     ${atras ? `<div class="note warn">${ICON.warn}<div>${atras} ${atras === 1 ? 'conta venceu' : 'contas venceram'} e ainda não ${atras === 1 ? 'foi marcada' : 'foram marcadas'} como paga${atras === 1 ? '' : 's'}.</div></div>` : ''}</div>`;
 }
 function renderContas() {
@@ -1505,7 +1602,7 @@ function renderContas() {
         ${c.linha ? `<button class="btn sm" type="button" data-cp="${esc(c.linha)}">Copiar código</button>` : ''}
         <button class="btn sm ghost" type="button" data-ed="${c.id}">Editar</button><button class="btn sm ghost" type="button" data-rm="${c.id}">Excluir</button></div></div>`;
   };
-  el.innerHTML = `<div class="card">
+  el.innerHTML = `${orcamentoHtml()}<div class="card">
       <div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Contas de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>
       <div class="tiles"><div class="tile"><div class="l">Total do mês</div><div class="v tn">${M(total)}</div><div class="d">${lista.length} ${lista.length === 1 ? 'conta' : 'contas'}</div></div>
         <div class="tile"><div class="l">Já pago</div><div class="v tn">${M(pago)}</div><div class="d">${(n => `${n} ${n === 1 ? 'paga' : 'pagas'}`)(lista.filter(c => c.pago).length)}</div></div>
@@ -1522,6 +1619,7 @@ function renderContas() {
         <li><b>Enviar PDF ou foto</b> do boleto ou da fatura.</li><li><b>Achar contas no extrato:</b> envie o extrato do banco (OFX ou CSV) e o app identifica o que se repete todo mês.</li></ul></div>`}`;
   $$('[data-mes]', el).forEach(b => b.onclick = () => { let {ano: a, mes: m} = st.mesContas; m += +b.dataset.mes; if (m < 0) { m = 11; a--; } if (m > 11) { m = 0; a++; } st.mesContas = {ano: a, mes: m}; renderContas(); });
   $('#cNova', el).onclick = () => editarConta();
+  $('#fEd', el)?.addEventListener('click', editarFinancas);
   $('#cBoleto', el).onclick = lerBoleto;
   $('#cArq', el).onclick = () => $('#arqConta').click();
   $('#cExt', el).onclick = () => $('#arqExtrato').click();
@@ -1549,6 +1647,7 @@ async function editarConta(c = {}) {
   try {
     const r = c.id ? await api(`/api/contas/${c.id}`, body, 'PUT') : await api('/api/contas', [body]);
     st.contas.itens = r.itens;
+    aposMudarContas();
     const [y, m] = v.venc.split('-').map(Number);
     if (!c.id && v.rec === 'nao') st.mesContas = {ano: y, mes: m - 1};
     renderContas(); renderResumoContas(); toast(c.id ? 'Conta atualizada' : 'Conta adicionada');
@@ -1570,7 +1669,7 @@ async function apagarConta(id) {
   const it = st.contas.itens.find(x => x.id === id);
   const v = await ask({title: 'Excluir conta', desc: `Excluir “${it.nome}”${it.recorrente ? ' de todos os meses' : ''}?`, ok: 'Excluir'});
   if (!v) return;
-  try { st.contas.itens = (await api(`/api/contas/${id}`, null, 'DELETE')).itens; renderContas(); renderResumoContas(); } catch (e) { toast(e.message); }
+  try { st.contas.itens = (await api(`/api/contas/${id}`, null, 'DELETE')).itens; aposMudarContas(); } catch (e) { toast(e.message); }
 }
 async function lerBoleto() {
   const v = await ask({title: 'Ler boleto', desc: 'Cole ou digite a linha digitável (os números acima ou abaixo do código de barras). O app descobre o valor, o vencimento e quem cobra.',
@@ -1601,13 +1700,21 @@ $('#arqExtrato').onchange = async e => {
   const fd = new FormData(); fd.append('arquivo', f);
   toast('Procurando contas que se repetem…');
   try {
-    const r = await api('/api/contas/extrato', fd), sug = r.sugestoes;
+    const r = await api('/api/contas/extrato', fd), sug = r.sugestoes, rendas = r.rendas || [];
     const periodo = `${r.de.split('-').reverse().join('/')} a ${r.ate.split('-').reverse().join('/')}`;
-    if (!sug.length) return ask({title: 'Nenhuma conta mensal encontrada', desc: `Li ${r.transacoes} lançamentos (${periodo}), mas nenhum se repete todo mês. Extratos de 3 meses ou mais funcionam melhor.`, ok: 'Fechar'});
-    const v = await ask({title: 'Contas que se repetem todo mês', desc: `Li ${r.transacoes} lançamentos (${periodo}). Marque as que quer acompanhar:`, ok: 'Adicionar selecionadas',
-      fields: [{name: 's', type: 'checks', options: sug.map((x, i) => ({value: String(i), checked: !x.ja_cadastrada && x.confianca === 'alta', label: `${x.nome} · ${M(x.valor)}${x.variavel ? ' (média)' : ''}`,
-        desc: `${x.categoria} · por volta do dia ${x.dia} · em ${x.meses} meses${x.ja_cadastrada ? ' · parece já cadastrada' : ''}`}))}]});
-    if (!v || !v.s.length) return;
+    if (!sug.length && !rendas.length) return ask({title: 'Nada que se repita todo mês', desc: `Li ${r.transacoes} lançamentos (${periodo}), mas nenhuma conta ou renda se repete todo mês. Extratos de 3 meses ou mais funcionam melhor.`, ok: 'Fechar'});
+    const v = await ask({title: 'O que encontrei no seu extrato', desc: `Li ${r.transacoes} lançamentos (${periodo}). Marque o que quer usar:`, ok: 'Usar selecionados',
+      fields: [...(rendas.length ? [{name: 'r', type: 'checks', label: 'Sua renda (entradas que se repetem)', options: rendas.map((x, i) => ({value: String(i),
+          checked: x.salario && !st.fin?.renda_mensal, label: `${x.nome} · ${M(x.valor)}`, desc: `por volta do dia ${x.dia} · em ${x.meses} meses${x.salario ? '' : ' · confira se é renda sua'}`}))}] : []),
+        ...(sug.length ? [{name: 's', type: 'checks', label: 'Contas que se repetem todo mês', options: sug.map((x, i) => ({value: String(i), checked: !x.ja_cadastrada && x.confianca === 'alta', label: `${x.nome} · ${M(x.valor)}${x.variavel ? ' (média)' : ''}`,
+          desc: `${x.categoria} · por volta do dia ${x.dia} · em ${x.meses} meses${x.ja_cadastrada ? ' · parece já cadastrada' : ''}`}))}] : [])]});
+    if (!v) return;
+    if (v.r?.length) {
+      const sel = v.r.map(i => rendas[+i]);
+      await salvarFin({renda_mensal: sel.reduce((s, x) => s + x.valor, 0), dia_renda: Math.min(...sel.map(x => x.dia)), renda_origem: 'extrato'});
+      toast('Renda atualizada pelo extrato');
+    }
+    if (!v.s?.length) { if (v.r?.length) posChanged(); return; }
     const h = hojeD();
     const proximo = x => {  // próximo vencimento: o mês seguinte ao último pagamento visto no extrato
       const [y, m] = x.ultima.split('-').map(Number), ult = new Date(y, m + 1, 0).getDate();
@@ -1616,7 +1723,7 @@ $('#arqExtrato').onchange = async e => {
     const novas = v.s.map(i => sug[+i]).map(x => ({nome: x.nome, categoria: x.categoria, valor: x.valor, recorrente: true, dia: x.dia, vencimento: proximo(x), origem: 'extrato'}));
     st.contas.itens = (await api('/api/contas', novas)).itens;
     st.mesContas = {ano: h.getFullYear(), mes: h.getMonth()};
-    renderContas(); renderResumoContas(); toast(`${novas.length} ${novas.length === 1 ? 'conta adicionada' : 'contas adicionadas'}`);
+    aposMudarContas(); toast(`${novas.length} ${novas.length === 1 ? 'conta adicionada' : 'contas adicionadas'}`);
   } catch (er) { toast(er.message); }
 };
 

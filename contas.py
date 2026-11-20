@@ -272,7 +272,7 @@ def _chave(desc):
     return " ".join(palavras[:3])
 
 
-_PREFIXOS = re.compile(r"^\s*(?:pix\s+(?:enviad[oa]|transf\w*)|transf\w*\s+enviad[oa]|d[eé]bito\s+autom[aá]tico|deb\.?\s*aut\.?|"
+_PREFIXOS = re.compile(r"^\s*(?:pix\s+(?:enviad[oa]|recebid[oa]|transf\w*)|transf\w*\s+(?:enviad[oa]|recebid[oa])|ted\s+recebid[oa]|cred(?:ito)?\.?(?:\s+de)?|d[eé]bito\s+autom[aá]tico|deb\.?\s*aut\.?|"
                        r"pagamento(?:\s+de)?|pagto\.?|pgto\.?|pag\s*\*|compra(?:\s+no\s+d[eé]bito)?|boleto|conta)\s*[-:*]?\s*", re.I)
 
 
@@ -284,6 +284,41 @@ def nome_bonito(desc):
     t = re.sub(r"[*#]+", " ", t).strip(" -.") or desc.strip()
     palavras = [p if (len(p) <= 2 and p.isupper() and p.isalpha() and p not in ("DE", "DA", "DO")) else p.capitalize() for p in t.split()]
     return " ".join(palavras)[:60]
+
+
+_SALARIO = re.compile(r"salario|folha de pag|proventos|pro ?labore|remuneracao|vencimentos|holerite|beneficio inss|aposentadoria|pensao")
+_NAO_RENDA = re.compile(r"resgate|rendimento|estorno|transferencia entre contas|mesma titularidade|aplicac|devolucao|reembolso|cashback|juros|"
+                        r"emprestimo|credito pessoal|antecipacao")
+
+
+def rendas(transacoes):
+    """Acha entradas que se repetem todo mês (salário, pró-labore, aposentadoria, aluguel recebido...).
+    Salário pago em duas partes no mês (adiantamento + saldo) é somado."""
+    grupos = {}
+    for t in transacoes:
+        if t["valor"] <= 0: continue
+        d = sem_acento(t["descricao"])
+        if _NAO_RENDA.search(d): continue
+        k = "salario" if _SALARIO.search(d) else _chave(t["descricao"])
+        if k: grupos.setdefault(k, []).append(t)
+    out = []
+    for k, ts in grupos.items():
+        por_mes = {}
+        for t in ts:
+            m = (t["data"].year, t["data"].month)
+            por_mes[m] = por_mes.get(m, 0) + t["valor"]
+        if len(por_mes) < 2: continue
+        valores = list(por_mes.values())
+        media = statistics.mean(valores)
+        salario = k == "salario"
+        if media < 300 or statistics.pstdev(valores) / media > (0.35 if salario else 0.2): continue
+        primeiro_dia = {}  # dia do primeiro crédito de cada mês: é quando o dinheiro começa a entrar
+        for t in ts:
+            m = (t["data"].year, t["data"].month)
+            primeiro_dia[m] = min(primeiro_dia.get(m, 31), t["data"].day)
+        out.append({"nome": "Salário" if salario else nome_bonito(ts[-1]["descricao"]), "valor": round(statistics.median(valores), 2),
+                    "dia": int(round(statistics.median(primeiro_dia.values()))), "meses": len(por_mes), "salario": salario})
+    return sorted(out, key=lambda x: (not x["salario"], -x["valor"]))
 
 
 def recorrentes(transacoes):

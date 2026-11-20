@@ -10,7 +10,7 @@ import hashlib, hmac, os, re, secrets, time, uuid
 import armazem
 
 SESSAO_DIAS = 180
-COLECOES_DO_USUARIO = ["carteira", "contas", "avisos", "avisos_cfg", "avisos_estado", "niveis", "push"]
+COLECOES_DO_USUARIO = ["carteira", "contas", "financas", "avisos", "avisos_cfg", "avisos_estado", "niveis", "push"]
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
 
 
