@@ -49,6 +49,16 @@ def tendencia_txt(m):
     return f"{'alta' if d > 2 else 'baixa' if d < -2 else 'lateral'}: preço {pct(abs(d))} {'acima' if d >= 0 else 'abaixo'} da média de 200 dias"
 
 
+def decidir(pontos, rsi):
+    """Regra única de compra/venda (usada na análise, nos avisos e no teste com o passado).
+    pontos: +1/-1 preço acima/abaixo da média de 200 dias, +1/-1 média de 50 acima/abaixo da de 200, +0,5/-0,5 retorno de 3 meses."""
+    if pontos >= 2 and (rsi is None or rsi < 70):
+        return "COMPRAR"
+    if pontos <= -2 and (rsi is None or rsi > 30):
+        return "VENDER"
+    return "MANTER"
+
+
 def analise_ativo(m):
     """Decisão COMPRAR/VENDER/MANTER a partir de indicadores, com alvo, stop, resumo e riscos."""
     p, s50, s200, rsi = m["preco"], m.get("sma50"), m.get("sma200"), m.get("rsi14")
@@ -67,12 +77,7 @@ def analise_ativo(m):
         sinais.append(f"{pct(r3, sinal=True)} em 3 meses")
     if rsi is not None:
         sinais.append(f"RSI {br(rsi, 0)} ({'sobrecomprado: subiu rápido demais' if rsi > 70 else 'sobrevendido: caiu rápido demais' if rsi < 30 else 'neutro'})")
-    if pontos >= 2 and (rsi is None or rsi < 70):
-        dec = "COMPRAR"
-    elif pontos <= -2 and (rsi is None or rsi > 30):
-        dec = "VENDER"
-    else:
-        dec = "MANTER"
+    dec = decidir(pontos, rsi)
     conf = round(min(45 + 10 * abs(pontos), 75)) if dec != "MANTER" else 50
     frase = {"COMPRAR": "Indicadores em alta", "VENDER": "Indicadores em baixa", "MANTER": "Sinais mistos ou neutros"}[dec]
     dy = m.get("dividend_yield_12m") or 0
