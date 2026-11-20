@@ -139,6 +139,17 @@ details[open]>summary::before{transform:rotate(45deg)}
 .act{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--sf2)}
 .act .tk{font-weight:600}
 .act p{grid-column:1/-1;margin:0;color:var(--ink2);font-size:14px}
+.act .mov{color:var(--ink);font-weight:600}
+.why{grid-column:1/-1;margin-top:6px}
+.why>summary{font-size:14px}
+.why[open]{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.why p{margin:8px 0;color:var(--ink);font-size:14px}
+.fatos{margin:8px 0}
+.fatos td{font-size:13.5px;white-space:normal!important;padding:7px 0}
+.fatos td:first-child{color:var(--ink2);padding-right:12px;width:46%}
+.fatos td:last-child{text-align:right}
+.fatos td b{font-weight:600}
+.modo{display:flex;gap:10px;align-items:flex-start}
 
 /* plano e carteira sugerida */
 .amount{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--sf2);padding:0 14px;max-width:360px}
@@ -500,6 +511,7 @@ function num(s) {  // aceita "1.234,56", "1234,56", "1234.56" e "10.000"
   else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
   return t === '' ? NaN : Number(t);
 }
+const fatosHtml = fs => fs?.length ? `<table class="tbl fatos"><tbody>${fs.map(f => `<tr><td>${esc(f.rotulo)}</td><td><b>${esc(f.valor)}</b>${f.ref ? `<div class="mut xs">${esc(f.ref)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : '';
 const pill = (kind, icon, txt) => `<span class="pill ${kind}">${icon ? ICON[icon] : ''}${esc(txt)}</span>`;
 const dot = c => `<span class="dot" style="background:var(--c-${c})" aria-hidden="true"></span>`;
 const nomeDe = t => st.uni[t]?.nome || RF[t] || t;
@@ -615,7 +627,9 @@ function renderResumo() {
       <td class="ink2">${p.vazio ? '—' : Math.abs(falta) < Math.max(50, total * 0.005) ? 'ok' : (falta > 0 ? 'faltam ' : 'sobram ') + Mc(Math.abs(falta))}</td></tr>`;
   }).join('');
   el.innerHTML = `
-  ${p.ia ? '' : `<div class="note warn">${ICON.warn}<div>A análise por IA não respondeu agora; mostrando uma recomendação padrão baseada no seu perfil. Tente atualizar em alguns minutos.</div></div>`}
+  ${p.fonte !== 'regras' ? '' : p.ia_configurada
+      ? `<div class="note warn">${ICON.warn}<div>A IA não respondeu agora: esta recomendação foi feita pelo motor de regras do app (indicadores de mercado, seu perfil e seu objetivo). Tente atualizar em alguns minutos.</div></div>`
+      : `<div class="note">${ICON.info}<div><b>Modo sem IA.</b> As recomendações são feitas por regras a partir de dados de mercado (juros, inflação, tendência e risco de cada ativo), do seu perfil e do seu objetivo. Cada decisão mostra os números que a justificam.</div></div>`}
   <div class="grid2">
     <div class="card">
       <h2>Sua alocação</h2>
@@ -632,12 +646,24 @@ function renderResumo() {
         : !objetivo ? `<div class="note">${ICON.target}<div>Conte seu objetivo em <a href="#" onclick="go('investir');return false">Onde investir</a> para receber uma carteira sob medida para ele.</div></div>` : ''}
       <p class="lead">${esc(p.resumo || (p.vazio ? 'Você ainda não informou investimentos. Veja em “Onde investir” uma carteira inicial para o seu perfil.' : 'Sem comentários da IA no momento.'))}</p>
       ${p.alertas.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')}
-      ${p.acoes.length ? `<h3>O que fazer com o que você já tem</h3><div class="acts-list">${p.acoes.map(a => {
-        const [k, ic, tx] = ACAO[a.acao] || ['', 'flat', a.acao];
-        return `<div class="act"><span class="tk">${esc(a.ativo)}</span><span style="justify-self:end">${pill(k, ic, tx)}</span><p>${esc(a.motivo)}</p></div>`; }).join('')}</div>` : ''}
+      ${p.acoes.length ? `<h3>O que fazer com o que você já tem</h3><p class="mut sm" style="margin:-4px 0 0">Toque em “Por quê?” para ver os números por trás de cada decisão.</p>
+        <div class="acts-list">${p.acoes.map(decisaoHtml).join('')}</div>` : ''}
       <div class="btns"><button class="btn primary" type="button" onclick="go('investir')">Ver onde investir</button><button class="btn" type="button" onclick="go('sim')">Simular o futuro</button></div>
     </div>
   </div>`;
+}
+function decisaoHtml(d) {
+  const [k, ic, tx] = ACAO[d.acao] || ['', 'flat', d.acao];
+  const mov = d.acao === 'MANTER' || Math.abs(d.valor) < 1 ? '' : d.valor < 0 ? `Vender ≈ ${M0(-d.valor)}` : `Comprar ≈ ${M0(d.valor)}`;
+  return `<div class="act"><span class="tk">${esc(rot(d.ativo))}</span><span style="justify-self:end">${pill(k, ic, tx)}</span>
+    <p>${esc(d.motivo)}</p>
+    ${mov ? `<p class="mov">${mov} <span class="mut xs" style="font-weight:400">(de ${P(d.peso_atual, 1, false)} para ${P(d.peso_alvo, 1, false)} da carteira)</span></p>` : ''}
+    <details class="why"><summary>Por quê?</summary>
+      ${d.porque ? `<p>${esc(d.porque)}</p>` : ''}
+      ${fatosHtml(d.fatos)}
+      ${d.contra ? `<div class="note">${ICON.info}<div><b>O que pesa contra:</b> ${esc(d.contra)}</div></div>` : ''}
+      ${d.custo ? `<div class="note warn">${ICON.warn}<div><b>Imposto estimado:</b> ${esc(d.custo)} <span class="mut xs">Estimativa pelas regras gerais; confirme com um contador.</span></div></div>` : ''}
+    </details></div>`;
 }
 function portMsg() {
   const msgs = ['Lendo as notícias do mercado…', 'Calculando métricas de dezenas de ativos…', 'Comparando sua carteira com o seu perfil…', 'A IA está montando a carteira recomendada…'];
@@ -650,11 +676,12 @@ function plano() {
   if (modo === 'rebal') {
     const tickers = [...new Set([...sug.map(s => s.ticker), ...Object.keys(atual)])];
     const peso = Object.fromEntries(sug.map(s => [s.ticker, s.peso]));
+    const manter = new Set((p.acoes || []).filter(d => d.acao === 'MANTER').map(d => d.ativo));  // mesma decisão do Resumo
     return tickers.map(t => {
       const alvo = (peso[t] || 0) / 100 * p.total, d = alvo - (atual[t] || 0);
       const s = sug.find(x => x.ticker === t) || {ticker: t, nome: nomeDe(t), classe: classeDe(t)};
       return {...s, valor: d};
-    }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003)).sort((a, b) => b.valor - a.valor);
+    }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003) && !manter.has(x.ticker)).sort((a, b) => b.valor - a.valor);
   }
   const T = p.total + aporte;
   const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual[s.ticker] || 0), 0)}));
@@ -675,6 +702,7 @@ function plano() {
   st.sobra = sobra;
   return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => b.valor - a.valor);
 }
+const motivoDe = t => st.port?.acoes?.find(d => d.ativo === t)?.motivo || st.port?.sugerida?.find(s => s.ticker === t)?.motivo || '';
 function planoHtml() {
   const p = st.port, ls = plano();
   if (!ls.length) return `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : 'Informe um valor para ver o plano.'}</p>`;
@@ -685,6 +713,7 @@ function planoHtml() {
     if (modo === 'aporte' && x.preco_brl && !FRACIONAVEL.has(x.ticker)) meta = x.cotas > 0 ? `${N(x.cotas)} ${x.cotas === 1 ? 'cota' : 'cotas'} × ${M(x.preco_brl)}` : `1 cota custa ${M(x.preco_brl)}: junte com o próximo aporte`;
     else if (modo === 'aporte' && x.ticker === 'DOLAR' && x.preco_brl) meta = `≈ US$ ${N(x.cotas, 2)} a ${M(x.preco_brl)}`;
     else if (modo === 'aporte' && x.ticker === 'VOO' && x.preco_brl) meta = `≈ ${N(x.cotas, 2)} cotas (fração) a ${M(x.preco, 'USD')}`;
+    else if (modo === 'rebal') meta = motivoDe(x.ticker);
     else if (x.classe === 'renda_fixa' && x.taxa_aa) meta = `rende cerca de ${A(x.taxa_aa)}`;
     const lbl = x.classe === 'renda_fixa' ? x.nome : rot(x.ticker), sub = x.classe === 'renda_fixa' || x.nome === lbl || x.nome === x.ticker ? '' : x.nome;
     return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span></div>
@@ -717,13 +746,17 @@ function renderInvestir() {
       <div class="btns"><button class="btn" type="button" id="btnCopy">Copiar plano</button><button class="btn" type="button" onclick="go('sim')">Simular resultado</button></div>
     </div>
     <div class="card">
-      <h2>Carteira recomendada ${p.ia ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Padrão do perfil')}</h2>
+      <h2>Carteira recomendada ${p.fonte === 'ia' ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Regras + dados')}</h2>
       <p class="lead sm">${esc(p.resumo || '')}</p>
       ${grupos.map(([k, g]) => `<div class="cls-h">${dot(k)}${CLN[k]}<span class="mut">${N(p.alvo[k], 1)}% da carteira</span></div>
         ${g.map(s => `<div class="asset">
           <div class="hd"><div class="ttl"><b>${esc(s.classe === 'renda_fixa' ? s.nome : rot(s.ticker))}</b><div>${esc(s.classe === 'renda_fixa' ? 'Renda fixa' : s.nome !== rot(s.ticker) ? s.nome : CLN[s.classe])}</div></div>${spark(s.serie)}<div class="w tn">${N(s.peso, 1)}%<small>da carteira</small></div></div>
           <div class="tags">${s.novo ? pill('info', '', 'Novo para você') : pill('good', '', 'Você já tem')}${s.tendencia ? pill('', s.tendencia === 'alta' ? 'up' : s.tendencia === 'baixa' ? 'down' : 'flat', 'Tendência ' + s.tendencia) : ''}</div>
           <p>${esc(s.motivo || s.descricao)}</p>
+          <details class="why"><summary>Por que este ativo?</summary>
+            ${s.porque ? `<p>${esc(s.porque)}</p>` : ''}${fatosHtml(s.fatos)}
+            ${s.contra ? `<div class="note">${ICON.info}<div><b>Principal risco:</b> ${esc(s.contra)}</div></div>` : ''}
+          </details>
           <div class="kpis">${s.classe === 'renda_fixa' ? `<span>Rende <b>${A(s.taxa_aa)}</b></span>` :
             `${s.preco ? `<span>Preço <b>${M(s.preco, s.moeda)}</b></span>` : ''}<span>12 meses <b>${P(s.ret_12m)}</b></span>${s.dy_12m ? `<span>Dividendos <b>${P(s.dy_12m, 1, false)}</b></span>` : ''}${s.vol_aa != null ? `<span>Oscilação <b>${P(s.vol_aa, 0, false)}</b></span>` : ''}`}</div>
           ${s.novo ? `<div class="btns" style="margin-top:10px"><button class="btn sm" type="button" data-follow="${esc(s.ticker)}">${extra.includes(s.ticker) || st.an[s.ticker] ? 'Acompanhando ✓' : 'Acompanhar em Meus ativos'}</button></div>` : ''}
@@ -747,7 +780,7 @@ function objetivoHtml() {
   let analise = '';
   if (objetivo && (st.portBusy || !aplicado)) analise = `<div class="obj-an">${busy('Analisando seu objetivo e refazendo a carteira…')}</div>`;
   else if (objetivo && an) analise = `<div class="obj-an">
-      <div class="q">${ICON.spark}<div><b>Como entendi:</b> ${esc(an.resumo)}</div></div>
+      <div class="q">${ICON.spark}<div><b>Como entendi${p.fonte === 'regras' ? ' (leitura automática, sem IA)' : ''}:</b> ${esc(an.resumo)}</div></div>
       ${an.metas.length ? `<div class="metas">${an.metas.map((m, i) => `<div class="mt ${i === 0 ? 'main' : ''}">${i === 0 && an.metas.length > 1 ? '<small>Meta principal</small>' : ''}<b>${esc(m.descricao)}</b>
         <span>${m.valor_alvo ? Mc(m.valor_alvo) + ' (valores de hoje)' : 'Valor não informado'} · ${m.prazo_anos ? 'em ' + prazoTxt(m.prazo_anos) : 'prazo não informado'}</span></div>`).join('')}</div>` : ''}
       <div class="tags">${an.liquidez ? pill(LIQ[an.liquidez][0], '', LIQ[an.liquidez][1]) : ''}${an.aporte_mensal ? pill('', '', `Aporte mensal: ${M0(an.aporte_mensal)}`) : ''}</div>
@@ -791,7 +824,7 @@ function bindObjetivo(el) {
 function copyPlan() {
   const ls = plano();
   const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(aporte)}:\n`) +
-    ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}`).join('\n');
+    ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}${modo === 'rebal' && motivoDe(x.ticker) ? ` — ${motivoDe(x.ticker)}` : ''}`).join('\n');
   (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => toast('Plano copiado'), () => ask({title: 'Copie o plano', fields: [{name: 't', label: 'Plano', type: 'textarea', value: txt}], ok: 'Fechar'}));
 }
 function follow(t, btn) {
@@ -1031,7 +1064,9 @@ function renderMercado() {
   const rates = [['Selic', A(t.selic), 'Taxa básica de juros'], ['CDI', A(t.cdi), 'Referência da renda fixa'], ['IPCA 12 meses', P(t.ipca12, 2, false), 'Inflação acumulada'],
     ...(prox ? [[`Selic fim de ${prox}`, A(f.selic[prox]), 'Expectativa do mercado (Focus)'], [`IPCA ${prox}`, P(f.ipca?.[prox], 2, false), 'Expectativa do mercado (Focus)']] : [])];
   el.innerHTML = `
-  ${p.ia ? '' : `<div class="note warn">${ICON.warn}<div>A leitura das notícias pela IA não está disponível agora; mostrando dados e manchetes sem análise.</div></div>`}
+  ${p.fonte !== 'regras' ? '' : st.iaAtiva
+      ? `<div class="note warn">${ICON.warn}<div>A leitura das notícias pela IA não respondeu agora: a visão por classe abaixo usa indicadores (juro real e tendência dos índices).</div></div>`
+      : `<div class="note">${ICON.info}<div><b>Modo sem IA.</b> As manchetes aparecem, mas não são interpretadas. A visão por classe usa indicadores: juro real para a renda fixa e tendência dos índices para bolsa, FIIs, exterior e dólar.</div></div>`}
   <div class="card"><h2>Indicadores</h2><div class="rates" style="margin-top:10px">${rates.map(r => `<div class="tile"><div class="l">${esc(r[0])}</div><div class="v tn">${r[1]}</div><div class="d">${esc(r[2])}</div></div>`).join('')}</div></div>
   <div class="grid2">
     <div class="card"><h2>${ICON.spark.replace('<svg', '<svg width="18" height="18" style="color:var(--acc)"')}Leitura do momento</h2>
@@ -1075,7 +1110,7 @@ function card(a) {
     <div class="pl tn ${cl(a.pl_atual)}">${p.qtd ? `${a.pl_atual > 0 ? '+' : ''}${M(a.pl_atual, mo)} <span class="mut" style="font-size:15px;font-weight:500">${P(a.pl_pct)}</span>` : '<span class="mut" style="font-size:16px;font-weight:500">Sem posição</span>'}</div>
     <div class="mut sm">${p.qtd ? `${N(p.qtd, 4)} ${a.classe === 'cambio' && a.ticker === 'DOLAR' ? 'dólares' : 'cotas'} · preço médio ${M(p.pm, mo)} · total ${M(a.valor, mo)}` : 'Use “Editar posição” para informar o que você tem'}</div>
     <div class="sug">${pill(kd, ic, tx + (a.confianca != null ? ` · ${N(a.confianca)}%` : ''))}<span>${esc(a.sugestao)}</span></div>
-    ${a.ia === false ? '<p class="mut xs">Análise da IA indisponível agora; mostrando só os indicadores.</p>' : ''}
+    ${a.fonte === 'regras' ? `<p class="mut xs">${st.iaAtiva ? 'A IA não respondeu agora; ' : ''}análise por regras (tendência, médias móveis, RSI e volatilidade). Notícias não avaliadas.</p>` : ''}
     <div class="pot"><div>Até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<b class="${cl(a.ganho_pot)}">${M(a.ganho_pot, mo)}</b></div><div>Até o stop (${a.stop ? M(a.stop, mo) : '—'})<b class="${cl(-a.perda_pot)}">${a.perda_pot != null ? M(-a.perda_pot, mo) : '—'}</b></div></div>
     <p class="mut xs">Valores para ${N(a.base_qtd, 4)} ${a.base_qtd === 1 ? 'unidade' : 'unidades'}.</p>
     ${a.resumo ? `<p class="ink2" style="margin:8px 0 0">${esc(a.resumo)}</p>` : ''}
@@ -1161,7 +1196,8 @@ $('#btnCfg').onclick = async () => {
   const bk = JSON.stringify({pos, extra, perfil, objetivo});
   const v = await ask({title: 'Backup e acesso', desc: 'Seus ativos já ficam salvos no servidor do app. Este texto é uma cópia extra: guarde-o em um lugar seguro; para restaurar, cole um backup e toque em Restaurar (ele substitui a carteira salva no servidor).',
     fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
-    extraHtml: `<div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
+    extraHtml: `<p class="mut sm" style="margin:0">Análises: ${st.iaAtiva ? 'com IA (Claude).' : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>
+      <div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
     ok: 'Restaurar', validate: v => { if (v.bk.trim() === bk) return 'Cole um backup diferente para restaurar, ou toque em Cancelar.'; try { JSON.parse(v.bk); } catch { return 'Texto de backup inválido.'; } }});
   if (!v) return;
   try {
@@ -1234,6 +1270,7 @@ async function login() {
   if (!w) return;
   $('#fatal').classList.add('hide');
   st.uni = w.universo || {};
+  st.iaAtiva = !!w.ia;
   renderSync();
   await sincronizarInicio();
   renderPerfilChip(); renderInvestir();
