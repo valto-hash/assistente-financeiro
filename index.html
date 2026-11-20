@@ -113,6 +113,23 @@ details[open]>summary::before{transform:rotate(45deg)}
 .note.warn{border-color:color-mix(in srgb,var(--warn) 35%,transparent);background:color-mix(in srgb,var(--warn) 8%,var(--sf))}
 .note.warn svg{color:var(--warn)}
 .err-box{color:var(--dn)}
+.note.good{border-color:color-mix(in srgb,var(--up) 35%,transparent);background:color-mix(in srgb,var(--up) 7%,var(--sf))}
+.note.good svg{color:var(--up)}
+.chk{display:flex;gap:6px;align-items:flex-start;margin:10px 0 0}
+.chk svg{flex:0 0 14px;width:14px;height:14px;margin-top:1px;color:var(--up)}
+.cons{display:flex;gap:6px;align-items:center;margin:8px 0 0;font-size:13px;color:var(--up);font-weight:600}
+.cons svg{width:15px;height:15px}
+.ac-tbl td b{font-size:15px}
+.ac-tbl{max-width:640px}
+.ac-tbl th,.ac-tbl td{white-space:normal}
+.ac-tbl td:first-child{min-width:4.6em}
+.ac-tbl td small{display:block;font-size:11.5px;line-height:1.35;color:var(--mut);font-weight:400}
+.ac-tbl th small{display:block;font-weight:400;text-transform:none}
+.protege{padding-left:18px;margin:6px 0 0}.protege li{margin:6px 0}
+.sinais{list-style:none;padding:0;margin:8px 0 0;font-size:13px}
+.sinais li{display:flex;flex-wrap:wrap;gap:2px 10px;padding:7px 0;border-bottom:1px solid var(--line2)}
+.sinais li:last-child{border-bottom:0}
+.sinais .st{margin-left:auto;color:var(--mut)}
 .sk{background:linear-gradient(90deg,var(--line2),var(--line),var(--line2));background-size:200% 100%;animation:sh 1.3s infinite linear;border-radius:8px;height:14px;margin:10px 0}
 @keyframes sh{to{background-position:-200% 0}}
 @keyframes pulse{50%{opacity:.5}}
@@ -413,7 +430,8 @@ const OKT = /^[A-Z0-9_.=-]{1,15}$/;
 const CL = ['renda_fixa', 'acao', 'fii', 'exterior', 'cambio'];
 const CLN = {renda_fixa: 'Renda fixa', acao: 'Ações Brasil', fii: 'Fundos imobiliários', exterior: 'Exterior', cambio: 'Dólar e ouro'};
 const RF = {TESOURO_SELIC: 'Tesouro Selic', PORQUINHO: 'Porquinho do Inter', TESOURO_IPCA: 'Tesouro IPCA+', CDB_CDI: 'CDB/LCI pós-fixado'};
-const FRACIONAVEL = new Set(['DOLAR', 'VOO']);
+const FRACIONAVEL = new Set(['DOLAR', 'VOO']);  // dólar em qualquer valor e VOO em fração; o resto da B3 só em cotas inteiras
+const qtdTxt = (t, n) => n == null ? '' : t === 'DOLAR' ? `US$ ${N(n, 2)}` : FRACIONAVEL.has(t) ? `${N(n, 4)} cotas` : `${N(n)} ${n === 1 ? 'cota' : 'cotas'}`;
 const PERFIS = {
   conservador: ['Conservador', 'Prioriza segurança e liquidez; aceita pouca oscilação.'],
   moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento no longo prazo.'],
@@ -429,6 +447,7 @@ const ICON = {
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
   target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>',
 };
 
@@ -640,6 +659,83 @@ function ask({title, desc = '', fields = [], ok = 'Salvar', extraHtml = '', vali
   });
 }
 
+/* ---------- confiabilidade: modelo, checagem dos números e consenso ---------- */
+const modeloNome = id => id ? 'Claude ' + String(id).replace(/^claude-/, '').replace(/-(\d+)-(\d+)$/, ' $1.$2').replace(/-(\d+)$/, ' $1').replace(/^\w/, c => c.toUpperCase()) : '';
+function checagemHtml(c) {
+  if (!c || !c.textos) return '';
+  const t = c.trocados;
+  return `<p class="mut xs chk">${ICON.check}<span>Checagem dos números: ${c.textos} ${c.textos === 1 ? 'texto da IA conferido' : 'textos da IA conferidos'} com os dados calculados${t
+    ? `; ${t} ${t === 1 ? 'foi trocado' : 'foram trocados'} pela explicação das regras porque ${t === 1 ? 'citava' : 'citavam'} um número que não está nos dados`
+    : '. Nenhum número fora dos dados'}.</span></p>`;
+}
+const nomeDec = d => (ACAO[d] || [, , d])[2];
+function consensoHtml(a) {
+  if (!a.consenso) return '';
+  if (a.consenso === 'concordam') return `<p class="cons">${ICON.check}IA e regras concordam: ${esc(nomeDec(a.decisao).toLowerCase())}</p>`;
+  return `<div class="note warn">${ICON.warn}<div><b>Opiniões divergentes, confiança baixa.</b> A IA diz <b>${esc(nomeDec(a.decisao))}</b>${a.confianca_ia != null ? ` (${N(a.confianca_ia)}% de confiança)` : ''}
+    e as regras dizem <b>${esc(nomeDec(a.regras.decisao))}</b>. Enquanto as duas não concordarem, o app não manda aviso de compra ou venda deste ativo.</div></div>`;
+}
+function passadoAtivo(t) {
+  const r = st.acertos?.teste, x = r?.por_ativo?.[t]?.['12m'];
+  if (!x || !x.base.n || (!x.COMPRAR.n && !x.VENDER.n)) return '';
+  const c = x.COMPRAR, v = x.VENDER;
+  return `<p class="mut xs" style="margin:8px 0 0">Teste com o passado (desde ${esc(r.desde)}): ${c.n ? `quando as regras indicaram compra, ${esc(rot(t))} rendeu mais que o CDI em 12 meses em <b>${P(c.acerto, 0, false)}</b> das ${N(c.n)} vezes` : 'as regras não indicaram compra'}${v.n ? `; as indicações de venda acertaram ${P(v.acerto, 0, false)} das ${N(v.n)}` : ''}. Sem sinal nenhum, ele bateu o CDI em ${P(x.base.acerto, 0, false)} dos meses.</p>`;
+}
+async function loadAcertos(force) {
+  if (st.acBusy || (st.acertos && !force)) return;
+  st.acBusy = true; st.acErr = null; renderAcertos();
+  try { st.acertos = await api('/api/acertos'); } catch (e) { st.acErr = e.message; }
+  st.acBusy = false; renderAcertos();
+  $$('[data-bt]').forEach(el => el.innerHTML = passadoAtivo(el.dataset.bt));
+}
+function renderAcertos() { const el = $('#acertos'); if (el) el.innerHTML = acertosHtml(); }
+const diaBR = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '';  // data ISO (aaaa-mm-dd) -> dd/mm/aaaa
+function acertosHtml() {
+  const r = st.acertos;
+  if (!r) return `<div class="card"><h2>Quanto o app acerta</h2>${st.acErr ? `<p class="err-box">${esc(st.acErr)}</p><div class="btns"><button class="btn" type="button" onclick="loadAcertos(true)">Tentar de novo</button></div>`
+    : busy('Testando as regras com 20 anos de histórico…') + sk(3)}</div>`;
+  const t = r.teste, g = t.geral || {}, H = [['3m', '3 meses'], ['6m', '6 meses'], ['12m', '12 meses']];
+  const pp = v => v == null ? '' : `<small>${v > 0 ? '+' : ''}${N(v, 1)} p.p.</small>`;
+  const cel = x => x?.n ? `<b>${P(x.acerto, 0, false)}</b><small>${N(x.n)} ${x.n === 1 ? 'sinal' : 'sinais'}</small>${pp(x.vantagem_media)}` : '—';
+  const g12 = g['12m'] || {}, ca = g12.COMPRAR?.acerto, ba = g12.base?.acerto, dif = (ca ?? 0) - (ba ?? 0);
+  const ver = ca == null ? '' : dif >= 5
+    ? ['good', `Nos testes, as compras indicadas pelas regras renderam mais que o CDI em 12 meses em ${P(ca, 0, false)} das vezes, contra ${P(ba, 0, false)} sem sinal: uma vantagem real, mas longe de certeza.`]
+    : dif <= -5
+      ? ['warn', `Nos testes, as compras indicadas pelas regras renderam mais que o CDI em 12 meses só em ${P(ca, 0, false)} das vezes, menos que sem sinal (${P(ba, 0, false)}). Por isso ${st.iaAtiva ? 'os avisos só saem quando a IA concorda com as regras, e ' : ''}a carteira recomendada se apoia na diversificação, não em acertar o momento de comprar.`]
+      : ['warn', `Nos testes, as compras indicadas pelas regras renderam mais que o CDI em 12 meses em ${P(ca, 0, false)} das vezes, quase o mesmo que sem sinal (${P(ba, 0, false)}). Use os sinais como um dado a mais, não como garantia.`];
+  const h = r.historico || {}, F = [['ia', 'IA'], ['regras', 'Regras'], ['consenso', 'IA e regras juntas']].filter(([k]) => h.fontes?.[k]);
+  const primeiro = h.desde ? new Date(new Date(h.desde + 'T12:00:00').getTime() + 91 * 864e5).toLocaleDateString('pt-BR') : '';
+  const stH = s => Object.keys(s.avaliacao || {}).length
+    ? H.filter(([k]) => s.avaliacao[k]).map(([k, n]) => `${n}: ${s.avaliacao[k].acertou ? '✓' : '✗'} ${s.avaliacao[k].vs_cdi > 0 ? '+' : ''}${N(s.avaliacao[k].vs_cdi, 1)} p.p.`).join(' · ')
+    : 'aguardando 3 meses';
+  return `<div class="card">
+    <h2>Quanto o app acerta</h2>
+    <p class="lead sm">Nenhuma ferramenta acerta o mercado 99% das vezes. O que dá para fazer é medir: o app testa as próprias regras com o passado e guarda cada sinal de compra e venda para conferir depois. O resultado aparece aqui, bom ou ruim.</p>
+    <h3>Teste com o passado</h3>
+    ${g12.base?.n ? `<p class="mut sm" style="margin:-4px 0 0">As regras de indicadores aplicadas no início de cada mês, desde ${esc(t.desde)}, em ${N(t.ativos)} ativos, usando só os dados que existiam em cada data.</p>
+    <div class="scroll-x"><table class="tbl ac-tbl" style="margin-top:6px"><thead><tr><th>Prazo</th><th>Compras<small>acertaram</small></th><th>Vendas<small>acertaram</small></th><th>Sem sinal<small>bateu o CDI</small></th></tr></thead><tbody>
+      ${H.map(([k, n]) => `<tr><td>${n}</td><td>${cel(g[k]?.COMPRAR)}</td><td>${cel(g[k]?.VENDER)}</td><td><b>${P(g[k]?.base?.acerto, 0, false)}</b><small>${N(g[k]?.base?.n)} meses</small></td></tr>`).join('')}
+    </tbody></table></div>
+    ${ver ? `<div class="note ${ver[0]}">${ver[0] === 'good' ? ICON.check : ICON.warn}<div>${esc(ver[1])}</div></div>` : ''}
+    <p class="mut xs">${esc(r.criterio)} “p.p.” é quanto o sinal ganhou do CDI, em média, em pontos percentuais. ${t.cdi_real ? 'CDI histórico do Banco Central.' : 'Sem acesso ao histórico do CDI agora: usei a taxa atual.'}
+      A IA não entra neste teste: ela lê as notícias de hoje e já sabe o que aconteceu depois, então testá-la no passado daria um resultado falso. Resultados passados não garantem resultados futuros.</p>`
+    : `<p class="mut sm">Não consegui baixar o histórico de preços agora. <a href="#" onclick="st.acertos=null;loadAcertos(true);return false">Tentar de novo</a></p>`}
+    <h3>Sinais do próprio app</h3>
+    ${!h.total ? `<p class="mut sm" style="margin:-4px 0 0">Cada sinal de compra ou venda que o app der a partir de agora fica guardado com a data e o preço, e é conferido depois de 3, 6 e 12 meses.</p>`
+    : `<p class="mut sm" style="margin:-4px 0 0">${N(h.total)} ${h.total === 1 ? 'sinal guardado' : 'sinais guardados'} desde ${diaBR(h.desde)}${h.pendentes ? `; ${N(h.pendentes)} ainda ${h.pendentes === 1 ? 'aguarda' : 'aguardam'} 3 meses para a primeira conferência` : ''}.</p>
+      ${F.length ? `<div class="scroll-x"><table class="tbl ac-tbl" style="margin-top:6px"><thead><tr><th>Quem deu o sinal</th>${H.map(([, n]) => `<th>${n}</th>`).join('')}</tr></thead><tbody>
+        ${F.map(([k, n]) => `<tr><td>${n}</td>${H.map(([hk]) => `<td>${cel(h.fontes[k][hk])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
+      : `<div class="note">${ICON.info}<div>Ainda não deu tempo de conferir: o primeiro resultado sai 3 meses depois do primeiro sinal${primeiro ? ` (a partir de ${primeiro})` : ''}.</div></div>`}
+      ${h.ultimos?.length ? `<details style="margin-top:8px"><summary>Últimos sinais</summary><ul class="sinais">${h.ultimos.map(x => `<li><b>${esc(rot(x.ticker))}</b><span>${esc(nomeDec(x.decisao))}</span><span class="mut">${x.fonte === 'ia' ? 'IA' : 'Regras'}${x.consenso === 'concordam' ? ' + regras' : x.consenso === 'divergem' ? ' (regras discordaram)' : ''} · ${diaBR(x.data)}</span><span class="st">${stH(x)}</span></li>`).join('')}</ul></details>` : ''}`}
+    <h3>Como o app se protege dos erros</h3>
+    <ul class="ink2 sm protege">
+      <li><b>Segunda opinião:</b> ${st.iaAtiva ? 'cada análise da IA é comparada com a das regras. Quando discordam, o app mostra “opiniões divergentes, confiança baixa” e não manda aviso de compra ou venda.' : 'sem IA configurada, os avisos usam só as regras. Com a IA, eles só saem quando as duas concordam.'}</li>
+      <li><b>Checagem dos números:</b> todo número citado num texto da IA precisa existir nos dados que o app calculou; se não existir, o texto é trocado pela explicação das regras.</li>
+      ${r.modelo_decisoes ? `<li><b>Modelo mais forte nas decisões:</b> a carteira recomendada (o que comprar, manter e vender) é montada pelo ${esc(modeloNome(r.modelo_decisoes))}, que pensa com mais calma antes de responder.</li>` : ''}
+    </ul>
+  </div>`;
+}
+
 /* ---------- abas ---------- */
 function go(t) {
   st.tab = t; rawSet('tab', t);
@@ -727,6 +823,7 @@ function renderResumo() {
         : !objetivo ? `<div class="note">${ICON.target}<div>Conte seu objetivo em <a href="#" onclick="go('investir');return false">Onde investir</a> para receber uma carteira sob medida para ele.</div></div>` : ''}
       <p class="lead">${esc(p.resumo || (p.vazio ? 'Você ainda não informou investimentos. Veja em “Onde investir” uma carteira inicial para o seu perfil.' : 'Sem comentários da IA no momento.'))}</p>
       ${p.alertas.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')}
+      ${checagemHtml(p.checagem)}
       ${p.acoes.length ? `<h3>O que fazer com o que você já tem</h3><p class="mut sm" style="margin:-4px 0 0">Toque em “Por quê?” para ver os números por trás de cada decisão.</p>
         <div class="acts-list">${p.acoes.map(decisaoHtml).join('')}</div>` : ''}
       <div class="btns"><button class="btn primary" type="button" onclick="go('investir')">Ver onde investir</button><button class="btn" type="button" onclick="go('sim')">Simular o futuro</button></div>
@@ -736,10 +833,12 @@ function renderResumo() {
 }
 function decisaoHtml(d) {
   const [k, ic, tx] = ACAO[d.acao] || ['', 'flat', d.acao];
-  const mov = d.acao === 'MANTER' || Math.abs(d.valor) < 1 ? '' : d.valor < 0 ? `Vender ≈ ${M0(-d.valor)}` : `Comprar ≈ ${M0(d.valor)}`;
+  const q = qtdTxt(d.ativo, d.cotas), venda = d.valor < 0;
+  const mov = d.acao === 'MANTER' || Math.abs(d.valor) < 1 ? '' : d.classe === 'renda_fixa' ? `${venda ? 'Resgatar' : 'Aplicar'} ≈ ${M0(Math.abs(d.valor))}`
+    : `${venda ? 'Vender' : 'Comprar'} ${q ? `${d.acao === 'VENDER' && !FRACIONAVEL.has(d.ativo) ? 'as ' : ''}${q} ≈ ` : '≈ '}${M0(Math.abs(d.valor))}`;
   return `<div class="act"><span class="tk">${esc(rot(d.ativo))}</span><span style="justify-self:end">${pill(k, ic, tx)}</span>
     <p>${esc(d.motivo)}</p>
-    ${mov ? `<p class="mov">${mov} <span class="mut xs" style="font-weight:400">(de ${P(d.peso_atual, 1, false)} para ${P(d.peso_alvo, 1, false)} da carteira)</span></p>` : ''}
+    ${mov ? `<p class="mov">${mov} <span class="mut xs" style="font-weight:400">(${d.preco_cota && d.ativo !== 'DOLAR' ? `${M(d.preco_cota)} cada; ` : ''}de ${P(d.peso_atual, 1, false)} para ${P(d.peso_alvo, 1, false)} da carteira)</span></p>` : ''}
     <details class="why"><summary>Por quê?</summary>
       ${d.porque ? `<p>${esc(d.porque)}</p>` : ''}
       ${fatosHtml(d.fatos)}
@@ -748,7 +847,7 @@ function decisaoHtml(d) {
     </details></div>`;
 }
 function portMsg() {
-  const msgs = ['Lendo as notícias do mercado…', 'Calculando métricas de dezenas de ativos…', 'Comparando sua carteira com o seu perfil…', 'A IA está montando a carteira recomendada…'];
+  const msgs = ['Lendo as notícias do mercado…', 'Calculando métricas de dezenas de ativos…', 'Comparando sua carteira com o seu perfil…', `${st.modelos ? modeloNome(st.modelos.decisoes) : 'A IA'} está pensando com calma na carteira recomendada…`];
   return msgs[Math.min(Math.floor((Date.now() - (st.portT0 || Date.now())) / 9000), msgs.length - 1)];
 }
 
@@ -756,14 +855,37 @@ function portMsg() {
 function plano() {
   const p = st.port, sug = p.sugerida, atual = Object.fromEntries(p.ativos.map(a => [a.ticker, a.valor]));
   if (modo === 'rebal') {
-    const tickers = [...new Set([...sug.map(s => s.ticker), ...Object.keys(atual)])];
-    const peso = Object.fromEntries(sug.map(s => [s.ticker, s.peso]));
-    const manter = new Set((p.acoes || []).filter(d => d.acao === 'MANTER').map(d => d.ativo));  // mesma decisão do Resumo
-    return tickers.map(t => {
-      const alvo = (peso[t] || 0) / 100 * p.total, d = alvo - (atual[t] || 0);
-      const s = sug.find(x => x.ticker === t) || {ticker: t, nome: nomeDe(t), classe: classeDe(t)};
-      return {...s, valor: d};
-    }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003) && !manter.has(x.ticker)).sort((a, b) => b.valor - a.valor);
+    const deSug = t => sug.find(x => x.ticker === t) || {ticker: t, nome: nomeDe(t), classe: classeDe(t)};
+    const linhas = [], semCota = [];
+    for (const d of p.acoes || []) {  // o que você já tem: a mesma decisão do Resumo, já em cotas inteiras
+      if (d.acao === 'MANTER' || Math.abs(d.valor) < 1) continue;
+      linhas.push({...deSug(d.ativo), valor: d.valor, cotas: d.cotas, preco_brl: d.preco_cota || deSug(d.ativo).preco_brl});
+    }
+    for (const s of sug) {  // ativos novos: só compra, e só em cotas inteiras ao preço de hoje
+      if (s.ticker in atual) continue;
+      let v = s.peso / 100 * p.total, cotas = null;
+      if (s.classe !== 'renda_fixa' && !FRACIONAVEL.has(s.ticker)) {
+        if (!s.preco_brl) { semCota.push({...s, semPreco: true}); continue; }
+        cotas = Math.floor(v / s.preco_brl + 1e-9);
+        if (!cotas) { semCota.push(s); continue; }
+        v = cotas * s.preco_brl;
+      } else if (s.preco_brl) cotas = v / s.preco_brl;
+      if (v >= Math.max(20, p.total * 0.003) || cotas) linhas.push({...s, valor: v, cotas});
+    }
+    // o arredondamento em cotas deixa uma diferença entre o que se vende e o que se compra: ela fica na renda fixa de liquidez
+    const saldo = -linhas.reduce((a, x) => a + x.valor, 0), LQ = ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'];
+    st.sobra = 0; st.semCota = semCota;
+    if (Math.abs(saldo) >= 1) {
+      const t = LQ.find(t => linhas.some(x => x.ticker === t)) || (LQ.includes(p.orcamento?.reserva_ativo) && p.orcamento.reserva_ativo)
+        || LQ.find(t => t in atual) || LQ.find(t => sug.some(x => x.ticker === t));
+      let l = t && linhas.find(x => x.ticker === t);
+      if (t && !l) { l = {...deSug(t), valor: 0}; linhas.push(l); }
+      if (l) {
+        const novo = Math.max(l.valor + saldo, -(atual[t] || 0));  // não resgata mais do que você tem
+        st.sobra = saldo - (novo - l.valor); l.valor = novo; l.ajuste = saldo;
+      } else st.sobra = saldo;
+    }
+    return linhas.filter(x => Math.abs(x.valor) >= 1).sort((a, b) => a.valor - b.valor);
   }
   // 1º fica de lado o dinheiro das contas a vencer; 2º completa a reserva de emergência; 3º o resto segue a carteira recomendada
   const inv = investivel(), orc = p.orcamento || {}, resAtivo = orc.reserva_ativo;
@@ -783,6 +905,7 @@ function plano() {
       const ef = x.cotas * x.preco_brl;
       sobra += x.valor - ef; x.valor = ef;
     } else if (x.preco_brl) x.cotas = x.valor / x.preco_brl;
+    else if (x.classe !== 'renda_fixa' && !FRACIONAVEL.has(x.ticker)) { x.cotas = 0; x.semPreco = true; sobra += x.valor; x.valor = 0; }
   });
   const liq = linhas.find(x => ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'].includes(x.ticker)) || linhas.find(x => x.classe === 'renda_fixa');
   if (liq) { liq.valor += sobra; sobra = 0; }
@@ -815,21 +938,27 @@ function planoHtml() {
   const rows = ls.map(x => {
     const venda = x.valor < 0, v = Math.abs(x.valor);
     let meta = '';
-    if (modo === 'aporte' && x.preco_brl && !FRACIONAVEL.has(x.ticker)) meta = x.cotas > 0 ? `${N(x.cotas)} ${x.cotas === 1 ? 'cota' : 'cotas'} × ${M(x.preco_brl)}` : `1 cota custa ${M(x.preco_brl)}: junte com o próximo aporte`;
+    if (modo === 'aporte' && x.semPreco) meta = 'Sem cotação agora: o valor ficou na renda fixa';
+    else if (modo === 'aporte' && x.preco_brl && !FRACIONAVEL.has(x.ticker)) meta = x.cotas > 0 ? `${N(x.cotas)} ${x.cotas === 1 ? 'cota' : 'cotas'} × ${M(x.preco_brl)}` : `1 cota custa ${M(x.preco_brl)}: junte com o próximo aporte`;
     else if (modo === 'aporte' && x.ticker === 'DOLAR' && x.preco_brl) meta = `≈ US$ ${N(x.cotas, 2)} a ${M(x.preco_brl)}`;
     else if (modo === 'aporte' && x.ticker === 'VOO' && x.preco_brl) meta = `≈ ${N(x.cotas, 2)} cotas (fração) a ${M(x.preco, 'USD')}`;
-    else if (modo === 'rebal') meta = motivoDe(x.ticker);
+    else if (modo === 'rebal') meta = [x.classe === 'renda_fixa' ? (x.ajuste ? 'inclui a diferença do arredondamento das cotas' : '')
+        : x.cotas != null ? (FRACIONAVEL.has(x.ticker) ? `≈ ${qtdTxt(x.ticker, Math.abs(x.cotas))}` : `${qtdTxt(x.ticker, Math.abs(x.cotas))} × ${M(x.preco_brl)}`) : '',
+        motivoDe(x.ticker)].filter(Boolean).join(' — ');
     else if (x.classe === 'renda_fixa' && x.taxa_aa) meta = `rende cerca de ${A(x.taxa_aa)}`;
     if (modo === 'aporte' && x.reserva) meta = `${M(x.reserva)} completam a reserva de emergência${x.valor - x.reserva > 1 ? `; ${M(x.valor - x.reserva)} são da carteira` : ''}`;
     const lbl = x.classe === 'renda_fixa' ? x.nome : rot(x.ticker), sub = x.classe === 'renda_fixa' || x.nome === lbl || x.nome === x.ticker ? '' : x.nome;
     return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span>${x.reserva && modo === 'aporte' ? pill('info', '', 'Reserva') : ''}</div>
-      <div class="val ${venda ? 'sell' : ''}">${modo === 'rebal' ? (venda ? 'Vender ' : 'Comprar ') : ''}${modo === 'aporte' && x.cotas === 0 ? '<span class="mut">—</span>' : M(v)}</div>
+      <div class="val ${venda ? 'sell' : ''}">${modo === 'rebal' ? (x.classe === 'renda_fixa' ? (venda ? 'Resgatar ' : 'Aplicar ') : venda ? 'Vender ' : 'Comprar ') : ''}${modo === 'aporte' && x.cotas === 0 ? '<span class="mut">—</span>' : M(v)}</div>
       <div class="meta"><span class="meter" aria-hidden="true"><i style="width:${(v / max * 100).toFixed(1)}%;background:var(--c-${x.classe})"></i></span><span>${meta}</span></div></div>`;
   }).join('');
   const tot = ls.reduce((a, x) => a + x.valor, 0);
   return `${antesDoPlano()}<div class="plan">${rows}</div>
     ${modo === 'aporte' ? `<div class="plan-tot"><span>Total</span><span class="tn">${M(tot)}</span></div>${st.sobra > 1 ? `<p class="mut sm">Sobram ${M(st.sobra)} por causa do arredondamento de cotas.</p>` : ''}`
-    : `<div class="note">${ICON.info}<div>Vender com lucro pode gerar imposto de renda (ações acima de R$ 20 mil vendidos no mês, FIIs sempre). Sempre que possível, rebalanceie direcionando os novos aportes.</div></div>`}`;
+      : `${st.sobra > 1 ? `<p class="mut sm">Sobram ${M(st.sobra)} das vendas por causa do arredondamento de cotas: deixe na conta da corretora ou na renda fixa.</p>`
+        : st.sobra < -1 ? `<p class="mut sm">As compras passam as vendas em ${M(-st.sobra)} por causa do arredondamento de cotas: use dinheiro novo ou compre 1 cota a menos.</p>` : ''}
+        ${st.semCota?.length ? `<p class="mut sm">Ficaram de fora porque o valor indicado não compra nem 1 cota: ${st.semCota.map(s => `${esc(rot(s.ticker))} (${s.semPreco ? 'sem cotação agora' : `1 cota custa ${M(s.preco_brl)}`})`).join(', ')}.</p>` : ''}
+      <div class="note">${ICON.info}<div>Vender com lucro pode gerar imposto de renda (ações acima de R$ 20 mil vendidos no mês, FIIs sempre). Sempre que possível, rebalanceie direcionando os novos aportes.</div></div>`}`;
 }
 function renderInvestir() {
   const el = $('#t-investir'), p = st.port;
@@ -856,6 +985,8 @@ function renderInvestir() {
     <div class="card">
       <h2>Carteira recomendada ${p.fonte === 'ia' ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Regras + dados')}</h2>
       <p class="lead sm">${esc(p.resumo || '')}</p>
+      ${p.modelo ? `<p class="mut xs" style="margin:6px 0 0">Montada pelo ${esc(modeloNome(p.modelo))}, que pensa com mais calma nas decisões de compra e venda.</p>` : ''}
+      ${checagemHtml(p.checagem)}
       ${grupos.map(([k, g]) => `<div class="cls-h">${dot(k)}${CLN[k]}<span class="mut">${N(p.alvo[k], 1)}% da carteira</span></div>
         ${g.map(s => `<div class="asset">
           <div class="hd"><div class="ttl"><b>${esc(s.classe === 'renda_fixa' ? s.nome : rot(s.ticker))}</b><div>${esc(s.classe === 'renda_fixa' ? 'Renda fixa' : s.nome !== rot(s.ticker) ? s.nome : CLN[s.classe])}</div></div>${spark(s.serie)}<div class="w tn">${N(s.peso, 1)}%<small>da carteira</small></div></div>
@@ -934,7 +1065,7 @@ function copyPlan() {
   const ls = plano();
   const cv = modo === 'aporte' && st.contas && !st.fin?.separar_contas ? contasAVencer().total : 0;
   const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(investivel())}${cv ? ` (de ${M(aporte)}; ${M(cv)} ficam para as contas a vencer)` : ''}:\n`) +
-    ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}${modo === 'rebal' && motivoDe(x.ticker) ? ` — ${motivoDe(x.ticker)}` : ''}`).join('\n');
+    ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.classe === 'renda_fixa' ? (x.valor < 0 ? 'resgatar ' : 'aplicar ') : x.valor < 0 ? 'vender ' : 'comprar ') : ''}${x.cotas && x.classe !== 'renda_fixa' && !FRACIONAVEL.has(x.ticker) ? `${qtdTxt(x.ticker, Math.abs(x.cotas))} × ${M(x.preco_brl)} = ` : ''}${M(Math.abs(x.valor))}${modo === 'rebal' && motivoDe(x.ticker) ? ` — ${motivoDe(x.ticker)}` : ''}`).join('\n');
   (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => toast('Plano copiado'), () => ask({title: 'Copie o plano', fields: [{name: 't', label: 'Plano', type: 'textarea', value: txt}], ok: 'Fechar'}));
 }
 function follow(t, btn) {
@@ -1190,6 +1321,7 @@ function renderMercado() {
     <div class="card"><h2>${ICON.spark.replace('<svg', '<svg width="18" height="18" style="color:var(--acc)"')}Leitura do momento</h2>
       <p class="lead">${esc(p.resumo || 'Sem análise disponível.')}</p>
       ${p.fatores.length ? `<h3>O que mais pesa agora</h3><ul class="ink2" style="padding-left:18px;margin:0">${p.fatores.map(x => `<li style="margin:4px 0">${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${checagemHtml(p.checagem)}
       <p class="mut xs" style="margin-top:12px">Atualizado em ${esc(new Date(p.atualizado).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'}))}. Manchetes do Google Notícias dos últimos 7 dias.</p>
     </div>
     <div class="card"><h2>Desempenho de referência</h2>
@@ -1204,7 +1336,9 @@ function renderMercado() {
       ${c.motivo ? `<p class="lead sm">${esc(c.motivo)}</p>` : ''}
       ${c.ajuste ? `<p class="mut xs">Ajuste aplicado na simulação: ${c.ajuste > 0 ? '+' : ''}${N(c.ajuste, 1)} p.p. no próximo ano.</p>` : ''}
       ${c.noticias.length ? `<details style="margin-top:8px"><summary>${c.noticias.length} manchetes</summary><ul class="news">${c.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}${n.fonte ? `<small>${esc(n.fonte)}</small>` : ''}</li>`).join('')}</ul></details>` : ''}
-    </div>`; }).join('')}</div>`;
+    </div>`; }).join('')}</div>
+  <div class="sect-t">Confiabilidade</div>
+  <div id="acertos">${acertosHtml()}</div>`;
 }
 
 /* ---------- Meus ativos ---------- */
@@ -1228,14 +1362,16 @@ function card(a) {
     <div class="pl tn ${cl(a.pl_atual)}">${p.qtd ? `${a.pl_atual > 0 ? '+' : ''}${M(a.pl_atual, mo)} <span class="mut" style="font-size:15px;font-weight:500">${P(a.pl_pct)}</span>` : '<span class="mut" style="font-size:16px;font-weight:500">Sem posição</span>'}</div>
     <div class="mut sm">${p.qtd ? `${N(p.qtd, 4)} ${a.classe === 'cambio' && a.ticker === 'DOLAR' ? 'dólares' : 'cotas'} · preço médio ${M(p.pm, mo)} · total ${M(a.valor, mo)}` : 'Use “Editar posição” para informar o que você tem'}</div>
     <div class="sug">${pill(kd, ic, tx + (a.confianca != null ? ` · ${N(a.confianca)}%` : ''))}<span>${esc(a.sugestao)}</span></div>
-    ${a.fonte === 'regras' ? `<p class="mut xs">${st.iaAtiva ? 'A IA não respondeu agora; ' : ''}análise por regras (tendência, médias móveis, RSI e volatilidade). Notícias não avaliadas.</p>` : ''}
+    ${a.fonte === 'regras' ? `<p class="mut xs">${st.iaAtiva ? 'A IA não respondeu agora; ' : ''}análise por regras (tendência, médias móveis, RSI e volatilidade). Notícias não avaliadas.</p>` : consensoHtml(a)}
     <div class="pot"><div>Até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<b class="${cl(a.ganho_pot)}">${M(a.ganho_pot, mo)}</b></div><div>Até o stop (${a.stop ? M(a.stop, mo) : '—'})<b class="${cl(-a.perda_pot)}">${a.perda_pot != null ? M(-a.perda_pot, mo) : '—'}</b></div></div>
     <p class="mut xs">Valores para ${N(a.base_qtd, 4)} ${a.base_qtd === 1 ? 'unidade' : 'unidades'}.</p>
     ${a.resumo ? `<p class="ink2" style="margin:8px 0 0">${esc(a.resumo)}</p>` : ''}
+    <div data-bt="${esc(a.ticker)}">${passadoAtivo(a.ticker)}</div>
     <details style="margin-top:10px"><summary>Indicadores, riscos e notícias</summary>
       <div class="kpis"><span>RSI <b>${N(m.rsi14, 0)}</b></span><span>3 meses <b>${P(m.ret_3m)}</b></span><span>12 meses <b>${P(m.ret_12m)}</b></span><span>Oscilação <b>${P(m.volatilidade_anual, 0, false)}</b></span><span>Queda máx. <b>${P(m.queda_max_12m, 0)}</b></span><span>Dividendos 12m <b>${P(m.dividend_yield_12m, 1, false)}</b></span></div>
       ${a.riscos.length ? `<ul class="ink2 sm" style="padding-left:18px">${a.riscos.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : ''}
       <ul class="news">${a.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}</li>`).join('')}</ul>
+      ${checagemHtml(a.checagem)}
     </details>
     <div class="btns"><button class="btn sm" type="button" onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
       <button class="btn sm" type="button" onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
@@ -1470,7 +1606,7 @@ $('#btnConta').onclick = () => ask({title: eu?.nome || 'Minha conta', desc: eu?.
     <button class="btn" type="button" data-conta="sair">Sair</button>
     <button class="btn" type="button" data-conta="sair-limpar">Sair e apagar meus dados deste aparelho</button>
     <button class="btn perigo" type="button" data-conta="excluir">Excluir minha conta</button></div>
-    <p class="mut xs" style="margin:0">Análises: ${st.iaAtiva ? 'com IA (Claude).' : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>`});
+    <p class="mut xs" style="margin:0">Análises: ${st.iaAtiva ? `com IA (${esc(modeloNome(st.modelos?.analises) || 'Claude')}), sempre conferida pelas regras. Carteira recomendada: ${esc(modeloNome(st.modelos?.decisoes) || 'Claude')}.` : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>`});
 function limparLocal() {
   const pre = `u:${eu?.id}:`;
   Object.keys(localStorage).filter(k => k.startsWith(pre)).forEach(k => rawSet(k, null));
@@ -1831,10 +1967,10 @@ async function novoAlerta(t, preco) {
   catch (e) { $('#fatal').textContent = e.message; $('#fatal').classList.remove('hide'); return; }
   $('#fatal').classList.add('hide');
   st.uni = w.universo || {};
-  st.iaAtiva = !!w.ia;
+  st.iaAtiva = !!w.ia; st.modelos = w.modelos || null;
   if (w.usuario) { eu = w.usuario; rawSet('eu', JSON.stringify(eu)); renderConta(); }
   await importarLegado();
-  loadContas(); loadAvisos();
+  loadContas(); loadAvisos(); loadAcertos();
   renderSync();
   await sincronizarInicio();
   renderPerfilChip(); renderInvestir();
