@@ -12,13 +12,18 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import armazem
+import regras
 import simulacao as sim
 
 load_dotenv()
 WATCHLIST = [t.strip().upper() for t in os.getenv("WATCHLIST", "PETR4,ITUB4,BBAS3,GARE11,CPTS11,VOO,DOLAR,TESOURO_SELIC,PORQUINHO").split(",") if t.strip()]
 TOKEN = os.getenv("APP_TOKEN", "")
 MODEL = os.getenv("MODEL", "claude-sonnet-5-5")
-client = anthropic.Anthropic()
+# A IA é opcional: sem ANTHROPIC_API_KEY (ou com USAR_IA=nao) o app usa o motor de regras (regras.py).
+USAR_IA = os.getenv("USAR_IA", "auto").strip().lower()
+IA_ATIVA = USAR_IA not in ("0", "nao", "não", "false", "off") and (
+    USAR_IA in ("1", "sim", "true", "on") or bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")))
+client = anthropic.Anthropic() if IA_ATIVA else None
 app = FastAPI()
 cache, fails = {}, {}  # as posições chegam do aparelho a cada pedido; a cópia salva da carteira fica em armazem.py
 _locks, _guard = {}, threading.Lock()
@@ -162,6 +167,7 @@ def enum(*v): return {"type": "string", "enum": list(v)}
 def ask_json(system, payload, schema=None, effort="medium"):
     """Pede JSON ao Claude. Usa structured outputs (JSON garantido pelo schema) e, se o modelo configurado
     não aceitar algum parâmetro, tenta de novo com menos recursos. Nunca lança erro: devolve {} se falhar."""
+    if not IA_ATIVA: return {}
     base = dict(model=MODEL, max_tokens=16000, system=system,
                 messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False, default=str)}])
     oc = {"effort": effort}
@@ -299,7 +305,7 @@ def sugestao(dec, p, alvo, stop, tem):
 
 
 def market(t):  # análise de mercado, independe da sua posição (por isso pode ficar em cache)
-    return cached("m:" + t, 1800, lambda: _market(t), ok=lambda v: v["ia"], ttl_falha=120)
+    return cached("m:" + t, 1800, lambda: _market(t), ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA, ttl_falha=120)
 
 
 def _market(t):
@@ -307,11 +313,13 @@ def _market(t):
     n = news(NEWSQ.get(t, t))
     a = ask_json(PROMPT, {"ativo": t, "nome": nome(t), "metricas": {k: v for k, v in m.items() if k != "serie"},
                           "noticias": [x["titulo"] for x in n]}, SCH_ATIVO)
+    fonte = "ia" if a else "regras"
+    if not a: a = regras.analise_ativo(m)  # sem IA (ou se ela falhar): indicadores de preço
     dec = str(a.get("decisao", "")).strip().upper()
     if dec not in ("COMPRAR", "VENDER", "MANTER"): dec = "MANTER"  # resposta inválida nunca vira ação
     out = {"decisao": dec, "confianca": num(a.get("confianca")), "alvo": num(a.get("alvo")), "stop": num(a.get("stop")),
            "resumo": str(a.get("resumo", ""))[:600], "riscos": [str(x)[:200] for x in a.get("riscos", [])][:4],
-           "metricas": m, "noticias": n, "ia": bool(a)}
+           "metricas": m, "noticias": n, "ia": fonte == "ia", "fonte": fonte}
     return out
 
 
@@ -398,6 +406,8 @@ def panorama():
             if m: mercado[rot] = {k: m[k] for k in ("ret_1m", "ret_12m", "vol_aa", "tendencia")}
         ia = ask_json(PROMPT_PANORAMA, {"hoje": date.today().isoformat(), "taxas": taxas, "mercado": mercado,
                                         "manchetes": {k: [n["titulo"] for n in v] for k, v in noticias.items()}}, SCH_PANORAMA)
+        fonte = "ia" if ia else "regras"
+        if not ia: ia = regras.panorama(taxas, mercado)  # sem IA: juro real e tendência dos índices
         classes = {}
         for c in CORE:
             x = (ia.get("classes") or {}).get(c) or {}
@@ -418,8 +428,8 @@ def panorama():
         for s in cen: s["prob"] = round(s["prob"] / tot * 100)
         return {"resumo": str(ia.get("resumo", ""))[:700], "classes": classes, "cenarios": cen,
                 "fatores": [str(f)[:240] for f in ia.get("fatores", [])][:5], "taxas": taxas, "mercado": mercado,
-                "ia": bool(ia), "atualizado": time.strftime("%Y-%m-%dT%H:%M:%S")}
-    return cached("panorama", 7200, calc, ok=lambda v: v["ia"])
+                "ia": fonte == "ia", "fonte": fonte, "atualizado": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    return cached("panorama", 7200, calc, ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA)
 
 
 # ---------------------------------------------------------------- carteira recomendada
@@ -436,8 +446,15 @@ Se o perfil for "não informado", use moderado e diga isso no resumo.
    coerente com o alvo de cada classe. Inclua liquidez para emergências (TESOURO_SELIC ou CDB_CDI).
    Use ETFs e fundos amplos como núcleo; ações e FIIs individuais como complemento, no máximo 10% cada.
    Mantenha os ativos atuais que continuam fazendo sentido (evita custo e IR na venda) e retire os que não fazem.
-   motivo: 1 a 2 frases concretas, citando dados (dividend yield, tendência, papel do ativo na carteira, cenário).
-3) acoes: para CADA ativo que o investidor já tem: AUMENTAR, MANTER, REDUZIR, VENDER ou REALIZAR_LUCRO, com motivo.
+   motivo: 1 frase. porque: 2 a 3 frases explicando por que ESTE ativo e não outro da mesma classe, que papel ele
+   cumpre na carteira (e no objetivo, se houver), citando os números recebidos. contra: 1 frase com o principal risco.
+3) acoes: para CADA ativo que o investidor já tem: AUMENTAR, MANTER, REDUZIR, VENDER ou REALIZAR_LUCRO, coerente com
+   a carteira do item 2 (VENDER se ele ficou fora; REDUZIR ou REALIZAR_LUCRO se o peso recomendado é menor que o atual;
+   AUMENTAR se é maior). motivo: 1 frase. porque: 2 a 3 frases citando os fatos (peso atual x recomendado, resultado da
+   posição, tendência, concentração, dividendos, imposto na venda). contra: 1 frase com o que pesa contra a decisão
+   (ex.: IR na venda, deixar de ganhar se continuar subindo, mais concentração).
+   IR na venda (pessoa física): ações 15% sobre o lucro, isentas se o total vendido no mês for até R$ 20 mil; FIIs 20%
+   sem isenção; ETFs 15% sem isenção; renda fixa 22,5% a 15% sobre o rendimento conforme o prazo (LCI/LCA isentas).
 4) resumo: 2 a 3 frases. alertas: 0 a 3 (concentração, falta de reserva, risco relevante).
 Não prometa retorno. Responda em português do Brasil."""
 
@@ -528,6 +545,111 @@ def montar_carteira(ia, perfil_ef, atual, sinais, com_objetivo=False):
     return alvo, dict(sorted(final.items(), key=lambda kv: -kv[1])), motivos, origem
 
 
+VENDAS = ("VENDER", "REDUZIR", "REALIZAR_LUCRO")
+CONTRA_PADRAO = {
+    "TESOURO_SELIC": "Quando os juros caem, rende menos que outras opções.",
+    "TESOURO_IPCA": "Se precisar vender antes do vencimento, o preço oscila (pode valer menos que o aplicado).",
+    "CDB_CDI": "Pode ter prazo de carência; o FGC garante até R$ 250 mil por instituição.",
+    "DOLAR": "Não rende juros: se o real se valorizar, perde valor.",
+    "GOLD11": "Ouro não paga rendimentos: serve como proteção, não como fonte de renda.",
+}
+
+
+def contra_padrao(a, c):
+    if a in CONTRA_PADRAO: return CONTRA_PADRAO[a]
+    if c == "fii": return "As cotas oscilam e os rendimentos podem cair se a vacância subir ou os juros mudarem."
+    if c == "exterior": return "Oscila com a bolsa americana e com o dólar."
+    if c == "renda_fixa": return "Rende menos que a bolsa em períodos de alta forte."
+    if a in ETF_ACAO: return "Acompanha a bolsa: cai junto quando o mercado cai."
+    return "Ação individual oscila mais que um ETF; por isso o peso é limitado."
+
+
+def fatos_classe(c, classes, alvo, pan):
+    v = pan["classes"].get(c, {})
+    fs = [regras.fato(f"{NOME_CLASSE[c]} na carteira", regras.pct(classes.get(c, 0)), f"ideal: {regras.pct(alvo.get(c, 0))}")]
+    if v.get("visao"):
+        fs.append(regras.fato("Visão para a classe", v["visao"].capitalize(), v.get("motivo", "")[:160]))
+    return fs
+
+
+def explicar_novo(s, m, x, alvo, classes, pan, total):
+    """Por que este ativo está na carteira recomendada: texto (IA ou regras) + fatos calculados."""
+    a, c = s["ticker"], s["classe"]
+    fs = [regras.fato("Peso recomendado", regras.pct(s["peso"]), "da carteira toda")]
+    if s["valor_atual"]:
+        fs.append(regras.fato("Peso hoje", regras.pct(s["valor_atual"] / total * 100 if total else 0)))
+    fs += fatos_classe(c, classes, alvo, pan)
+    if c == "renda_fixa" and s.get("taxa_aa"):
+        fs.append(regras.fato("Rendimento estimado", regras.pct(s["taxa_aa"], 2) + " ao ano"))
+    tipo = ("ETF: uma cesta de muitos ativos" if a in ETF_ACAO | ETF_EXT else "Ação de uma única empresa" if c == "acao"
+            else "Fundo imobiliário" if c == "fii" else "Título de renda fixa" if c == "renda_fixa" else None)
+    if tipo: fs.append(regras.fato("Tipo", tipo))
+    fs += regras.fatos_metricas(m, c)
+    porque = str(x.get("porque", "")).strip()[:600]
+    if not porque:
+        gap = alvo.get(c, 0) - classes.get(c, 0)
+        efeito = ("este ativo ajuda a completar essa parte." if gap > 1 else
+                  ("a classe está acima do ideal, por isso o peso dele fica menor que o atual." if s["valor_atual"] else
+                   "a classe está acima do ideal, por isso ele entra com peso pequeno.") if gap < -1 else
+                  "ele ajuda a manter essa parte equilibrada.")
+        porque = (f"A carteira tem {regras.pct(classes.get(c, 0))} em {regras.NOME_MIN[c]} e o ideal é {regras.pct(alvo.get(c, 0))}: {efeito}"
+                  + (f" {s['descricao']}." if s.get("descricao") and s["descricao"] not in (s.get("motivo") or "") else ""))
+    return {"porque": porque, "contra": str(x.get("contra", "")).strip()[:300] or contra_padrao(a, c), "fatos": fs[:10]}
+
+
+def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_ia, fonte):
+    """O que fazer com cada ativo que você já tem, por quê, quanto movimentar e o IR estimado da venda."""
+    ia = {norm(str(x.get("ativo", ""))): x for x in acoes_ia if isinstance(x, dict)} if fonte == "ia" else {}
+    out = []
+    for i in itens:
+        t, c = i["ticker"], i["classe"]
+        an = analises.get(t, {})
+        m = an.get("metricas") or {}
+        peso_alvo = pesos.get(t, 0)
+        dif = (peso_alvo - i["pct"]) / 100 * total
+        acao_r, motivo_r = regras.acao_mantido({**i, "pl_pct": an.get("pl_pct")}, peso_alvo, total, i["sinal"])
+        x = ia.get(t, {})
+        acao = str(x.get("acao", "")).upper()
+        coerente = (acao in VENDAS and dif < 0) or (acao == "AUMENTAR" and dif > 0) or acao == "MANTER"
+        if not (acao in ("AUMENTAR", "MANTER") + VENDAS and coerente):  # IA ausente ou incoerente com os pesos: usa as regras
+            acao, x = acao_r, {}
+        elif acao in VENDAS and peso_alvo <= 0:  # saiu da carteira recomendada: é venda total, não redução
+            acao = "VENDER"
+        venda = -dif if acao in VENDAS and dif < 0 else 0
+        if acao == "VENDER": venda = i["valor"]
+        fs = [regras.fato("Peso na carteira", regras.pct(i["pct"]), f"recomendado: {regras.pct(peso_alvo)}")]
+        fs += fatos_classe(c, classes, alvo, pan)
+        if an.get("pl_pct") is not None:
+            fs.append(regras.fato("Resultado da posição", regras.pct(an["pl_pct"], sinal=True), regras.brl(i["pl"])))
+        if i.get("sinal") and c != "renda_fixa":
+            fs.append(regras.fato("Sinal dos indicadores", i["sinal"].capitalize() + (f" ({regras.br(an['confianca'], 0)}% de confiança)" if an.get("confianca") else "")))
+        if c == "renda_fixa" and an.get("taxa"):
+            fs.append(regras.fato("Rendimento estimado", regras.pct(an["taxa"], 2) + " ao ano"))
+        fs += regras.fatos_metricas(m, c)[:4]
+        if abs(dif) >= max(50, 0.005 * total) and acao != "MANTER":
+            fs.append(regras.fato("Para chegar ao recomendado", ("vender " if dif < 0 else "comprar ") + regras.brl(abs(dif))))
+        custo = regras.ir_venda(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT) if venda else None
+        porque = str(x.get("porque", "")).strip()[:600]
+        if not porque:
+            tend = regras.tendencia_txt(m)
+            porque = (f"Hoje ele representa {regras.pct(i['pct'])} da carteira e a recomendação é {regras.pct(peso_alvo)}."
+                      + (f" Tendência de {tend}." if tend else "")
+                      + (f" A posição está com {regras.pct(an['pl_pct'], sinal=True)}." if an.get("pl_pct") is not None else ""))
+        contra = str(x.get("contra", "")).strip()[:300]
+        if not contra:
+            lucro = (an.get("pl_pct") or 0) > 0
+            contra = ({"VENDER": "Vender realiza o resultado de agora" + (" e pode gerar IR; se o ativo continuar subindo, você deixa de ganhar." if lucro else "; se o ativo se recuperar, você não participa da alta."),
+                       "REDUZIR": "Se o ativo continuar subindo, a parte vendida deixa de ganhar" + (" e a venda pode gerar IR." if lucro else "."),
+                       "REALIZAR_LUCRO": "A venda pode gerar IR e você deixa de ganhar com essa parte se continuar subindo.",
+                       "AUMENTAR": "Aumentar concentra mais dinheiro neste ativo e no risco dele.",
+                       "MANTER": "Manter não muda o risco atual: se o cenário piorar, a posição sente."}[acao])
+        out.append({"ativo": t, "nome": i.get("nome", t), "classe": c, "acao": acao,
+                    "motivo": (str(x.get("motivo", "")).strip() or motivo_r)[:320], "porque": porque, "contra": contra,
+                    "fatos": fs[:11], "custo": custo, "valor": round(dif, 2), "peso_atual": i["pct"], "peso_alvo": peso_alvo})
+    ordem = {"VENDER": 0, "REALIZAR_LUCRO": 1, "REDUZIR": 2, "AUMENTAR": 3, "MANTER": 4}
+    return sorted(out, key=lambda d: (ordem.get(d["acao"], 5), -abs(d["valor"])))
+
+
 @app.get("/")
 def home(): return FileResponse("index.html")
 
@@ -536,7 +658,7 @@ def home(): return FileResponse("index.html")
 def watchlist(req: Request, x_token: str = Header("")):
     auth(req, x_token)
     return {"tickers": WATCHLIST, "universo": {k: {"classe": v[0], "nome": v[1], "descricao": v[2]} for k, v in UNIVERSO.items()},
-            "classes": NOME_CLASSE, "perfis": PERFIS}
+            "classes": NOME_CLASSE, "perfis": PERFIS, "ia": IA_ATIVA}
 
 
 @app.post("/api/analyze")
@@ -575,9 +697,13 @@ def portfolio(req: Request, r: PortReq, x_token: str = Header("")):
         for t, a in analises.items():
             k = usd if a["moeda"] == "USD" else 1
             v = a["valor"] * k
+            m = a.get("metricas") or {}
             itens.append({"ticker": t, "nome": a.get("nome", t), "classe": a["classe"], "valor": round(v, 2),
-                          "pl": round((a.get("pl_atual") or 0) * k, 2), "sinal": a.get("decisao"), "sugestao": a.get("sugestao"),
-                          "taxa_aa": a.get("taxa"), "resumo": a.get("resumo", "")[:200]})
+                          "pl": round((a.get("pl_atual") or 0) * k, 2), "pl_pct": a.get("pl_pct"), "sinal": a.get("decisao"),
+                          "sugestao": a.get("sugestao"), "taxa_aa": a.get("taxa"), "resumo": a.get("resumo", "")[:200],
+                          "metricas": {"ret_12m": m.get("ret_12m"), "volatilidade": m.get("volatilidade_anual"),
+                                       "dividendos_12m": m.get("dividend_yield_12m"), "rsi14": m.get("rsi14"),
+                                       "tendencia": regras.tendencia_txt(m)} if m else None})
             total += v
         classes = {}
         for i in itens:
@@ -594,8 +720,9 @@ def portfolio(req: Request, r: PortReq, x_token: str = Header("")):
             lista.append({"ativo": a, "nome": nm, "classe": c, "descricao": desc, **extra})
         permitidos = sorted({x["ativo"] for x in lista} | set(held))
         schema = obj(**({"objetivo_analise": SCH_OBJETIVO} if objetivo else {}), resumo=STR, alvo=SCH_AJ, alvo_motivo=STR,
-                     carteira=arr(obj(ativo=enum(*permitidos), peso=NUM, motivo=STR)),
-                     acoes=arr(obj(ativo=STR, acao=enum("AUMENTAR", "MANTER", "REDUZIR", "VENDER", "REALIZAR_LUCRO"), motivo=STR)),
+                     carteira=arr(obj(ativo=enum(*permitidos), peso=NUM, motivo=STR, porque=STR, contra=STR)),
+                     acoes=arr(obj(ativo=STR, acao=enum("AUMENTAR", "MANTER", "REDUZIR", "VENDER", "REALIZAR_LUCRO"),
+                                   motivo=STR, porque=STR, contra=STR)),
                      alertas=arr(STR))
         ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else ""), {
             **({"objetivo": objetivo} if objetivo else {}),
@@ -606,7 +733,28 @@ def portfolio(req: Request, r: PortReq, x_token: str = Header("")):
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
             "ativos_permitidos": lista}, schema)
         atual = {i["ticker"]: i["valor"] for i in itens}
-        alvo, pesos, motivos, origem = montar_carteira(ia, perfil_ef, atual, {i["ticker"]: i["sinal"] for i in itens}, bool(objetivo))
+        sinais = {i["ticker"]: i["sinal"] for i in itens}
+        fonte = "ia" if ia.get("carteira") else "regras"
+        if fonte == "ia":
+            alvo, pesos, motivos, origem = montar_carteira(ia, perfil_ef, atual, sinais, bool(objetivo))
+            obj_an, alvo_motivo, resumo = (ler_objetivo(ia.get("objetivo_analise")) if objetivo else None), str(ia.get("alvo_motivo", ""))[:400], str(ia.get("resumo", ""))[:600]
+            textos = {norm(str(x.get("ativo", ""))): x for x in ia.get("carteira", []) if isinstance(x, dict)}
+            if objetivo and not obj_an: obj_an = regras.objetivo(objetivo)  # a IA não analisou o objetivo: usa as regras
+        else:  # sem IA (ou se ela falhar): motor de regras
+            obj_an = regras.objetivo(objetivo) if objetivo else None
+            alvo, alvo_motivo = regras.alvo_classes(PERFIS[perfil_ef], pan["classes"], obj_an)
+            cand = {a: {"classe": c, "nome": nm, "descricao": desc, "m": univ.get(a)} for a, (c, nm, desc) in UNIVERSO.items()}
+            for t, an in analises.items():
+                mm = an.get("metricas") or {}
+                cand.setdefault(t, {"classe": an["classe"], "nome": an.get("nome", t), "descricao": "",
+                                    "m": {"tendencia": (regras.tendencia_txt(mm) or "").split(":")[0] or None, "ret_12m": mm.get("ret_12m"),
+                                          "vol_aa": mm.get("volatilidade_anual"), "dy_12m": mm.get("dividend_yield_12m")} if mm else None})
+            pesos, motivos = regras.escolher_ativos(alvo, cand, atual, sinais, (obj_an or {}).get("liquidez"), ETF_ACAO | ETF_EXT)
+            origem, textos = {}, {}
+            if obj_an: obj_an["influencia"] = alvo_motivo
+            resumo = (f"Carteira montada por regras para o perfil {perfil_ef}{' e o seu objetivo' if obj_an else ''}: "
+                      f"{regras.pct(alvo['renda_fixa'], 0)} em renda fixa e o restante dividido entre ações, FIIs, exterior e proteção, "
+                      "com ETFs e títulos amplos como base.")
         sugerida = []
         for a, w in pesos.items():
             m = univ.get(a) or {}
@@ -622,23 +770,21 @@ def portfolio(req: Request, r: PortReq, x_token: str = Header("")):
                              "tendencia": m.get("tendencia"), "serie": m.get("serie"),
                              "taxa_aa": an.get("taxa") or taxa_rf(a, taxas),
                              "valor_atual": atual.get(a, 0), "novo": a not in atual})
-        acoes = [{"ativo": norm(str(x.get("ativo", "")))[:20], "acao": str(x.get("acao", ""))[:20], "motivo": str(x.get("motivo", ""))[:320]}
-                 for x in ia.get("acoes", []) if isinstance(x, dict) and norm(str(x.get("ativo", ""))) in held][:12]
-        if not acoes:
-            acoes = [{"ativo": i["ticker"], "acao": {"COMPRAR": "AUMENTAR", "VENDER": "REDUZIR"}.get(i["sinal"], "MANTER"),
-                      "motivo": i["sugestao"] or ""} for i in itens if i["classe"] != "renda_fixa"]
+            x = textos.get(a, {})
+            sugerida[-1].update(explicar_novo(sugerida[-1], m or (an.get("metricas") or {}), x, alvo, classes, pan, total))
+        acoes = explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, ia.get("acoes", []), fonte)
         alertas = [f"{i['ticker']} representa {i['pct']:.1f}% da carteira (concentração alta)".replace(".", ",") for i in itens if i["pct"] > 30 and len(itens) > 1]
         alertas += [f"Não consegui cotar {t} agora; ele ficou fora das contas." for t in falhou]
         return {"vazio": not held, "total": round(total, 2), "pl": round(sum(i["pl"] for i in itens), 2),
                 "classes": classes, "ativos": sorted(itens, key=lambda i: -i["valor"]),
                 "perfil": perfil_ef, "perfil_informado": r.perfil in PERFIS,
-                "alvo": alvo, "alvo_perfil": PERFIS[perfil_ef], "alvo_motivo": str(ia.get("alvo_motivo", ""))[:400],
-                "sugerida": sugerida, "acoes": acoes, "resumo": str(ia.get("resumo", ""))[:600],
+                "alvo": alvo, "alvo_perfil": PERFIS[perfil_ef], "alvo_motivo": alvo_motivo,
+                "sugerida": sugerida, "acoes": acoes, "resumo": resumo,
                 "alertas": (alertas + [str(x)[:240] for x in ia.get("alertas", [])])[:4],
-                "ia": bool(ia), "classes_padrao": list(origem), "usd": usd,
-                "objetivo": objetivo, "objetivo_analise": ler_objetivo(ia.get("objetivo_analise")) if objetivo else None}
+                "ia": fonte == "ia", "fonte": fonte, "ia_configurada": IA_ATIVA, "classes_padrao": list(origem), "usd": usd,
+                "objetivo": objetivo, "objetivo_analise": obj_an}
     try:
-        return cached(key, 1800, calc, ok=lambda v: v["ia"])
+        return cached(key, 1800, calc, ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA)
     except Exception as e:
         raise HTTPException(502, str(e))
 
