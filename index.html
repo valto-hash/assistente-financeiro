@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b2a5b">
 <title>Assistente Financeiro</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Financeiro">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -39,7 +43,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 header.top{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;padding-top:env(safe-area-inset-top)}
 .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;letter-spacing:-.01em;white-space:nowrap}
-@media (max-width:420px){.brand{font-size:15px}.chip-h .k{display:none}}
+.brand{min-width:0}
+.brand .nome-app{overflow:hidden;text-overflow:ellipsis}
+.hdr-acts{flex:0 0 auto}
+@media (max-width:420px){.brand{font-size:15px}.chip-h .k{display:none}.hdr-acts{gap:6px}.chip-h{padding:6px 10px}}
+@media (max-width:370px){.brand .nome-app{display:none}}
 .logo{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:grid;place-items:center}
 .hdr-acts{display:flex;gap:8px;align-items:center}
 .chip-h{border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:99px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;display:flex;gap:6px;align-items:center}
@@ -56,7 +64,7 @@ header.top{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#
 
 /* abas: barra inferior no celular, pílulas no topo no computador */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:var(--sf);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
-nav.tabs button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 2px;font-size:11px;font-weight:500;color:var(--mut);cursor:pointer;border-radius:10px}
+nav.tabs button{flex:1 1 0;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 1px;font-size:10.5px;font-weight:500;color:var(--mut);cursor:pointer;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-selected=true]{color:var(--acc)}
 nav.tabs button:focus-visible{outline:2px solid var(--acc)}
@@ -289,6 +297,60 @@ dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
 .opt-cards b{display:block}
 .opt-cards span{font-size:13px;color:var(--mut)}
 #dlgErr{color:var(--dn);font-size:13px;min-height:0}
+/* entrada, conta e avisos */
+.auth{position:fixed;inset:0;z-index:80;background:linear-gradient(160deg,var(--brand),var(--brand2));display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:calc(40px + env(safe-area-inset-top)) 16px 32px}
+.auth-box{width:min(420px,100%)}
+.auth-hd{color:#fff;text-align:center;margin-bottom:18px}
+.auth-hd .logo{width:56px;height:56px;border-radius:16px;margin:0 auto 12px;display:grid}
+.auth-hd h1{font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+.auth-hd p{margin:0;opacity:.82;font-size:14px}
+.auth .card{margin:0}
+.auth form{display:grid;gap:12px;margin-top:14px}
+.auth .segctl{display:flex}
+.auth .segctl button{flex:1}
+body.travado{overflow:hidden}
+.icon-h{position:relative}
+.icon-h.avatar{font-weight:700;font-size:13px;letter-spacing:.02em}
+.badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;border-radius:10px;background:#d03b3b;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px;border:2px solid var(--brand)}
+.menu-conta{display:grid;gap:8px}
+.menu-conta .btn{justify-content:flex-start}
+.menu-conta .btn.perigo{color:var(--dn)}
+.avisos-lista{display:grid;gap:8px;max-height:46vh;overflow:auto;margin:0 -4px;padding:0 4px}
+.aviso{display:flex;gap:10px;text-align:left;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--sf2);cursor:pointer;width:100%;color:inherit}
+.aviso.novo{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 6%,var(--sf))}
+.aviso .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:0 0 30px}
+.aviso .ic svg{width:16px;height:16px}
+.aviso b{display:block;font-size:14px}
+.aviso span{display:block;font-size:13px;color:var(--ink2)}
+.aviso small{display:block;font-size:11.5px;color:var(--mut);margin-top:2px}
+.ic.compra{background:color-mix(in srgb,var(--up) 15%,transparent);color:var(--up)}
+.ic.venda{background:color-mix(in srgb,var(--dn) 15%,transparent);color:var(--dn)}
+.ic.conta,.ic.preco,.ic.rebalancear{background:color-mix(in srgb,var(--acc) 15%,transparent);color:var(--acc)}
+.opcoes{display:grid;gap:2px;margin:6px 0}
+.opcoes label{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line2);font-size:14px;cursor:pointer}
+.opcoes input[type=checkbox]{width:20px;height:20px;accent-color:var(--acc);flex:0 0 auto}
+.opcoes select{border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--sf)}
+.checks{display:grid;gap:8px;max-height:46vh;overflow:auto}
+.checks label{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer}
+.checks label:has(input:checked){border-color:var(--acc);background:color-mix(in srgb,var(--acc) 6%,var(--sf))}
+.checks input{width:18px;height:18px;margin-top:2px;accent-color:var(--acc)}
+.checks b{display:block;font-size:14px}
+.checks span{font-size:12.5px;color:var(--mut)}
+/* contas do mês */
+.mes-nav{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.mes-nav h2{margin:0;text-align:center;flex:1}
+.mes-nav .btn{min-width:40px;padding:6px 10px}
+.barra-pago{height:8px;border-radius:99px;background:var(--line2);overflow:hidden;margin-top:12px}
+.barra-pago i{display:block;height:100%;background:var(--up);border-radius:99px}
+.conta-grupo{margin-top:6px}
+.conta-grupo h3{display:flex;justify-content:space-between;font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 6px}
+.conta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:12px 0;border-bottom:1px solid var(--line2);align-items:center}
+.conta:last-child{border-bottom:0}
+.conta .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conta .meta{font-size:12.5px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.conta .vl{font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.conta .acoes{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.conta.paga .nm,.conta.paga .vl{color:var(--mut)}
 #toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:calc(100vw - 32px)}
 #toast.on{opacity:1}
 @media (min-width:820px){#toast{bottom:24px}}
@@ -298,19 +360,21 @@ dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
 <body>
 <header class="top">
   <div class="wrap bar">
-    <div class="brand"><span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>Assistente Financeiro</div>
+    <div class="brand"><span class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><span class="nome-app">Assistente Financeiro</span></div>
     <div class="hdr-acts">
       <button class="chip-h" id="btnPerfil" type="button" aria-label="Alterar perfil de investidor"></button>
-      <button class="icon-h" id="btnCfg" type="button" aria-label="Configurações e backup"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg></button>
+      <button class="icon-h" id="btnAvisos" type="button" aria-label="Avisos"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="badge hide" id="avisosN"></span></button>
+      <button class="icon-h avatar" id="btnConta" type="button" aria-label="Minha conta, backup e sair"></button>
     </div>
   </div>
   <div class="wrap hero" id="hero"><div class="lbl">Patrimônio investido</div><div class="big"><span class="sk-h"></span></div><div class="sub">&nbsp;</div></div>
   <nav class="tabs" role="tablist" aria-label="Seções">
     <button role="tab" data-t="resumo" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg>Resumo</button>
-    <button role="tab" data-t="investir" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>Onde investir</button>
-    <button role="tab" data-t="sim" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg>Simulação</button>
+    <button role="tab" data-t="investir" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>Investir</button>
+    <button role="tab" data-t="sim" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg>Simular</button>
     <button role="tab" data-t="mercado" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2"/><path d="M8 9h5M8 13h5"/></svg>Mercado</button>
-    <button role="tab" data-t="ativos" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 14.5h1"/></svg>Meus ativos</button>
+    <button role="tab" data-t="ativos" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 14.5h1"/></svg>Ativos</button>
+    <button role="tab" data-t="contas" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg>Contas</button>
   </nav>
 </header>
 
@@ -320,10 +384,11 @@ dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
   <section id="t-investir" role="tabpanel" hidden></section>
   <section id="t-sim" role="tabpanel" hidden></section>
   <section id="t-mercado" role="tabpanel" hidden></section>
+  <section id="t-contas" role="tabpanel" hidden></section>
   <section id="t-ativos" role="tabpanel" hidden>
     <div class="card">
       <h2>Meus ativos</h2>
-      <p class="lead sm">Você opera na sua corretora e anota aqui. Seus ativos ficam salvos no servidor do app (protegidos pela senha) e neste aparelho, e aparecem em qualquer aparelho em que você entrar.</p>
+      <p class="lead sm">Você opera na sua corretora e anota aqui. Seus ativos ficam salvos na sua conta e aparecem em qualquer aparelho em que você entrar.</p>
       <div id="syncInfo" class="sync" aria-live="polite"></div>
       <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button></div>
     </div>
@@ -331,6 +396,9 @@ dialog::backdrop{background:rgba(8,15,30,.55);backdrop-filter:blur(2px)}
   </section>
   <p class="disc">Ferramenta educacional: sugestões e simulações são estimativas automáticas, não recomendação profissional nem garantia de resultado. Rentabilidade passada não garante rentabilidade futura. Valores antes de impostos e taxas.</p>
 </main>
+<div id="auth" class="auth hide" role="dialog" aria-modal="true" aria-label="Entrar no Assistente Financeiro"></div>
+<input type="file" id="arqConta" accept="application/pdf,image/*" hidden>
+<input type="file" id="arqExtrato" accept=".ofx,.csv,.txt,text/csv,application/x-ofx" hidden>
 <dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
 
@@ -364,21 +432,29 @@ const ICON = {
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>',
 };
 
-let tok = raw('tok') || '';
-let pos = ld('pos', {}), extra = ld('extra', []), perfil = raw('perfil') || 'não informado';
-let objetivo = (raw('objetivo') || '').slice(0, 600), objDraft = objetivo;  // objetivo aplicado e o texto em edição
+let sess = raw('sessao') || '', eu = ld('eu', null);  // sessão e dados da pessoa que entrou
+const U = k => eu ? `u:${eu.id}:${k}` : k;          // cada pessoa tem os próprios dados neste aparelho
+let pos = {}, extra = [], perfil = 'não informado';
+let objetivo = '', objDraft = '';  // objetivo aplicado e o texto em edição
 const EXEMPLOS = ['Montar minha reserva de emergência', 'Entrada de um apartamento em 5 anos', 'Aposentadoria daqui a 25 anos', 'Viagem em 2 anos', 'Fazer o dinheiro crescer no longo prazo'];
-let aporte = ld('aporte', 5000), modo = 'aporte';
-const simCfg = Object.assign({inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'}, ld('simcfg', {}));
+let aporte = 5000, modo = 'aporte';
+const SIM_PADRAO = {inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'};
+const simCfg = {...SIM_PADRAO};
+function carregarLocal() {
+  pos = ld(U('pos'), {}); extra = ld(U('extra'), []); perfil = raw(U('perfil')) || 'não informado';
+  objetivo = (raw(U('objetivo')) || '').slice(0, 600); objDraft = objetivo; aporte = ld(U('aporte'), 5000);
+  Object.keys(simCfg).forEach(k => delete simCfg[k]); Object.assign(simCfg, SIM_PADRAO, ld(U('simcfg'), {}));
+  sync = Object.assign({versao: 0, hash: null, quando: null}, ld(U('sync'), {}));
+}
 const st = {uni: {}, port: null, pan: null, sim: null, an: {}, portErr: null, panErr: null, simErr: null, portBusy: false, simBusy: false, tab: 'resumo'};
-const sv = () => { rawSet('pos', JSON.stringify(pos)); rawSet('extra', JSON.stringify(extra)); rawSet('perfil', perfil); rawSet('objetivo', objetivo || null);
-  rawSet('aporte', JSON.stringify(aporte)); rawSet('simcfg', JSON.stringify(simCfg)); agendarEnvio(); };
+const sv = () => { if (!eu) return; rawSet(U('pos'), JSON.stringify(pos)); rawSet(U('extra'), JSON.stringify(extra)); rawSet(U('perfil'), perfil);
+  rawSet(U('objetivo'), objetivo || null); rawSet(U('aporte'), JSON.stringify(aporte)); rawSet(U('simcfg'), JSON.stringify(simCfg)); agendarEnvio(); };
 
 /* ---------- sincronização da carteira com o servidor ----------
    Cada aparelho guarda uma cópia (localStorage) e o servidor guarda a oficial. "versao" é a versão do servidor em que
    este aparelho se baseou; "hash" é o conteúdo que foi salvo por último. Se outro aparelho salvou antes, o servidor
    recusa (409) e o app pergunta qual versão manter, em vez de sobrescrever em silêncio. */
-let sync = Object.assign({versao: 0, hash: null, quando: null}, ld('sync', {}));
+let sync = {versao: 0, hash: null, quando: null};
 const syncSt = {estado: 'inicio', modo: null, persistente: null, erro: null};
 function canon(d) {
   const pp = {};
@@ -397,10 +473,10 @@ const dadosLocais = () => canon({pos, extra, perfil, objetivo});
 const hashDe = d => JSON.stringify(d);
 const temDados = d => Object.keys(d.pos).length > 0 || d.extra.length > 0 || !!d.objetivo || d.perfil !== 'não informado';
 const nAtivos = d => Object.values(d.pos).filter(p => p.qtd > 0 || p.saldo > 0).length;
-const salvarSync = v => { sync = v; rawSet('sync', JSON.stringify(sync)); };
+const salvarSync = v => { sync = v; rawSet(U('sync'), JSON.stringify(sync)); };
 function aplicarDados(d) { pos = d.pos; extra = d.extra; perfil = d.perfil; objetivo = d.objetivo; objDraft = objetivo; }
 async function apiSync(method, body) {
-  const r = await fetch('/api/carteira', {method, headers: {'X-Token': tok, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
+  const r = await fetch('/api/carteira', {method, headers: {Authorization: 'Bearer ' + sess, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
   let j = {};
   try { j = await r.json(); } catch {}
   if (j.modo) { syncSt.modo = j.modo; syncSt.persistente = j.persistente; }
@@ -428,7 +504,7 @@ async function sincronizarInicio() {
 let envioT, retryT;
 function agendarEnvio() { clearTimeout(envioT); envioT = setTimeout(enviar, 800); }
 async function enviar() {
-  if (!tok || ['inicio', 'conflito'].includes(syncSt.estado)) return;
+  if (!sess || ['inicio', 'conflito'].includes(syncSt.estado)) return;
   const d = dadosLocais(), h = hashDe(d);
   if (h === sync.hash) { if (syncSt.estado !== 'ok') { syncSt.estado = 'ok'; renderSync(); } return; }
   if (enviar.busy) { enviar.again = true; return; }
@@ -522,9 +598,11 @@ const sk = (n = 3) => Array.from({length: n}, (_, i) => `<div class="sk" style="
 const busy = msg => `<div class="loading-msg"><span class="spin" aria-hidden="true"></span><span>${esc(msg)}</span></div>`;
 
 /* ---------- API ---------- */
-async function api(u, body) {
-  const r = await fetch(u, {method: body ? 'POST' : 'GET', headers: {'X-Token': tok, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
-  if (r.status === 401) { rawSet('tok', null); tok = ''; throw new Error('Senha incorreta. Toque em "Configurações" e entre de novo.'); }
+async function api(u, body, method) {
+  const form = body instanceof FormData;
+  const r = await fetch(u, {method: method || (body ? 'POST' : 'GET'), body: body && (form ? body : JSON.stringify(body)),
+    headers: {Authorization: 'Bearer ' + sess, ...(form ? {} : {'Content-Type': 'application/json'})}});
+  if (r.status === 401 && sess) { sess = ''; rawSet('sessao', null); rawSet('aviso_sessao', '1'); location.reload(); throw new Error('Sessão expirada.'); }
   let j = {};
   try { j = await r.json(); } catch {}
   if (!r.ok) throw new Error(j.detail || `Erro ${r.status}`);
@@ -532,29 +610,32 @@ async function api(u, body) {
 }
 
 /* ---------- diálogo (substitui prompt/alert) ---------- */
-function ask({title, desc = '', fields = [], ok = 'Salvar', extraHtml = '', validate}) {
+function ask({title, desc = '', fields = [], ok = 'Salvar', extraHtml = '', validate, cancelar = true}) {
   return new Promise(res => {
     const d = $('#dlg');
     d.innerHTML = `<form class="dlg" novalidate><h3 id="dlgTitle">${esc(title)}</h3>${desc ? `<p>${esc(desc)}</p>` : ''}
       ${fields.map(f => f.type === 'radio' ? `<div class="opt-cards" role="radiogroup">${f.options.map(o => `<label><input type="radio" name="${f.name}" value="${esc(o.value)}" ${o.value === f.value ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
+        : f.type === 'select' ? `<label class="fld"><span>${esc(f.label)}</span><div class="inp"><select name="${f.name}">${f.options.map(o => `<option value="${esc(o[0])}" ${o[0] === f.value ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select></div>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</label>`
+        : f.type === 'checks' ? `${f.label ? `<p class="b sm" style="margin:2px 0 -6px">${esc(f.label)}</p>` : ''}<div class="checks">${f.options.map(o => `<label><input type="checkbox" name="${f.name}" value="${esc(o.value)}" ${o.checked ? 'checked' : ''}><div><b>${esc(o.label)}</b><span>${esc(o.desc || '')}</span></div></label>`).join('')}</div>`
         : f.type === 'textarea' ? `<label class="fld"><span>${esc(f.label)}</span><textarea name="${f.name}" rows="5">${esc(f.value ?? '')}</textarea>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}</label>`
         : `<label class="fld"><span>${esc(f.label)}</span><div class="inp">${f.prefix ? `<i>${esc(f.prefix)}</i>` : ''}<input name="${f.name}" type="${f.type || 'text'}" inputmode="${f.mode || 'text'}" value="${esc(f.value ?? '')}" ${f.list ? `list="dl-${f.name}"` : ''} autocomplete="off" ${f.upper ? 'autocapitalize="characters"' : ''} placeholder="${esc(f.ph || '')}">${f.suffix ? `<i>${esc(f.suffix)}</i>` : ''}</div>${f.hint ? `<small>${esc(f.hint)}</small>` : ''}${f.list ? `<datalist id="dl-${f.name}">${f.list.map(o => `<option value="${esc(o[0])}">${esc(o[1])}</option>`).join('')}</datalist>` : ''}</label>`).join('')}
       ${extraHtml}<div id="dlgErr" role="alert"></div>
-      <div class="row-btns"><button type="button" class="btn ghost" data-x>Cancelar</button><button type="submit" class="btn primary">${esc(ok)}</button></div></form>`;
+      <div class="row-btns">${cancelar ? '<button type="button" class="btn ghost" data-x>Cancelar</button>' : ''}<button type="submit" class="btn primary">${esc(ok)}</button></div></form>`;
     const f = $('form', d);
     let done = false;
     const fin = v => { if (done) return; done = true; d.close(); res(v); };
-    $('[data-x]', d).onclick = () => fin(null);
+    if ($('[data-x]', d)) $('[data-x]', d).onclick = () => fin(null);
     d.oncancel = e => { e.preventDefault(); fin(null); };
     f.onsubmit = e => {
       e.preventDefault();
-      const v = Object.fromEntries(new FormData(f).entries());
+      const fd = new FormData(f), v = Object.fromEntries(fd.entries());
+      fields.filter(x => x.type === 'checks').forEach(x => v[x.name] = fd.getAll(x.name));
       const er = validate ? validate(v) : '';
       if (er) { $('#dlgErr').textContent = er; return; }
       fin(v);
     };
     d.showModal();
-    const first = $('input:not([type=radio]),textarea', d);
+    const first = $('input:not([type=radio]):not([type=checkbox]),textarea', d);
     if (first && !matchMedia('(pointer:coarse)').matches) first.focus();
   });
 }
@@ -650,7 +731,8 @@ function renderResumo() {
         <div class="acts-list">${p.acoes.map(decisaoHtml).join('')}</div>` : ''}
       <div class="btns"><button class="btn primary" type="button" onclick="go('investir')">Ver onde investir</button><button class="btn" type="button" onclick="go('sim')">Simular o futuro</button></div>
     </div>
-  </div>`;
+  </div><div id="resumoContas"></div>`;
+  renderResumoContas();
 }
 function decisaoHtml(d) {
   const [k, ic, tx] = ACAO[d.acao] || ['', 'flat', d.acao];
@@ -683,10 +765,15 @@ function plano() {
       return {...s, valor: d};
     }).filter(x => Math.abs(x.valor) >= Math.max(20, p.total * 0.003) && !manter.has(x.ticker)).sort((a, b) => b.valor - a.valor);
   }
-  const T = p.total + aporte;
-  const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual[s.ticker] || 0), 0)}));
+  // 1º fica de lado o dinheiro das contas a vencer; 2º completa a reserva de emergência; 3º o resto segue a carteira recomendada
+  const inv = investivel(), orc = p.orcamento || {}, resAtivo = orc.reserva_ativo;
+  const resParte = resAtivo ? Math.min(inv, orc.reserva_falta || 0) : 0, resto = inv - resParte;
+  const atual2 = {...atual};
+  if (resParte) atual2[resAtivo] = (atual2[resAtivo] || 0) + resParte;
+  const T = p.total + inv;
+  const linhas = sug.map(s => ({...s, falta: Math.max(s.peso / 100 * T - (atual2[s.ticker] || 0), 0)}));
   const sf = linhas.reduce((a, x) => a + x.falta, 0);
-  linhas.forEach(x => x.valor = sf <= 0 ? aporte * x.peso / 100 : sf >= aporte ? aporte * x.falta / sf : x.falta + (aporte - sf) * x.peso / 100);
+  linhas.forEach(x => x.valor = resto <= 0 ? 0 : sf <= 0 ? resto * x.peso / 100 : sf >= resto ? resto * x.falta / sf : x.falta + (resto - sf) * x.peso / 100);
   // arredonda para cotas inteiras nos ativos da B3; a sobra vai para a renda fixa de liquidez
   let sobra = 0;
   linhas.forEach(x => {
@@ -700,12 +787,30 @@ function plano() {
   const liq = linhas.find(x => ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'].includes(x.ticker)) || linhas.find(x => x.classe === 'renda_fixa');
   if (liq) { liq.valor += sobra; sobra = 0; }
   st.sobra = sobra;
-  return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => b.valor - a.valor);
+  if (resParte) {
+    const l = linhas.find(x => x.ticker === resAtivo);
+    if (l) { l.valor += resParte; l.reserva = resParte; }
+    else linhas.push({ticker: resAtivo, nome: nomeDe(resAtivo), classe: 'renda_fixa', valor: resParte, reserva: resParte, bruto: resParte});
+  }
+  return linhas.filter(x => x.valor >= 0.5 || (x.cotas === 0 && x.bruto >= 1)).sort((a, b) => (b.reserva ? 1 : 0) - (a.reserva ? 1 : 0) || b.valor - a.valor);
 }
 const motivoDe = t => st.port?.acoes?.find(d => d.ativo === t)?.motivo || st.port?.sugerida?.find(s => s.ticker === t)?.motivo || '';
+function antesDoPlano() {  // contas a vencer e reserva, explicadas antes das linhas do plano
+  if (modo !== 'aporte' || !st.contas) return '';
+  const cv = contasAVencer(), sep = st.fin?.separar_contas, orc = st.port?.orcamento || {}, inv = investivel();
+  const ate = cv.ate.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
+  let h = '';
+  if (cv.total > 0) h += `<div class="note">${ICON.info}<div>Contas até ${ate}${st.fin?.dia_renda ? ' (seu próximo recebimento)' : ''} ainda não pagas:
+    <b>${M(cv.total)}</b> (${cv.lista.map(c => esc(c.nome)).slice(0, 3).join(', ')}${cv.lista.length > 3 ? '…' : ''}).
+    ${sep ? 'Você marcou que já separou esse dinheiro.' : inv > 0 ? `O plano deixa esse valor de lado e investe <b>${M(inv)}</b>.` : 'Todo o valor fica para as contas.'}
+    <label class="toggle" style="margin-top:6px"><input type="checkbox" id="sepContas" ${sep ? 'checked' : ''}> Já separei o dinheiro das contas</label></div></div>`;
+  if (orc.reserva_falta > 1 && inv > 0) h += `<div class="note">${ICON.target}<div><b>Primeiro a reserva de emergência:</b> faltam ${M(orc.reserva_falta)} para cobrir
+    ${orc.reserva_meses} meses das suas contas. ${inv <= orc.reserva_falta ? 'Todo este valor vai para ela.' : `${M(orc.reserva_falta)} vão para ela e o resto segue a carteira recomendada.`}</div></div>`;
+  return h;
+}
 function planoHtml() {
   const p = st.port, ls = plano();
-  if (!ls.length) return `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : 'Informe um valor para ver o plano.'}</p>`;
+  if (!ls.length) return antesDoPlano() + `<p class="mut">${modo === 'rebal' ? 'Sua carteira já está muito próxima da recomendada.' : investivel() <= 0 && aporte > 0 ? 'Nada a investir agora.' : 'Informe um valor para ver o plano.'}</p>`;
   const max = Math.max(...ls.map(x => Math.abs(x.valor)));
   const rows = ls.map(x => {
     const venda = x.valor < 0, v = Math.abs(x.valor);
@@ -715,13 +820,14 @@ function planoHtml() {
     else if (modo === 'aporte' && x.ticker === 'VOO' && x.preco_brl) meta = `≈ ${N(x.cotas, 2)} cotas (fração) a ${M(x.preco, 'USD')}`;
     else if (modo === 'rebal') meta = motivoDe(x.ticker);
     else if (x.classe === 'renda_fixa' && x.taxa_aa) meta = `rende cerca de ${A(x.taxa_aa)}`;
+    if (modo === 'aporte' && x.reserva) meta = `${M(x.reserva)} completam a reserva de emergência${x.valor - x.reserva > 1 ? `; ${M(x.valor - x.reserva)} são da carteira` : ''}`;
     const lbl = x.classe === 'renda_fixa' ? x.nome : rot(x.ticker), sub = x.classe === 'renda_fixa' || x.nome === lbl || x.nome === x.ticker ? '' : x.nome;
-    return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span></div>
+    return `<div class="plan-row"><div class="who">${dot(x.classe)}<b>${esc(lbl)}</b><span class="mut sm">${esc(sub)}</span>${x.reserva && modo === 'aporte' ? pill('info', '', 'Reserva') : ''}</div>
       <div class="val ${venda ? 'sell' : ''}">${modo === 'rebal' ? (venda ? 'Vender ' : 'Comprar ') : ''}${modo === 'aporte' && x.cotas === 0 ? '<span class="mut">—</span>' : M(v)}</div>
       <div class="meta"><span class="meter" aria-hidden="true"><i style="width:${(v / max * 100).toFixed(1)}%;background:var(--c-${x.classe})"></i></span><span>${meta}</span></div></div>`;
   }).join('');
   const tot = ls.reduce((a, x) => a + x.valor, 0);
-  return `<div class="plan">${rows}</div>
+  return `${antesDoPlano()}<div class="plan">${rows}</div>
     ${modo === 'aporte' ? `<div class="plan-tot"><span>Total</span><span class="tn">${M(tot)}</span></div>${st.sobra > 1 ? `<p class="mut sm">Sobram ${M(st.sobra)} por causa do arredondamento de cotas.</p>` : ''}`
     : `<div class="note">${ICON.info}<div>Vender com lucro pode gerar imposto de renda (ações acima de R$ 20 mil vendidos no mês, FIIs sempre). Sempre que possível, rebalanceie direcionando os novos aportes.</div></div>`}`;
 }
@@ -740,6 +846,8 @@ function renderInvestir() {
       <div id="aporteBox" ${modo === 'rebal' ? 'class="hide"' : ''}>
         <label class="amount"><span>R$</span><input id="aporte" inputmode="decimal" value="${N(aporte, 2)}" aria-label="Valor a investir"></label>
         <div class="quick">${[1000, 5000, 10000, 50000].map(v => `<button type="button" data-q="${v}">${Mc(v)}</button>`).join('')}</div>
+        ${p.orcamento?.sobra > 0 ? `<p class="mut sm" style="margin:10px 0 0">Pela sua renda e suas contas, sobram cerca de <b>${M(p.orcamento.sobra)}</b> por mês. <a href="#" id="usarSobra">Investir esse valor</a></p>`
+          : p.orcamento && !p.orcamento.renda_mensal ? `<p class="mut sm" style="margin:10px 0 0"><a href="#" onclick="go('contas');return false">Informe sua renda</a> em Contas para o app calcular quanto sobra por mês para investir.</p>` : ''}
       </div>
       <h3>${modo === 'rebal' ? 'Ajustes para chegar à carteira recomendada' : 'Seu plano de compra'}</h3>
       <div id="plano">${planoHtml()}</div>
@@ -768,6 +876,7 @@ function renderInvestir() {
   const inp = $('#aporte', el);
   if (inp) inp.oninput = () => { const v = num(inp.value); aporte = isNaN(v) ? 0 : Math.max(v, 0); sv(); $('#plano').innerHTML = planoHtml(); simDirty(); };
   $$('[data-q]', el).forEach(b => b.onclick = () => { aporte = +b.dataset.q; sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
+  $('#usarSobra', el)?.addEventListener('click', e => { e.preventDefault(); aporte = Math.round(p.orcamento.sobra); sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
   $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
   $('#btnCopy', el).onclick = copyPlan;
   bindObjetivo(el);
@@ -823,7 +932,8 @@ function bindObjetivo(el) {
 }
 function copyPlan() {
   const ls = plano();
-  const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(aporte)}:\n`) +
+  const cv = modo === 'aporte' && st.contas && !st.fin?.separar_contas ? contasAVencer().total : 0;
+  const txt = (modo === 'rebal' ? 'Rebalanceamento sugerido:\n' : `Plano para investir ${M(investivel())}${cv ? ` (de ${M(aporte)}; ${M(cv)} ficam para as contas a vencer)` : ''}:\n`) +
     ls.filter(x => Math.abs(x.valor) >= 0.5).map(x => `- ${rot(x.ticker)}${x.nome !== rot(x.ticker) ? ` (${x.nome})` : ''}: ${modo === 'rebal' ? (x.valor < 0 ? 'vender ' : 'comprar ') : ''}${M(Math.abs(x.valor))}${modo === 'aporte' && x.cotas && !FRACIONAVEL.has(x.ticker) ? ` (${x.cotas} cotas)` : ''}${modo === 'rebal' && motivoDe(x.ticker) ? ` — ${motivoDe(x.ticker)}` : ''}`).join('\n');
   (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => toast('Plano copiado'), () => ask({title: 'Copie o plano', fields: [{name: 't', label: 'Plano', type: 'textarea', value: txt}], ok: 'Fechar'}));
 }
@@ -865,7 +975,7 @@ function renderSim() {
       <p class="lead sm">2.000 futuros possíveis sorteados a partir de até 20 anos de histórico real dos ativos, ajustados pelas expectativas de juros e inflação e pelos cenários montados com as notícias recentes.</p>
       <div class="ctrls" id="simCtrls" style="margin-top:14px">
         <label class="fld"><span>Valor inicial</span><div class="inp"><i>R$</i><input id="sIni" inputmode="decimal"></div><small id="sIniH"></small></label>
-        <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div></label>
+        <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div><small id="sMenH"></small></label>
         <label class="fld"><span>Prazo</span><div class="inp"><select id="sAnos">${[...new Set([1, 3, 5, 10, 15, 20, 30, simCfg.anos])].sort((a, b) => a - b).map(a => `<option value="${a}">${a} ${a === 1 ? 'ano' : 'anos'}</option>`).join('')}</select></div></label>
         <label class="fld"><span>Cenário das notícias</span><div class="inp"><select id="sCen"></select></div></label>
       </div>
@@ -878,7 +988,7 @@ function renderSim() {
     <div id="simMore"></div>`;
     const ini = $('#sIni'), men = $('#sMen');
     ini.oninput = () => { const v = num(ini.value); simCfg.inicial = ini.value.trim() === '' || isNaN(v) ? null : Math.max(v, 0); sv(); debSim(); updIniHint(); };
-    men.oninput = () => { const v = num(men.value); simCfg.mensal = isNaN(v) ? 0 : Math.max(v, 0); sv(); debSim(); };
+    men.oninput = () => { const v = num(men.value); simCfg.mensal = isNaN(v) ? 0 : Math.max(v, 0); sv(); debSim(); updMenHint(); };
     $('#sAnos').onchange = e => { simCfg.anos = +e.target.value; sv(); runSim(); };
     $('#sCen').onchange = e => { simCfg.cenario = e.target.value; sv(); runSim(); };
     $('#sReal').onchange = e => { simCfg.real = e.target.checked; sv(); renderSimBody(); };
@@ -898,7 +1008,15 @@ function renderSim() {
   renderSimBody();
 }
 let debT; function debSim() { clearTimeout(debT); debT = setTimeout(runSim, 600); }
+function updMenHint() {
+  const h = $('#sMenH'), sobra = st.port?.orcamento?.sobra;
+  if (!h) return;
+  h.innerHTML = !(sobra > 0) ? '' : Math.abs(simCfg.mensal - sobra) < 1 ? 'O que sobra da sua renda depois das contas'
+    : `Sobram ${M0(sobra)} da renda depois das contas. <a href="#" id="sMenUsar">Usar</a>`;
+  const a = $('#sMenUsar'); if (a) a.onclick = e => { e.preventDefault(); simCfg.mensal = Math.round(sobra); sv(); $('#sMen').value = N(simCfg.mensal, 2); updMenHint(); runSim(); };
+}
 function updIniHint() {
+  updMenHint();
   const h = $('#sIniH'); if (!h) return;
   h.innerHTML = simCfg.inicial == null ? 'Patrimônio atual + valor do aporte' : `<a href="#" id="sIniReset">Usar patrimônio atual + aporte</a>`;
   const a = $('#sIniReset'); if (a) a.onclick = e => { e.preventDefault(); simCfg.inicial = null; sv(); $('#sIni').value = N(inicialAuto(), 2); updIniHint(); runSim(); };
@@ -1121,7 +1239,8 @@ function card(a) {
     </details>
     <div class="btns"><button class="btn sm" type="button" onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
       <button class="btn sm" type="button" onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
-      <button class="btn sm" type="button" onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>${rmBtn(a.ticker)}</div></section>`;
+      <button class="btn sm" type="button" onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>
+      <button class="btn sm" type="button" onclick="novoAlerta('${a.ticker}', ${m.preco})">Alerta de preço</button>${rmBtn(a.ticker)}</div></section>`;
 }
 async function load(t) {
   const el = document.getElementById('r-' + t);
@@ -1192,12 +1311,12 @@ $('#btnPerfil').onclick = async () => {
   if (!v || v.p === perfil) return;
   perfil = v.p; sv(); renderPerfilChip(); loadPort(true);
 };
-$('#btnCfg').onclick = async () => {
+async function abrirBackup() {
   const bk = JSON.stringify({pos, extra, perfil, objetivo});
   const v = await ask({title: 'Backup e acesso', desc: 'Seus ativos já ficam salvos no servidor do app. Este texto é uma cópia extra: guarde-o em um lugar seguro; para restaurar, cole um backup e toque em Restaurar (ele substitui a carteira salva no servidor).',
     fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
     extraHtml: `<p class="mut sm" style="margin:0">Análises: ${st.iaAtiva ? 'com IA (Claude).' : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>
-      <div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
+      <div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button></div>`,
     ok: 'Restaurar', validate: v => { if (v.bk.trim() === bk) return 'Cole um backup diferente para restaurar, ou toque em Cancelar.'; try { JSON.parse(v.bk); } catch { return 'Texto de backup inválido.'; } }});
   if (!v) return;
   try {
@@ -1211,10 +1330,9 @@ $('#btnCfg').onclick = async () => {
     if (g?.status === 200) { salvarSync({...sync, versao: g.j.versao}); syncSt.estado = 'ok'; await enviar(); }
     location.reload();
   } catch { toast('Texto de backup inválido.'); }
-};
+}
 document.addEventListener('click', e => {
   if (e.target.id === 'bkCopy') { const ta = $('#dlg textarea'); navigator.clipboard?.writeText(ta.value).then(() => toast('Backup copiado'), () => { ta.select(); }); }
-  if (e.target.id === 'bkOut') { rawSet('tok', null); location.reload(); }
 });
 
 /* ---------- carga ---------- */
@@ -1251,26 +1369,472 @@ async function loadPan() {
   renderMercado();
   if (st.port && $('#sCen')) renderSim();
 }
-async function login() {
-  const v = await ask({title: 'Entrar', desc: 'Digite a senha do app (a variável APP_TOKEN do servidor).', fields: [{name: 'k', label: 'Senha', type: 'password'}], ok: 'Entrar',
-    validate: v => v.k ? '' : 'Digite a senha.'});
-  if (!v) return false;
-  tok = v.k; rawSet('tok', tok); return true;
+/* ---------- contas de acesso ---------- */
+const ABAS = ['resumo', 'investir', 'sim', 'mercado', 'ativos', 'contas'];
+const LOGO = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>';
+function telaEntrar(msg = '') {
+  return new Promise(async res => {
+    const el = $('#auth');
+    let cfg = {exige_convite: true}, modoA = 'entrar';
+    try { cfg = await (await fetch('/api/conta/config')).json(); } catch {}
+    document.body.classList.add('travado');
+    const desenhar = () => {
+      const criar = modoA === 'criar';
+      el.innerHTML = `<div class="auth-box"><div class="auth-hd"><span class="logo" style="background:rgba(255,255,255,.14);place-items:center">${LOGO}</span>
+        <h1>Assistente Financeiro</h1><p>Investimentos, simulações e contas do mês, num só lugar.</p></div>
+        <div class="card"><div class="segctl" role="group" aria-label="Entrar ou criar conta">
+          <button type="button" data-am="entrar" aria-pressed="${!criar}">Entrar</button><button type="button" data-am="criar" aria-pressed="${criar}">Criar conta</button></div>
+        ${msg ? `<div class="note warn" style="margin-top:12px">${ICON.warn}<div>${esc(msg)}</div></div>` : ''}
+        <form id="authForm" novalidate>
+          ${criar ? '<label class="fld"><span>Seu nome</span><div class="inp"><input name="nome" autocomplete="name" required></div></label>' : ''}
+          <label class="fld"><span>E-mail</span><div class="inp"><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" required></div></label>
+          <label class="fld"><span>Senha</span><div class="inp"><input name="senha" type="password" autocomplete="${criar ? 'new-password' : 'current-password'}" required minlength="8"></div>${criar ? '<small>Pelo menos 8 caracteres.</small>' : ''}</label>
+          ${criar && cfg.exige_convite ? '<label class="fld"><span>Código de convite</span><div class="inp"><input name="convite" autocomplete="off" autocapitalize="off"></div><small>Peça o código a quem administra o app.</small></label>' : ''}
+          <div id="authErr" class="err-box sm" role="alert"></div>
+          <button class="btn primary" type="submit">${criar ? 'Criar minha conta' : 'Entrar'}</button>
+        </form>
+        <p class="mut xs" style="margin:14px 0 0">Cada pessoa tem a própria conta: carteira, contas do mês e avisos ficam separados.</p></div></div>`;
+      $$('[data-am]', el).forEach(b => b.onclick = () => { modoA = b.dataset.am; msg = ''; desenhar(); });
+      const f = $('#authForm', el);
+      if (!matchMedia('(pointer:coarse)').matches) $('input', f).focus();
+      f.onsubmit = async e => {
+        e.preventDefault();
+        const v = Object.fromEntries(new FormData(f).entries()), btn = $('button[type=submit]', f), err = $('#authErr', el);
+        err.textContent = '';
+        if (criar && (v.nome || '').trim().length < 2) return err.textContent = 'Informe seu nome.';
+        if (!/^\S+@\S+\.\S+$/.test((v.email || '').trim())) return err.textContent = 'Informe um e-mail válido.';
+        if ((v.senha || '').length < (criar ? 8 : 1)) return err.textContent = criar ? 'A senha precisa ter pelo menos 8 caracteres.' : 'Digite a senha.';
+        btn.disabled = true; btn.textContent = criar ? 'Criando…' : 'Entrando…';
+        try {
+          const r = await fetch(criar ? '/api/conta/cadastrar' : '/api/conta/entrar', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(v)});
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : `Erro ${r.status}`);
+          sess = j.token; eu = j.usuario; rawSet('sessao', sess); rawSet('eu', JSON.stringify(eu));
+          el.classList.add('hide'); el.innerHTML = ''; document.body.classList.remove('travado');
+          res();
+        } catch (er) { err.textContent = er.message; btn.disabled = false; btn.textContent = criar ? 'Criar minha conta' : 'Entrar'; }
+      };
+    };
+    desenhar();
+    el.classList.remove('hide');
+  });
+}
+function renderConta() {
+  const ini = (eu?.nome || '?').split(/\s+/).filter(Boolean).map(x => x[0]).slice(0, 2).join('').toUpperCase();
+  $('#btnConta').textContent = ini;
+  $('#btnConta').title = eu ? `${eu.nome} (${eu.email})` : '';
+}
+async function importarLegado() {
+  // ativos registrados neste aparelho antes de existirem contas: pergunta se são desta pessoa
+  const leg = {pos: ld('pos', null), extra: ld('extra', null), perfil: raw('perfil'), objetivo: raw('objetivo'), aporte: ld('aporte', null), simcfg: ld('simcfg', null)};
+  const n = Object.values(leg.pos || {}).filter(p => p.qtd > 0 || p.saldo > 0).length + (leg.extra || []).length;
+  if (!n && !leg.objetivo) return;
+  if (Object.keys(pos).length || extra.length) return;  // esta pessoa já tem dados aqui: o legado fica para quem o registrou
+  const v = await ask({title: 'Ativos salvos neste aparelho', desc: 'Encontramos ativos registrados neste aparelho antes de existirem contas. Eles são seus?',
+    fields: [{name: 'v', type: 'radio', value: 'sim', options: [
+      {value: 'sim', label: 'Sim, levar para a minha conta', desc: `${n} ${n === 1 ? 'item' : 'itens'} na carteira${leg.objetivo ? ' e um objetivo' : ''}.`},
+      {value: 'nao', label: 'Não, são de outra pessoa', desc: 'Ficam guardados para quem os registrou entrar com a própria conta.'}]}], ok: 'Continuar'});
+  if (v?.v !== 'sim') return;
+  pos = leg.pos || {}; extra = leg.extra || []; if (leg.perfil) perfil = leg.perfil; if (leg.objetivo) { objetivo = leg.objetivo; objDraft = objetivo; }
+  if (leg.aporte) aporte = leg.aporte;
+  if (leg.simcfg) Object.assign(simCfg, leg.simcfg);
+  ['pos', 'extra', 'perfil', 'objetivo', 'aporte', 'simcfg', 'sync'].forEach(k => rawSet(k, null));
+  sv(); toast('Ativos trazidos para a sua conta');
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-conta]');
+  if (!b) return;
+  $('#dlg').close();
+  const acao = b.dataset.conta;
+  if (acao === 'backup') return abrirBackup();
+  if (acao === 'senha') {
+    const v = await ask({title: 'Trocar senha', fields: [{name: 'a', label: 'Senha atual', type: 'password'}, {name: 'n', label: 'Nova senha', type: 'password', hint: 'Pelo menos 8 caracteres.'}],
+      validate: v => !v.a ? 'Digite a senha atual.' : (v.n || '').length < 8 ? 'A nova senha precisa ter pelo menos 8 caracteres.' : ''});
+    if (!v) return;
+    try { await api('/api/conta/senha', {atual: v.a, nova: v.n}); toast('Senha trocada'); } catch (er) { toast(er.message); }
+    return;
+  }
+  if (acao === 'sair' || acao === 'sair-limpar') return sair(acao === 'sair-limpar');
+  if (acao === 'excluir') {
+    const v = await ask({title: 'Excluir minha conta', desc: 'Apaga para sempre sua carteira, contas do mês, avisos e o seu acesso. Não dá para desfazer.',
+      fields: [{name: 's', label: 'Digite sua senha para confirmar', type: 'password'}], ok: 'Excluir para sempre', validate: v => v.s ? '' : 'Digite sua senha.'});
+    if (!v) return;
+    try { await api('/api/conta', {senha: v.s}, 'DELETE'); } catch (er) { return toast(er.message); }
+    limparLocal(); sess = ''; rawSet('sessao', null); rawSet('eu', null); location.reload();
+  }
+});
+$('#btnConta').onclick = () => ask({title: eu?.nome || 'Minha conta', desc: eu?.email || '', ok: 'Fechar', cancelar: false,
+  extraHtml: `<div class="menu-conta">
+    <button class="btn" type="button" data-conta="backup">Backup da carteira</button>
+    <button class="btn" type="button" data-conta="senha">Trocar senha</button>
+    <button class="btn" type="button" data-conta="sair">Sair</button>
+    <button class="btn" type="button" data-conta="sair-limpar">Sair e apagar meus dados deste aparelho</button>
+    <button class="btn perigo" type="button" data-conta="excluir">Excluir minha conta</button></div>
+    <p class="mut xs" style="margin:0">Análises: ${st.iaAtiva ? 'com IA (Claude).' : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>`});
+function limparLocal() {
+  const pre = `u:${eu?.id}:`;
+  Object.keys(localStorage).filter(k => k.startsWith(pre)).forEach(k => rawSet(k, null));
+}
+async function sair(limpar) {
+  try {  // este aparelho para de receber as notificações desta pessoa
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    if (sub) { await api('/api/push/cancelar', {endpoint: sub.endpoint}).catch(() => {}); await sub.unsubscribe(); }
+  } catch {}
+  await api('/api/conta/sair', {}).catch(() => {});
+  if (limpar) limparLocal();
+  sess = ''; rawSet('sessao', null); rawSet('eu', null); location.reload();
+}
+
+/* ---------- contas do mês ---------- */
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const hojeD = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+st.mesContas = {ano: new Date().getFullYear(), mes: new Date().getMonth()};
+const ymDe = (a, m) => `${a}-${String(m + 1).padStart(2, '0')}`;
+const dataBR = d => d.toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
+const isoLocal = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+async function loadContas() {
+  try { [st.contas, st.fin] = await Promise.all([api('/api/contas'), api('/api/financas')]); st.contasErr = null; } catch (e) { st.contasErr = e.message; }
+  renderContas(); renderResumoContas(); if (st.port) renderInvestir();
+}
+const LIQ = ['TESOURO_SELIC', 'CDB_CDI', 'PORQUINHO'];
+const reservaLocal = () => LIQ.reduce((s, t) => s + (pos[t]?.saldo || 0), 0);
+function proximaRenda() {
+  const dia = st.fin?.dia_renda, h = hojeD();
+  if (!dia) return null;
+  const em = (a, m) => new Date(a, m, Math.min(dia, new Date(a, m + 1, 0).getDate()));
+  const d = em(h.getFullYear(), h.getMonth());
+  return d > h ? d : em(h.getFullYear(), h.getMonth() + 1);
+}
+function contasAVencer() {
+  // contas ainda não pagas que vencem até o próximo recebimento (ou nos próximos 30 dias), incluindo as atrasadas deste mês
+  const h = hojeD(), ate = proximaRenda() || new Date(h.getFullYear(), h.getMonth(), h.getDate() + 30);
+  const prox = new Date(h.getFullYear(), h.getMonth() + 1, 1);
+  const lista = [...contasDoMes(h.getFullYear(), h.getMonth()), ...contasDoMes(prox.getFullYear(), prox.getMonth())].filter(c => !c.pago && c.venc <= ate);
+  return {ate, lista, total: lista.reduce((s, c) => s + c.valorMes, 0)};
+}
+function investivel() { return Math.max(aporte - (st.fin?.separar_contas || !st.contas ? 0 : contasAVencer().total), 0); }
+async function salvarFin(mud) {
+  const f = {...st.fin, ...mud};
+  st.fin = await api('/api/financas', {renda_mensal: f.renda_mensal || 0, dia_renda: f.dia_renda || 0, reserva_meses: f.reserva_meses || 6,
+    separar_contas: !!f.separar_contas, renda_origem: f.renda_origem || 'manual'}, 'PUT');
+  renderContas(); renderResumoContas();
+}
+async function aposMudarContas() {  // contas mensais mudam a sobra e o tamanho da reserva: atualiza e refaz a recomendação
+  try { st.fin = await api('/api/financas'); } catch {}
+  renderContas(); renderResumoContas(); posChanged();
+}
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'sepContas') return;
+  try { await salvarFin({separar_contas: e.target.checked}); } catch (er) { toast(er.message); }
+  const pl = $('#plano'); if (pl) pl.innerHTML = planoHtml();
+});
+async function editarFinancas() {
+  const f = st.fin || {};
+  const v = await ask({title: 'Renda e reserva', desc: 'Com a sua renda e as suas contas, o app calcula quanto sobra por mês e o tamanho da reserva de emergência.',
+    fields: [{name: 'r', label: 'Renda mensal líquida (o que cai na conta)', prefix: 'R$', mode: 'decimal', value: f.renda_mensal ? N(f.renda_mensal, 2) : ''},
+      {name: 'd', label: 'Dia em que você recebe', mode: 'numeric', value: f.dia_renda || '', hint: 'As contas que vencem antes disso ficam de fora do valor a investir.'},
+      {name: 'm', label: 'Reserva de emergência', type: 'select', value: String(f.reserva_meses || 6), options: [['3', '3 meses de contas (renda bem estável)'],
+        ['6', '6 meses de contas (recomendado)'], ['9', '9 meses de contas'], ['12', '12 meses de contas (autônomo ou renda variável)']]}],
+    validate: v => v.r && isNaN(num(v.r)) ? 'Renda inválida.' : v.d && !(+v.d >= 1 && +v.d <= 31) ? 'O dia vai de 1 a 31.' : ''});
+  if (!v) return;
+  try { await salvarFin({renda_mensal: num(v.r) || 0, dia_renda: +v.d || 0, reserva_meses: +v.m, renda_origem: 'manual'}); posChanged(); toast('Orçamento atualizado'); }
+  catch (e) { toast(e.message); }
+}
+function orcamentoHtml() {
+  const f = st.fin;
+  if (!f) return '';
+  const ra = reservaLocal(), alvo = f.reserva_alvo, sobra = f.sobra;
+  return `<div class="card"><div class="view-h"><h2>Renda e orçamento</h2><button class="btn sm" type="button" id="fEd">${f.renda_mensal ? 'Editar' : 'Informar renda'}</button></div>
+    <div class="tiles"><div class="tile"><div class="l">Renda mensal</div><div class="v tn">${f.renda_mensal ? M(f.renda_mensal) : '—'}</div>
+        <div class="d">${f.renda_mensal ? `${f.dia_renda ? `recebe dia ${f.dia_renda}` : 'dia não informado'}${f.renda_origem === 'extrato' ? ' · pelo extrato' : ''}` : 'Informe ou envie o extrato'}</div></div>
+      <div class="tile"><div class="l">Contas mensais</div><div class="v tn">${M(f.contas_mensais)}</div><div class="d">${f.n_contas} ${f.n_contas === 1 ? 'conta' : 'contas'} todo mês</div></div>
+      <div class="tile main"><div class="l">Sobra por mês</div><div class="v tn ${sobra < 0 ? 'dn' : ''}">${sobra != null ? M(sobra) : '—'}</div>
+        <div class="d">${sobra == null ? 'Precisa da sua renda' : sobra > 0 ? 'Pode ir para investimentos' : 'As contas passam da renda'}</div></div></div>
+    ${alvo > 0 ? `<div style="margin-top:14px"><div class="view-h"><span class="sm ink2">Reserva de emergência: ${f.reserva_meses} meses de contas</span><b class="sm tn">${M0(ra)} de ${M0(alvo)}</b></div>
+      <div class="barra-pago"><i style="width:${Math.min(100, ra / alvo * 100).toFixed(1)}%"></i></div>
+      <p class="mut xs" style="margin:6px 0 0">${ra >= alvo ? 'Reserva completa ✓' : `Faltam ${M0(alvo - ra)}. O app coloca o dinheiro novo nela antes dos outros investimentos.`} Conta como reserva o que está em Tesouro Selic, CDB pós-fixado ou Porquinho.</p></div>` : ''}
+    ${sobra < 0 ? `<div class="note warn">${ICON.warn}<div>Suas contas mensais passam da sua renda em ${M(-sobra)}. Antes de investir, vale rever os gastos.</div></div>` : ''}
+  </div>`;
+}
+function contasDoMes(ano, mes) {
+  const ym = ymDe(ano, mes), ult = new Date(ano, mes + 1, 0).getDate();
+  return (st.contas?.itens || []).flatMap(it => {
+    let venc;
+    if (it.recorrente) { if (ym < (it.criado || '0000-00')) return []; venc = new Date(ano, mes, Math.min(it.dia, ult)); }
+    else { if (!it.vencimento || it.vencimento.slice(0, 7) !== ym) return []; const [y, m, d] = it.vencimento.split('-').map(Number); venc = new Date(y, m - 1, d); }
+    const pg = (it.pagamentos || {})[ym];
+    return [{...it, venc, ym, pago: !!pg, valorMes: pg ? pg.valor : it.valor}];
+  }).sort((a, b) => a.venc - b.venc);
+}
+function renderResumoContas() {
+  const el = $('#resumoContas');
+  if (!el || !st.contas?.itens?.length) { if (el) el.innerHTML = ''; return; }
+  const h = hojeD(), l = contasDoMes(h.getFullYear(), h.getMonth()).filter(c => !c.pago);
+  const falta = l.reduce((s, c) => s + c.valorMes, 0), prox = l.find(c => c.venc >= h), atras = l.filter(c => c.venc < h).length;
+  el.innerHTML = `<div class="card"><div class="view-h"><h2>Contas deste mês</h2><button class="btn sm" type="button" onclick="go('contas')">Ver contas</button></div>
+    <p class="lead sm">${l.length ? `Falta pagar <b>${M(falta)}</b> em ${l.length} ${l.length === 1 ? 'conta' : 'contas'}.${prox ? ` Próxima: <b>${esc(prox.nome)}</b> em ${dataBR(prox.venc)}.` : ''}` : 'Tudo pago este mês. ✓'}</p>
+    ${st.fin?.reserva_alvo ? `<p class="sm ink2" style="margin:6px 0 0">Reserva de emergência: <b>${M0(reservaLocal())}</b> de ${M0(st.fin.reserva_alvo)} (${st.fin.reserva_meses} meses de contas)${st.fin.sobra != null ? ` · sobra por mês: <b class="${st.fin.sobra < 0 ? 'dn' : ''}">${M0(st.fin.sobra)}</b>` : ''}.</p>` : ''}
+    ${atras ? `<div class="note warn">${ICON.warn}<div>${atras} ${atras === 1 ? 'conta venceu' : 'contas venceram'} e ainda não ${atras === 1 ? 'foi marcada' : 'foram marcadas'} como paga${atras === 1 ? '' : 's'}.</div></div>` : ''}</div>`;
+}
+function renderContas() {
+  const el = $('#t-contas');
+  if (!el) return;
+  if (!st.contas) { el.innerHTML = `<div class="card">${st.contasErr ? `<p class="err-box">${esc(st.contasErr)}</p>` : busy('Carregando suas contas…') + sk(4)}</div>`; return; }
+  const {ano, mes} = st.mesContas, h = hojeD(), lista = contasDoMes(ano, mes);
+  const total = lista.reduce((s, c) => s + c.valorMes, 0), pago = lista.filter(c => c.pago).reduce((s, c) => s + c.valorMes, 0);
+  const em7 = new Date(h); em7.setDate(em7.getDate() + 7);
+  const grupos = [
+    ['Atrasadas', lista.filter(c => !c.pago && c.venc < h)],
+    ['Vencem nos próximos 7 dias', lista.filter(c => !c.pago && c.venc >= h && c.venc <= em7)],
+    ['Mais adiante', lista.filter(c => !c.pago && c.venc > em7)],
+    ['Pagas', lista.filter(c => c.pago)]].filter(([, g]) => g.length);
+  const porCat = {};
+  lista.forEach(c => porCat[c.categoria] = (porCat[c.categoria] || 0) + c.valorMes);
+  const linha = c => {
+    const dias = Math.round((c.venc - h) / 864e5);
+    const st_ = c.pago ? pill('good', '', 'Paga') : dias < 0 ? pill('bad', 'warn', `Venceu há ${-dias} ${dias === -1 ? 'dia' : 'dias'}`) : dias === 0 ? pill('warn', '', 'Vence hoje') : dias <= 7 ? pill('info', '', `Em ${dias} ${dias === 1 ? 'dia' : 'dias'}`) : '';
+    return `<div class="conta ${c.pago ? 'paga' : ''}"><div><div class="nm">${esc(c.nome)}</div>
+      <div class="meta"><span>${esc(c.categoria)}</span>·<span>vence ${dataBR(c.venc)}</span>·<span>${c.recorrente ? 'todo mês' : 'uma vez'}</span>${st_}</div></div>
+      <div class="vl">${M(c.valorMes)}</div>
+      <div class="acoes">${c.pago ? `<button class="btn sm" type="button" data-pg="${c.id}" data-ym="${c.ym}" data-v="0">Desfazer pagamento</button>`
+        : `<button class="btn sm primary" type="button" data-pg="${c.id}" data-ym="${c.ym}" data-v="1">Paguei</button>`}
+        ${c.linha ? `<button class="btn sm" type="button" data-cp="${esc(c.linha)}">Copiar código</button>` : ''}
+        <button class="btn sm ghost" type="button" data-ed="${c.id}">Editar</button><button class="btn sm ghost" type="button" data-rm="${c.id}">Excluir</button></div></div>`;
+  };
+  el.innerHTML = `${orcamentoHtml()}<div class="card">
+      <div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Contas de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>
+      <div class="tiles"><div class="tile"><div class="l">Total do mês</div><div class="v tn">${M(total)}</div><div class="d">${lista.length} ${lista.length === 1 ? 'conta' : 'contas'}</div></div>
+        <div class="tile"><div class="l">Já pago</div><div class="v tn">${M(pago)}</div><div class="d">${(n => `${n} ${n === 1 ? 'paga' : 'pagas'}`)(lista.filter(c => c.pago).length)}</div></div>
+        <div class="tile main"><div class="l">Falta pagar</div><div class="v tn">${M(total - pago)}</div><div class="d">${lista.filter(c => !c.pago).length} em aberto</div></div></div>
+      ${total ? `<div class="barra-pago" role="img" aria-label="${P(pago / total * 100, 0, false)} pago"><i style="width:${(pago / total * 100).toFixed(1)}%"></i></div>` : ''}
+      <div class="btns"><button class="btn primary" type="button" id="cNova">+ Adicionar conta</button><button class="btn" type="button" id="cBoleto">Ler boleto</button>
+        <button class="btn" type="button" id="cArq">Enviar PDF ou foto</button><button class="btn" type="button" id="cExt">Achar contas no extrato</button></div>
+      <p class="mut xs" style="margin:10px 0 0">PDFs, fotos e extratos são lidos e descartados: o arquivo não fica guardado. ${st.iaAtiva ? 'Fotos e PDFs escaneados são lidos pela IA.' : 'Sem IA, só PDFs com texto (não escaneados) podem ser lidos; fotos precisam da IA.'}</p>
+    </div>
+    ${lista.length ? `<div class="grid2 top"><div class="card">${grupos.map(([t, g]) => `<div class="conta-grupo"><h3><span>${t}</span><span class="tn">${M(g.reduce((s, c) => s + c.valorMes, 0))}</span></h3>${g.map(linha).join('')}</div>`).join('')}</div>
+      <div class="card"><h2>Por categoria</h2><table class="tbl" style="margin-top:8px"><tbody>${Object.entries(porCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${M(v)}</td><td class="mut">${P(v / total * 100, 0, false)}</td></tr>`).join('')}</tbody></table></div></div>`
+    : `<div class="card"><h2>Nenhuma conta neste mês</h2><p class="lead">Cadastre as contas que você paga todo mês (luz, água, internet, aluguel, cartão…) e o app avisa antes de cada vencimento. Quatro jeitos:</p>
+        <ul class="ink2" style="padding-left:18px"><li><b>Adicionar conta:</b> digite nome, valor e vencimento.</li><li><b>Ler boleto:</b> cole a linha digitável e o app descobre valor, vencimento e banco.</li>
+        <li><b>Enviar PDF ou foto</b> do boleto ou da fatura.</li><li><b>Achar contas no extrato:</b> envie o extrato do banco (OFX ou CSV) e o app identifica o que se repete todo mês.</li></ul></div>`}`;
+  $$('[data-mes]', el).forEach(b => b.onclick = () => { let {ano: a, mes: m} = st.mesContas; m += +b.dataset.mes; if (m < 0) { m = 11; a--; } if (m > 11) { m = 0; a++; } st.mesContas = {ano: a, mes: m}; renderContas(); });
+  $('#cNova', el).onclick = () => editarConta();
+  $('#fEd', el)?.addEventListener('click', editarFinancas);
+  $('#cBoleto', el).onclick = lerBoleto;
+  $('#cArq', el).onclick = () => $('#arqConta').click();
+  $('#cExt', el).onclick = () => $('#arqExtrato').click();
+  $$('[data-pg]', el).forEach(b => b.onclick = () => pagarConta(b.dataset.pg, b.dataset.ym, b.dataset.v === '1'));
+  $$('[data-ed]', el).forEach(b => b.onclick = () => editarConta(st.contas.itens.find(x => x.id === b.dataset.ed)));
+  $$('[data-rm]', el).forEach(b => b.onclick = () => apagarConta(b.dataset.rm));
+  $$('[data-cp]', el).forEach(b => b.onclick = () => navigator.clipboard?.writeText(b.dataset.cp.replace(/\D/g, '')).then(() => toast('Código copiado: cole no app do banco'), () => toast(b.dataset.cp)));
+}
+async function editarConta(c = {}) {
+  const h = hojeD();
+  let venc = c.vencimento || '';
+  if (!venc && c.recorrente && c.dia) { const ult = new Date(h.getFullYear(), h.getMonth() + 1, 0).getDate(); venc = isoLocal(new Date(h.getFullYear(), h.getMonth(), Math.min(c.dia, ult))); }
+  const cats = st.contas?.categorias || ['Outros'];
+  const v = await ask({title: c.id ? 'Editar conta' : 'Nova conta', desc: c.aviso || '', ok: c.id ? 'Salvar' : 'Adicionar',
+    fields: [{name: 'nome', label: 'Nome', value: c.nome || '', ph: 'Ex.: Conta de luz'},
+      {name: 'valor', label: 'Valor', prefix: 'R$', mode: 'decimal', value: c.valor ? N(c.valor, 2) : '', hint: 'Se muda todo mês (luz, água), use um valor médio.'},
+      {name: 'venc', label: 'Vencimento', type: 'date', value: venc},
+      {name: 'rec', label: 'Repete', type: 'select', value: c.recorrente === false ? 'nao' : 'sim', options: [['sim', 'Todo mês, no mesmo dia'], ['nao', 'Só uma vez']]},
+      {name: 'cat', label: 'Categoria', type: 'select', value: c.categoria || 'Outros', options: cats.map(x => [x, x])},
+      {name: 'linha', label: 'Código de barras ou linha digitável (opcional)', mode: 'numeric', value: c.linha || ''}],
+    validate: v => !v.nome.trim() ? 'Dê um nome para a conta.' : !v.venc ? 'Informe o vencimento.' : v.valor && isNaN(num(v.valor)) ? 'Valor inválido.' : ''});
+  if (!v) return;
+  const body = {nome: v.nome, categoria: v.cat, valor: num(v.valor) || 0, recorrente: v.rec === 'sim', dia: +v.venc.slice(8, 10),
+    vencimento: v.venc, linha: v.linha, origem: c.origem || 'manual'};
+  try {
+    const r = c.id ? await api(`/api/contas/${c.id}`, body, 'PUT') : await api('/api/contas', [body]);
+    st.contas.itens = r.itens;
+    aposMudarContas();
+    const [y, m] = v.venc.split('-').map(Number);
+    if (!c.id && v.rec === 'nao') st.mesContas = {ano: y, mes: m - 1};
+    renderContas(); renderResumoContas(); toast(c.id ? 'Conta atualizada' : 'Conta adicionada');
+  } catch (e) { toast(e.message); }
+}
+async function pagarConta(id, ym, pago) {
+  const it = st.contas.itens.find(x => x.id === id);
+  let valor = it.valor;
+  if (pago) {
+    const v = await ask({title: `Pagar ${it.nome}`, ok: 'Marcar como paga', fields: [{name: 'v', label: 'Valor pago', prefix: 'R$', mode: 'decimal', value: N(it.valor, 2)}],
+      validate: v => isNaN(num(v.v)) ? 'Valor inválido.' : ''});
+    if (!v) return;
+    valor = num(v.v);
+  }
+  try { st.contas.itens = (await api(`/api/contas/${id}/pagar`, {mes: ym, pago, valor})).itens; renderContas(); renderResumoContas(); }
+  catch (e) { toast(e.message); }
+}
+async function apagarConta(id) {
+  const it = st.contas.itens.find(x => x.id === id);
+  const v = await ask({title: 'Excluir conta', desc: `Excluir “${it.nome}”${it.recorrente ? ' de todos os meses' : ''}?`, ok: 'Excluir'});
+  if (!v) return;
+  try { st.contas.itens = (await api(`/api/contas/${id}`, null, 'DELETE')).itens; aposMudarContas(); } catch (e) { toast(e.message); }
+}
+async function lerBoleto() {
+  const v = await ask({title: 'Ler boleto', desc: 'Cole ou digite a linha digitável (os números acima ou abaixo do código de barras). O app descobre o valor, o vencimento e quem cobra.',
+    fields: [{name: 'c', label: 'Linha digitável', type: 'textarea'}], ok: 'Ler', validate: v => v.c.replace(/\D/g, '').length < 44 ? 'A linha tem 47 ou 48 números (ou 44 no código de barras).' : ''});
+  if (!v) return;
+  try {
+    const d = await api('/api/contas/ler-codigo', {codigo: v.c});
+    editarConta({nome: d.tipo === 'boleto' ? `Boleto ${d.emissor}` : d.emissor, valor: d.valor, vencimento: d.vencimento || '', categoria: d.categoria,
+      linha: d.linha, recorrente: d.tipo !== 'boleto', origem: 'boleto',
+      aviso: [d.valido ? `Lido: ${d.emissor}${d.valor ? ', ' + M(d.valor) : ''}${d.vencimento ? ', vence ' + d.vencimento.split('-').reverse().join('/') : ''}. Confira e ajuste o nome.` : d.aviso, !d.vencimento ? 'Este código não traz o vencimento: informe a data.' : ''].filter(Boolean).join(' ')});
+  } catch (e) { toast(e.message); }
+}
+$('#arqConta').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  toast('Lendo o arquivo…');
+  try {
+    const d = await api('/api/contas/ler-arquivo', fd);
+    editarConta({nome: d.nome || (d.emissor ? `Boleto ${d.emissor}` : ''), valor: d.valor, vencimento: d.vencimento || '', categoria: d.categoria, linha: d.linha || '',
+      recorrente: d.recorrente, origem: d.tipo === 'fatura_cartao' ? 'fatura' : 'boleto',
+      aviso: `Dados lidos ${d.fonte === 'ia' ? 'pela IA' : 'do texto do PDF'}: confira antes de salvar.${d.vencimento ? '' : ' Não achei o vencimento: informe a data.'}`});
+  } catch (er) { toast(er.message); }
+};
+$('#arqExtrato').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  toast('Procurando contas que se repetem…');
+  try {
+    const r = await api('/api/contas/extrato', fd), sug = r.sugestoes, rendas = r.rendas || [];
+    const periodo = `${r.de.split('-').reverse().join('/')} a ${r.ate.split('-').reverse().join('/')}`;
+    if (!sug.length && !rendas.length) return ask({title: 'Nada que se repita todo mês', desc: `Li ${r.transacoes} lançamentos (${periodo}), mas nenhuma conta ou renda se repete todo mês. Extratos de 3 meses ou mais funcionam melhor.`, ok: 'Fechar'});
+    const v = await ask({title: 'O que encontrei no seu extrato', desc: `Li ${r.transacoes} lançamentos (${periodo}). Marque o que quer usar:`, ok: 'Usar selecionados',
+      fields: [...(rendas.length ? [{name: 'r', type: 'checks', label: 'Sua renda (entradas que se repetem)', options: rendas.map((x, i) => ({value: String(i),
+          checked: x.salario && !st.fin?.renda_mensal, label: `${x.nome} · ${M(x.valor)}`, desc: `por volta do dia ${x.dia} · em ${x.meses} meses${x.salario ? '' : ' · confira se é renda sua'}`}))}] : []),
+        ...(sug.length ? [{name: 's', type: 'checks', label: 'Contas que se repetem todo mês', options: sug.map((x, i) => ({value: String(i), checked: !x.ja_cadastrada && x.confianca === 'alta', label: `${x.nome} · ${M(x.valor)}${x.variavel ? ' (média)' : ''}`,
+          desc: `${x.categoria} · por volta do dia ${x.dia} · em ${x.meses} meses${x.ja_cadastrada ? ' · parece já cadastrada' : ''}`}))}] : [])]});
+    if (!v) return;
+    if (v.r?.length) {
+      const sel = v.r.map(i => rendas[+i]);
+      await salvarFin({renda_mensal: sel.reduce((s, x) => s + x.valor, 0), dia_renda: Math.min(...sel.map(x => x.dia)), renda_origem: 'extrato'});
+      toast('Renda atualizada pelo extrato');
+    }
+    if (!v.s?.length) { if (v.r?.length) posChanged(); return; }
+    const h = hojeD();
+    const proximo = x => {  // próximo vencimento: o mês seguinte ao último pagamento visto no extrato
+      const [y, m] = x.ultima.split('-').map(Number), ult = new Date(y, m + 1, 0).getDate();
+      return isoLocal(new Date(y, m, Math.min(x.dia, ult)));
+    };
+    const novas = v.s.map(i => sug[+i]).map(x => ({nome: x.nome, categoria: x.categoria, valor: x.valor, recorrente: true, dia: x.dia, vencimento: proximo(x), origem: 'extrato'}));
+    st.contas.itens = (await api('/api/contas', novas)).itens;
+    st.mesContas = {ano: h.getFullYear(), mes: h.getMonth()};
+    aposMudarContas(); toast(`${novas.length} ${novas.length === 1 ? 'conta adicionada' : 'contas adicionadas'}`);
+  } catch (er) { toast(er.message); }
+};
+
+/* ---------- avisos e notificações ---------- */
+const ICON_AVISO = {compra: 'up', venda: 'down', preco: 'info', conta: 'warn', rebalancear: 'info'};
+async function loadAvisos() {
+  try { st.avisos = await api('/api/avisos'); } catch { return; }
+  const n = st.avisos.nao_lidos, b = $('#avisosN');
+  b.textContent = n > 9 ? '9+' : n; b.classList.toggle('hide', !n);
+  $('#btnAvisos').setAttribute('aria-label', n ? `Avisos: ${n} novo${n === 1 ? '' : 's'}` : 'Avisos');
+}
+setInterval(() => { if (sess && document.visibilityState === 'visible') loadAvisos(); }, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (sess && document.visibilityState === 'visible') loadAvisos(); });
+const tempo = t => { const s = Date.now() / 1000 - t; return s < 3600 ? `há ${Math.max(1, Math.round(s / 60))} min` : s < 86400 ? `há ${Math.round(s / 3600)} h` : new Date(t * 1000).toLocaleDateString('pt-BR'); };
+function suportaPush() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+async function statusPush() {
+  if (!suportaPush()) return /iPhone|iPad/.test(navigator.userAgent) && !navigator.standalone ? 'ios' : 'sem';
+  if (Notification.permission === 'denied') return 'negado';
+  const reg = await navigator.serviceWorker.getRegistration();
+  return (await reg?.pushManager.getSubscription()) && Notification.permission === 'granted' ? 'ativo' : 'inativo';
+}
+async function abrirAvisos() {
+  await loadAvisos();
+  const a = st.avisos || {itens: [], config: {}}, cfg = a.config || {}, pst = await statusPush();
+  const d = $('#dlg');
+  const pushHtml = {
+    ativo: `<p class="sm" style="margin:0">${ICON.spark.replace('<svg', '<svg width="14" height="14" style="color:var(--up)"')} Notificações ativas neste aparelho. <button class="btn sm ghost" type="button" id="pTeste">Enviar teste</button></p>`,
+    inativo: `<button class="btn primary" type="button" id="pAtivar">Receber notificações neste aparelho</button>`,
+    negado: `<p class="sm err-box" style="margin:0">As notificações estão bloqueadas para este site. Libere nas configurações do navegador (cadeado ao lado do endereço → Notificações) e volte aqui.</p>`,
+    ios: `<p class="sm" style="margin:0">No iPhone, as notificações só funcionam com o app na Tela de Início: toque em <b>Compartilhar → Adicionar à Tela de Início</b>, abra o app por lá e ative aqui.</p>`,
+    sem: `<p class="sm mut" style="margin:0">Este navegador não aceita notificações. Os avisos continuam aparecendo aqui no app.</p>`}[pst];
+  const chk = (k, txt) => `<label><span>${txt}</span><input type="checkbox" data-cfg="${k}" ${cfg[k] ? 'checked' : ''}></label>`;
+  d.innerHTML = `<form class="dlg" method="dialog"><h3 id="dlgTitle">Avisos</h3>
+    <div class="avisos-lista">${a.itens.length ? a.itens.map(x => `<button type="button" class="aviso ${x.lido ? '' : 'novo'}" data-aba="${esc(x.aba)}">
+      <span class="ic ${esc(x.tipo)}">${ICON[ICON_AVISO[x.tipo] || 'info']}</span><div><b>${esc(x.titulo)}</b><span>${esc(x.texto)}</span><small>${tempo(x.quando)}</small></div></button>`).join('')
+      : '<p class="mut sm" style="margin:0">Nenhum aviso por enquanto. O app avisa quando um ativo seu der sinal de compra ou venda, atingir o alvo ou o stop, quando a carteira precisar de rebalanceamento e antes do vencimento das suas contas.</p>'}</div>
+    ${pushHtml}
+    <details><summary>Configurar avisos</summary><div class="opcoes">
+      ${chk('sinais', 'Sinal de compra ou venda nos meus ativos')}${chk('alvo_stop', 'Alvo ou stop atingido')}${chk('recomendados', 'Bom momento para comprar um ativo recomendado')}
+      ${chk('rebalancear', 'Carteira longe da alocação ideal')}${chk('contas', 'Contas a vencer')}
+      <label><span>Avisar das contas com antecedência de</span><select data-cfg="contas_dias">${[1, 2, 3, 5, 7].map(n => `<option value="${n}" ${cfg.contas_dias === n ? 'selected' : ''}>${n} ${n === 1 ? 'dia' : 'dias'}</option>`).join('')}</select></label>
+    </div>
+    <h3 style="margin:12px 0 4px;font-size:14px">Alertas de preço</h3>
+    <div class="opcoes">${(cfg.precos || []).map(x => `<label><span>${esc(rot(x.ticker))} ${x.condicao === 'abaixo' ? 'abaixo de' : 'acima de'} ${x.ticker === 'VOO' ? 'US$' : 'R$'} ${N(x.valor, 2)}${x.ativo ? '' : ' <span class="mut xs">(já avisado)</span>'}</span><button class="btn sm ghost" type="button" data-rmp="${x.id}">Remover</button></label>`).join('') || '<p class="mut sm" style="margin:4px 0">Nenhum. Crie em Ativos → “Alerta de preço”.</p>'}</div>
+    <p class="mut xs">O servidor confere a cada 30 minutos enquanto estiver ligado.${a.cron ? '' : ' Se ele desliga quando ninguém usa (comum em planos gratuitos), quem administra pode configurar CRON_CHAVE e um agendador externo.'} Avisos de compra e venda usam os indicadores de preço e não são recomendação profissional.</p></details>
+    <div class="row-btns"><button class="btn" type="button" data-x>Fechar</button></div></form>`;
+  $('[data-x]', d).onclick = () => d.close();
+  d.oncancel = null;
+  $$('[data-aba]', d).forEach(b => b.onclick = () => { d.close(); go(ABAS.includes(b.dataset.aba) ? b.dataset.aba : 'resumo'); });
+  $$('[data-cfg]', d).forEach(i => i.onchange = async () => {
+    const novo = {...cfg}; $$('[data-cfg]', d).forEach(x => novo[x.dataset.cfg] = x.type === 'checkbox' ? x.checked : +x.value);
+    try { Object.assign(cfg, await api('/api/avisos/config', novo, 'PUT')); toast('Avisos atualizados'); } catch (e) { toast(e.message); }
+  });
+  $$('[data-rmp]', d).forEach(b => b.onclick = async () => { try { await api(`/api/avisos/preco/${b.dataset.rmp}`, null, 'DELETE'); abrirAvisos(); } catch (e) { toast(e.message); } });
+  $('#pAtivar', d)?.addEventListener('click', ativarPush);
+  $('#pTeste', d)?.addEventListener('click', async () => { try { const r = await api('/api/push/teste', {}); toast(r.enviados ? 'Teste enviado' : 'Nenhum aparelho inscrito'); } catch (e) { toast(e.message); } });
+  if (!d.open) d.showModal();
+  if (a.nao_lidos) { api('/api/avisos/lidos', {}).then(() => { $('#avisosN').classList.add('hide'); st.avisos.nao_lidos = 0; }).catch(() => {}); }
+}
+$('#btnAvisos').onclick = abrirAvisos;
+function chaveU8(b64) {
+  const p = '='.repeat((4 - b64.length % 4) % 4), raw_ = atob((b64 + p).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw_].map(c => c.charCodeAt(0)));
+}
+async function ativarPush() {
+  try {
+    if (!suportaPush()) return toast('Este navegador não aceita notificações.');
+    if (await Notification.requestPermission() !== 'granted') return abrirAvisos();
+    const reg = await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription() || await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: chaveU8(st.avisos.push_chave)});
+    await api('/api/push/inscrever', sub.toJSON());
+    await api('/api/push/teste', {});
+    toast('Notificações ativadas');
+  } catch (e) { toast('Não consegui ativar as notificações: ' + e.message); }
+  abrirAvisos();
+}
+function registrarSW() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', e => { if (e.data?.aba && ABAS.includes(e.data.aba)) go(e.data.aba); });
+}
+async function novoAlerta(t, preco) {
+  const moeda = t === 'VOO' ? 'US$' : 'R$';
+  const v = await ask({title: `Alerta de preço: ${rot(t)}`, desc: `Hoje: ${moeda} ${N(preco, 2)}. O app avisa uma vez quando o preço chegar lá.`, ok: 'Criar alerta',
+    fields: [{name: 'c', label: 'Avisar quando ficar', type: 'select', value: 'abaixo', options: [['abaixo', 'Abaixo de'], ['acima', 'Acima de']]},
+      {name: 'v', label: 'Preço', prefix: moeda, mode: 'decimal', value: N(preco, 2)}],
+    validate: v => !(num(v.v) > 0) ? 'Informe um preço.' : ''});
+  if (!v) return;
+  try { await api('/api/avisos/preco', {ticker: t, condicao: v.c, valor: num(v.v)}); toast('Alerta criado'); loadAvisos(); } catch (e) { toast(e.message); }
 }
 (async () => {
-  renderPerfilChip();
-  go(['resumo', 'investir', 'sim', 'mercado', 'ativos'].includes(raw('tab')) ? raw('tab') : 'resumo');
-  renderHero(); renderResumo(); renderInvestir(); renderMercado();
-  if (!tok && !(await login())) { $('#fatal').textContent = 'Recarregue a página para entrar.'; $('#fatal').classList.remove('hide'); return; }
+  rawSet('tok', null);  // a antiga senha única do app não é mais usada: cada pessoa tem a sua conta
+  registrarSW();
+  const abaUrl = new URLSearchParams(location.search).get('aba');
+  if (abaUrl) { rawSet('tab', abaUrl); history.replaceState(null, '', location.pathname); }
+  if (!sess || !eu) { await telaEntrar(raw('aviso_sessao') ? 'Sua sessão expirou. Entre de novo.' : ''); }
+  rawSet('aviso_sessao', null);
+  carregarLocal();
+  renderConta(); renderPerfilChip();
+  go(ABAS.includes(raw('tab')) ? raw('tab') : 'resumo');
+  renderHero(); renderResumo(); renderInvestir(); renderMercado(); renderContas();
   let w;
-  for (let i = 0; i < 3; i++) {
-    try { w = await api('/api/watchlist'); break; }
-    catch (e) { if (!tok) { if (!(await login())) break; } else { $('#fatal').textContent = e.message; $('#fatal').classList.remove('hide'); break; } }
-  }
-  if (!w) return;
+  try { w = await api('/api/watchlist'); }
+  catch (e) { $('#fatal').textContent = e.message; $('#fatal').classList.remove('hide'); return; }
   $('#fatal').classList.add('hide');
   st.uni = w.universo || {};
   st.iaAtiva = !!w.ia;
+  if (w.usuario) { eu = w.usuario; rawSet('eu', JSON.stringify(eu)); renderConta(); }
+  await importarLegado();
+  loadContas(); loadAvisos();
   renderSync();
   await sincronizarInicio();
   renderPerfilChip(); renderInvestir();
