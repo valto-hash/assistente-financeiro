@@ -2,6 +2,7 @@ fastapi
 uvicorn
 yfinance
 pandas
+numpy
 requests
 anthropic
 python-dotenv
