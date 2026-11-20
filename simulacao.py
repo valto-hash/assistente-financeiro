@@ -204,7 +204,7 @@ def matriz_historica(ativos):
 
 # ---------------------------------------------------------------- simulação
 
-def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0, mensal=0.0, anos=10, semente=7):
+def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0, mensal=0.0, anos=10, semente=7, meta=0.0):
     """carteiras: {nome: {ativo: peso}}; ativos: {ativo: {"classe","tipo": mercado|pos|ipca,"fator","real"}};
     macro: {"cdi","ipca","focus_selic"}; cenarios: [{"nome","prob","ajustes":{classe: p.p.}}]."""
     T = int(anos * 12)
@@ -305,6 +305,8 @@ def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0
                 "queda_tipica": round(float(np.median(queda) * 100), 1),
                 "queda_ruim": round(float(np.percentile(queda, 10) * 100), 1),
                 "pior_12m": round(float(np.percentile(indice[:, 11] - 1, 5) * 100), 1) if T >= 12 else None,
+                # meta em reais de hoje: compara com o valor final descontada a inflação do período
+                "prob_meta": round(float((real_final >= meta).mean() * 100), 1) if meta > 0 else None,
             },
         }
 
@@ -320,6 +322,7 @@ def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0
         "meses_historicos": M,
         "cdi_medio": round(rf_longo, 2),
         "ipca": round(ipca_longo, 2),
+        "meta": meta or None,
     }
 
 

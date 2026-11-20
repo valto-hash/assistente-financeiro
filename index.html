@@ -148,6 +148,26 @@ details[open]>summary::before{transform:rotate(45deg)}
 .quick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .quick button{border:1px solid var(--line);background:var(--sf);border-radius:99px;padding:5px 12px;font-size:13px;cursor:pointer}
 .quick button:hover{border-color:var(--acc);color:var(--acc)}
+.btn:disabled{opacity:.5;cursor:default;filter:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.obj-card h2 svg{width:18px;height:18px;color:var(--acc)}
+.obj-txt{width:100%;margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--sf2);padding:12px 14px;font:inherit;font-size:15px;line-height:1.5;resize:vertical;min-height:92px;color:var(--ink)}
+.obj-txt:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 18%,transparent)}
+.obj-ex{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.obj-ex>span{font-size:12.5px;color:var(--mut);margin-right:2px}
+.obj-ex button{border:1px dashed var(--line);background:none;border-radius:99px;padding:4px 11px;font-size:12.5px;color:var(--ink2);cursor:pointer}
+.obj-ex button:hover{border-color:var(--acc);border-style:solid;color:var(--acc)}
+.obj-foot{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.obj-foot .grow{flex:1}
+.obj-an{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.obj-an .q{display:flex;gap:10px;align-items:flex-start;font-size:15px}
+.obj-an .q svg{flex:0 0 18px;width:18px;height:18px;color:var(--acc);margin-top:2px}
+.metas{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:8px;margin:12px 0}
+.metas .mt{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--sf2)}
+.metas .mt.main{border-color:color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 6%,var(--sf))}
+.metas .mt b{display:block;font-size:14px}
+.metas .mt span{font-size:13px;color:var(--mut)}
+.metas .mt small{display:block;font-size:11px;font-weight:600;color:var(--acc);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
 .segctl{display:inline-flex;background:var(--line2);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
 .segctl button{border:0;background:none;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink2);cursor:pointer}
 .segctl button[aria-pressed=true]{background:var(--sf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -206,6 +226,7 @@ details[open]>summary::before{transform:rotate(45deg)}
 .tile .l{font-size:12.5px;color:var(--mut)}
 .tile .v{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:2px 0}
 .tile .d{font-size:12px;color:var(--mut)}
+.tile.goal{grid-column:span 2}
 .tile.main{background:color-mix(in srgb,var(--acc) 8%,var(--sf));border-color:color-mix(in srgb,var(--acc) 30%,transparent)}
 .scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;margin-top:10px}
 .scen>div{border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--sf2)}
@@ -324,15 +345,18 @@ const ICON = {
   flat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg>',
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
+  target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2z"/></svg>',
 };
 
 let tok = raw('tok') || '';
 let pos = ld('pos', {}), extra = ld('extra', []), perfil = raw('perfil') || 'não informado';
+let objetivo = (raw('objetivo') || '').slice(0, 600), objDraft = objetivo;  // objetivo aplicado e o texto em edição
+const EXEMPLOS = ['Montar minha reserva de emergência', 'Entrada de um apartamento em 5 anos', 'Aposentadoria daqui a 25 anos', 'Viagem em 2 anos', 'Fazer o dinheiro crescer no longo prazo'];
 let aporte = ld('aporte', 5000), modo = 'aporte';
 const simCfg = Object.assign({inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'}, ld('simcfg', {}));
 const st = {uni: {}, port: null, pan: null, sim: null, an: {}, portErr: null, panErr: null, simErr: null, portBusy: false, simBusy: false, tab: 'resumo'};
-const sv = () => { rawSet('pos', JSON.stringify(pos)); rawSet('extra', JSON.stringify(extra)); rawSet('perfil', perfil);
+const sv = () => { rawSet('pos', JSON.stringify(pos)); rawSet('extra', JSON.stringify(extra)); rawSet('perfil', perfil); rawSet('objetivo', objetivo || null);
   rawSet('aporte', JSON.stringify(aporte)); rawSet('simcfg', JSON.stringify(simCfg)); };
 
 /* ---------- formatação ---------- */
@@ -476,7 +500,7 @@ function renderResumo() {
   <div class="grid2">
     <div class="card">
       <h2>Sua alocação</h2>
-      <p class="lead sm">${p.perfil_informado ? '' : 'Perfil não informado: usei o perfil moderado. '}Comparação com a alocação ideal para o perfil ${esc(perfilTxt)}, ajustada ao momento do mercado.</p>
+      <p class="lead sm">${p.perfil_informado ? '' : 'Perfil não informado: usei o perfil moderado. '}Comparação com a alocação ideal para o perfil ${esc(perfilTxt)}${p.objetivo_analise ? ' e o seu objetivo' : ''}, ajustada ao momento do mercado.</p>
       ${p.vazio ? '' : segBar(p.classes, 'Hoje')}
       ${segBar(p.alvo, 'Ideal', '')}
       ${legendCls(CL.filter(k => (p.classes[k] || 0) + (p.alvo[k] || 0) > 0))}
@@ -485,6 +509,8 @@ function renderResumo() {
     </div>
     <div class="card">
       <h2>${ICON.spark.replace('<svg', '<svg width="18" height="18" style="color:var(--acc)"')}Diagnóstico</h2>
+      ${p.objetivo_analise?.resumo ? `<div class="note">${ICON.target}<div><b>Seu objetivo:</b> ${esc(p.objetivo_analise.resumo)}</div></div>`
+        : !objetivo ? `<div class="note">${ICON.target}<div>Conte seu objetivo em <a href="#" onclick="go('investir');return false">Onde investir</a> para receber uma carteira sob medida para ele.</div></div>` : ''}
       <p class="lead">${esc(p.resumo || (p.vazio ? 'Você ainda não informou investimentos. Veja em “Onde investir” uma carteira inicial para o seu perfil.' : 'Sem comentários da IA no momento.'))}</p>
       ${p.alertas.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')}
       ${p.acoes.length ? `<h3>O que fazer com o que você já tem</h3><div class="acts-list">${p.acoes.map(a => {
@@ -555,7 +581,7 @@ function renderInvestir() {
   const el = $('#t-investir'), p = st.port;
   if (!p) { el.innerHTML = st.portErr ? `<div class="card err-box">${esc(st.portErr)}</div>` : `<div class="card">${busy(portMsg())}${sk(5)}</div>`; return; }
   const grupos = CL.map(k => [k, p.sugerida.filter(s => s.classe === k)]).filter(([, g]) => g.length);
-  el.innerHTML = `
+  el.innerHTML = `${objetivoHtml()}
   <div class="grid2 top">
     <div class="card sticky">
       <h2>Quanto você quer investir agora?</h2>
@@ -592,6 +618,56 @@ function renderInvestir() {
   $$('[data-q]', el).forEach(b => b.onclick = () => { aporte = +b.dataset.q; sv(); inp.value = N(aporte, 2); $('#plano').innerHTML = planoHtml(); simDirty(); });
   $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
   $('#btnCopy', el).onclick = copyPlan;
+  bindObjetivo(el);
+}
+const prazoTxt = a => a < 1 ? `${Math.max(1, Math.round(a * 12))} meses` : `${N(a, a % 1 ? 1 : 0)} ${a === 1 ? 'ano' : 'anos'}`;
+const metaPrincipal = () => (st.port?.objetivo_analise?.metas || []).find(m => m.valor_alvo > 0 || m.prazo_anos > 0) || null;
+function objetivoHtml() {
+  const p = st.port, an = p?.objetivo_analise, aplicado = objetivo && p?.objetivo === objetivo.replace(/\s+/g, ' ').trim();
+  const LIQ = {ALTA: ['warn', 'Vai precisar do dinheiro logo: prioridade para segurança e liquidez'], MEDIA: ['info', 'Médio prazo: equilíbrio entre segurança e rendimento'], BAIXA: ['good', 'Longo prazo: dá para aceitar mais oscilação']};
+  let analise = '';
+  if (objetivo && (st.portBusy || !aplicado)) analise = `<div class="obj-an">${busy('Analisando seu objetivo e refazendo a carteira…')}</div>`;
+  else if (objetivo && an) analise = `<div class="obj-an">
+      <div class="q">${ICON.spark}<div><b>Como entendi:</b> ${esc(an.resumo)}</div></div>
+      ${an.metas.length ? `<div class="metas">${an.metas.map((m, i) => `<div class="mt ${i === 0 ? 'main' : ''}">${i === 0 && an.metas.length > 1 ? '<small>Meta principal</small>' : ''}<b>${esc(m.descricao)}</b>
+        <span>${m.valor_alvo ? Mc(m.valor_alvo) + ' (valores de hoje)' : 'Valor não informado'} · ${m.prazo_anos ? 'em ' + prazoTxt(m.prazo_anos) : 'prazo não informado'}</span></div>`).join('')}</div>` : ''}
+      <div class="tags">${an.liquidez ? pill(LIQ[an.liquidez][0], '', LIQ[an.liquidez][1]) : ''}${an.aporte_mensal ? pill('', '', `Aporte mensal: ${M0(an.aporte_mensal)}`) : ''}</div>
+      ${an.influencia ? `<h3>Como isso mudou a carteira</h3><p class="ink2" style="margin:0">${esc(an.influencia)}</p>` : ''}
+      ${an.atencao.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')}
+      ${metaPrincipal()?.valor_alvo ? `<div class="btns"><button class="btn sm" type="button" onclick="go('sim')">Ver a chance de atingir a meta</button></div>` : ''}
+    </div>`;
+  else if (objetivo && aplicado) analise = `<div class="note warn" style="margin-top:14px">${ICON.warn}<div>A IA não conseguiu analisar seu objetivo agora; a carteira abaixo segue só o seu perfil. Tente de novo em alguns minutos.</div></div>`;
+  return `<div class="card obj-card">
+    <h2>${ICON.target}Seu objetivo</h2>
+    <p class="lead sm">Conte com suas palavras o que você quer conquistar: o quê, para quando, quanto precisa e quanto consegue guardar por mês. A carteira recomendada é montada para isso.</p>
+    <label class="sr-only" for="objTxt">Seu objetivo</label>
+    <textarea id="objTxt" class="obj-txt" maxlength="600" rows="3" placeholder="Ex.: Quero juntar R$ 150 mil para a entrada de um apartamento em 5 anos. Consigo investir R$ 2.000 por mês e já tenho uma reserva de emergência.">${esc(objDraft)}</textarea>
+    ${objetivo ? '' : `<div class="obj-ex"><span>Ideias:</span>${EXEMPLOS.map(e => `<button type="button" data-ex="${esc(e)}">${esc(e)}</button>`).join('')}</div>`}
+    <div class="obj-foot"><span class="mut xs" id="objCount" aria-live="polite"></span><span class="grow"></span>
+      ${objetivo ? '<button class="btn sm ghost" type="button" id="objClear">Limpar objetivo</button>' : ''}
+      <button class="btn sm primary" type="button" id="objGo"></button></div>
+    ${analise}
+  </div>`;
+}
+function bindObjetivo(el) {
+  const ta = $('#objTxt', el), go_ = $('#objGo', el);
+  if (!ta) return;
+  const upd = () => {
+    const mudou = objDraft.trim() !== objetivo.trim();
+    $('#objCount', el).textContent = `${objDraft.length}/600${mudou && objetivo ? ' · alterações ainda não aplicadas' : ''}`;
+    go_.disabled = !objDraft.trim() || !mudou || st.portBusy;
+    go_.textContent = objetivo && !mudou ? 'Objetivo aplicado ✓' : objetivo ? 'Atualizar recomendação' : 'Analisar meu objetivo';
+  };
+  ta.oninput = () => { objDraft = ta.value.slice(0, 600); upd(); };
+  $$('[data-ex]', el).forEach(b => b.onclick = () => {
+    const t = ta.value.trim();
+    ta.value = t ? `${t}${/[.!?]$/.test(t) ? '' : '.'} ${b.dataset.ex}.` : `${b.dataset.ex}.`;
+    objDraft = ta.value.slice(0, 600); upd(); ta.focus();
+  });
+  go_.onclick = () => { objetivo = objDraft.trim(); objDraft = objetivo; sv(); loadPort(true); };
+  const cl_ = $('#objClear', el);
+  if (cl_) cl_.onclick = () => { objetivo = ''; objDraft = ''; simCfg.objAplicado = null; sv(); loadPort(true); };
+  upd();
 }
 function copyPlan() {
   const ls = plano();
@@ -619,7 +695,8 @@ async function runSim() {
   st.simBusy = true; st.simErr = null; renderSim();
   const my = st.simReq = Symbol();
   try {
-    const r = await api('/api/simulate', {carteiras, pos, inicial: simCfg.inicial ?? inicialAuto(), mensal: simCfg.mensal, anos: simCfg.anos, cenario: simCfg.cenario});
+    const r = await api('/api/simulate', {carteiras, pos, inicial: simCfg.inicial ?? inicialAuto(), mensal: simCfg.mensal, anos: simCfg.anos, cenario: simCfg.cenario,
+      meta: metaPrincipal()?.valor_alvo || 0});
     if (my !== st.simReq) return;
     st.sim = r;
   } catch (e) { if (my === st.simReq) st.simErr = e.message; }
@@ -637,7 +714,7 @@ function renderSim() {
       <div class="ctrls" id="simCtrls" style="margin-top:14px">
         <label class="fld"><span>Valor inicial</span><div class="inp"><i>R$</i><input id="sIni" inputmode="decimal"></div><small id="sIniH"></small></label>
         <label class="fld"><span>Aporte mensal</span><div class="inp"><i>R$</i><input id="sMen" inputmode="decimal"></div></label>
-        <label class="fld"><span>Prazo</span><div class="inp"><select id="sAnos">${[1, 3, 5, 10, 15, 20, 30].map(a => `<option value="${a}">${a} ${a === 1 ? 'ano' : 'anos'}</option>`).join('')}</select></div></label>
+        <label class="fld"><span>Prazo</span><div class="inp"><select id="sAnos">${[...new Set([1, 3, 5, 10, 15, 20, 30, simCfg.anos])].sort((a, b) => a - b).map(a => `<option value="${a}">${a} ${a === 1 ? 'ano' : 'anos'}</option>`).join('')}</select></div></label>
         <label class="fld"><span>Cenário das notícias</span><div class="inp"><select id="sCen"></select></div></label>
       </div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:14px">
@@ -685,8 +762,16 @@ function renderSimBody() {
   const foco = R.carteiras[simCfg.foco] ? simCfg.foco : nomes[0];
   const S = R.carteiras[foco].stats, anos = Math.round(R.meses[R.meses.length - 1] / 12);
   const inv = R.investido[R.investido.length - 1];
-  const tiles = `<div class="tiles">
-    <div class="tile main"><div class="l">Valor provável em ${anos} ${anos === 1 ? 'ano' : 'anos'}</div><div class="v tn">${Mc(dv(S.p50))}</div><div class="d">Metade dos cenários termina acima disso</div></div>
+  const mp = metaPrincipal(), temMeta = R.meta && S.prob_meta != null;
+  let metaTile = '';
+  if (temMeta) {
+    const nec = taxaNecessaria(R.investido[0], simCfg.mensal, R.meses[R.meses.length - 1], R.meta, R.ipca);
+    metaTile = `<div class="tile main goal"><div class="l">Chance de atingir a meta${mp?.descricao ? ': ' + esc(mp.descricao.toLowerCase()) : ''}</div><div class="v tn">${N(S.prob_meta, 0)}%</div>
+      <div class="d">${Mc(R.meta)} em valores de hoje, em ${anos} ${anos === 1 ? 'ano' : 'anos'}${mp?.prazo_anos && Math.round(mp.prazo_anos) !== anos ? ` (seu prazo: ${prazoTxt(mp.prazo_anos)})` : ''}.
+      ${nec == null ? '' : !isFinite(nec) ? 'Com esse valor inicial e esse aporte, a meta fica fora de alcance nesse prazo: aumente o aporte ou o prazo.' : nec <= R.ipca + 0.05 ? 'Basta o dinheiro acompanhar a inflação para chegar lá.' : `Precisaria render cerca de ${P(nec, 1, false)} a.a. (CDI esperado: ${P(R.cdi_medio, 1, false)}).`}</div></div>`;
+  }
+  const tiles = `<div class="tiles">${metaTile}
+    <div class="tile ${temMeta ? '' : 'main'}"><div class="l">Valor provável em ${anos} ${anos === 1 ? 'ano' : 'anos'}</div><div class="v tn">${Mc(dv(S.p50))}</div><div class="d">Metade dos cenários termina acima disso</div></div>
     <div class="tile"><div class="l">Se o mercado for mal</div><div class="v tn">${Mc(dv(S.p10))}</div><div class="d">Só 1 em cada 10 cenários fica abaixo</div></div>
     <div class="tile"><div class="l">Se o mercado for bem</div><div class="v tn">${Mc(dv(S.p90))}</div><div class="d">1 em cada 10 cenários fica acima</div></div>
     <div class="tile"><div class="l">Chance de bater o CDI</div><div class="v tn">${N(S.prob_cdi, 0)}%</div><div class="d">CDI no período: ${Mc(dv(R.cdi[R.cdi.length - 1]))}</div></div>
@@ -697,10 +782,12 @@ function renderSimBody() {
     ${[['Valor provável', k => Mc(dv(R.carteiras[k].stats.p50))], ['Cenário ruim (10%)', k => Mc(dv(R.carteiras[k].stats.p10))], ['Cenário bom (90%)', k => Mc(dv(R.carteiras[k].stats.p90))],
       ['Retorno esperado ao ano', k => P(R.carteiras[k].stats.ret_aa, 1, false)], ['Oscilação ao ano', k => P(R.carteiras[k].stats.vol_aa, 1, false)],
       ['Chance de bater o CDI', k => N(R.carteiras[k].stats.prob_cdi, 0) + '%'], ['Pior queda típica', k => P(R.carteiras[k].stats.queda_tipica, 0)],
-      ['Pior 12 meses (5% de chance)', k => P(R.carteiras[k].stats.pior_12m, 0)]].map(([l, f]) => `<tr><td>${l}</td><td>${f('atual')}</td><td>${f('sugerida')}</td></tr>`).join('')}</tbody></table></div>` : '';
+      ['Pior 12 meses (5% de chance)', k => P(R.carteiras[k].stats.pior_12m, 0)],
+      ...(temMeta ? [['Chance de atingir a meta', k => N(R.carteiras[k].stats.prob_meta, 0) + '%']] : [])].map(([l, f]) => `<tr><td>${l}</td><td>${f('atual')}</td><td>${f('sugerida')}</td></tr>`).join('')}</tbody></table></div>` : '';
   body.innerHTML = `<div class="${st.simBusy ? 'stale' : ''}">
     <div class="legend" style="margin-top:16px">${nomes.map(k => `<span><i class="ln" style="background:${SERIES[k][1]};height:3px"></i>${SERIES[k][0]} (mediana)</span>`).join('')}
       <span><i class="ln" style="background:${SERIES.cdi[1]}"></i>${SERIES.cdi[0]}</span><span><i class="ln" style="background:${SERIES.inv[1]}"></i>${SERIES.inv[0]}</span>
+      ${temMeta ? `<span><i class="ln" style="background:repeating-linear-gradient(90deg,var(--ink2) 0 4px,transparent 4px 7px)"></i>Meta${simCfg.real ? '' : ' (corrigida pela inflação)'}</span>` : ''}
       <span><i class="bd" style="background:${SERIES[foco][1]};opacity:.22"></i>Faixa provável da ${SERIES[foco][0].toLowerCase()} (80% dos cenários)</span></div>
     <div class="chart" id="chart"></div>${tiles}${comp}</div>`;
   drawChart();
@@ -730,6 +817,16 @@ function renderSimBody() {
     </ul></details></div>`;
 }
 const fmtData = s => { const [y, m, d] = s.split('-'); return `${d}/${m}/${y.slice(2)}`; };
+function taxaNecessaria(ini, mensal, meses, metaHoje, ipca) {
+  // rentabilidade anual (nominal) para chegar à meta, que está em reais de hoje e é corrigida pela inflação
+  if (!(metaHoje > 0) || !(meses > 0)) return null;
+  const alvo = metaHoje * (1 + ipca / 100) ** (meses / 12);
+  const fv = r => { let v = ini; for (let i = 0; i < meses; i++) v = v * (1 + r) + mensal; return v; };
+  let lo = -0.02, hi = 0.08;
+  if (fv(hi) < alvo) return Infinity;
+  for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; fv(mid) < alvo ? lo = mid : hi = mid; }
+  return ((1 + hi) ** 12 - 1) * 100;
+}
 function drawChart() {
   const box = $('#chart'), R = st.sim;
   if (!box || !R || box.offsetParent === null) return;
@@ -742,7 +839,10 @@ function drawChart() {
   const F = Object.fromEntries(Object.entries(R.carteiras[foco].faixas).map(([k, v]) => [k, adj(v)]));
   const med = Object.fromEntries(nomes.map(k => [k, adj(R.carteiras[k].faixas.p50)]));
   const cdi = adj(R.cdi), inv = adj(R.investido), X = R.meses, T = X[X.length - 1];
-  const ymax = Math.max(...F.p90, ...cdi, ...Object.values(med).flat(), ...inv) * 1.04;
+  const dmax = Math.max(...F.p90, ...cdi, ...Object.values(med).flat(), ...inv);
+  const metaL = R.meta && R.carteiras[foco].stats.prob_meta != null ? D.map(d => real ? R.meta : R.meta * d) : null;
+  const metaVis = metaL && Math.max(...metaL) <= dmax * 2.5;
+  const ymax = Math.max(dmax, metaVis ? Math.max(...metaL) : 0) * 1.04;
   const ticks = niceTicks(ymax, H < 280 ? 3 : 4), top = ticks[ticks.length - 1];
   const x = i => m.l + X[i] / T * iw, y = v => m.t + ih - v / top * ih;
   const line = a => a.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
@@ -761,6 +861,7 @@ function drawChart() {
     <path d="${band(F.p10, F.p90)}" fill="${SERIES[foco][1]}" opacity=".10"/>
     <path d="${band(F.p25, F.p75)}" fill="${SERIES[foco][1]}" opacity=".14"/>
     <path d="${line(inv)}" fill="none" stroke="var(--ref)" stroke-width="1.5" stroke-linejoin="round"/>
+    ${metaVis ? `<path d="${line(metaL)}" fill="none" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="5 4"/>` : ''}
     <path d="${line(cdi)}" fill="none" stroke="var(--s3)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     ${nomes.filter(k => k !== foco).map(k => `<path d="${line(med[k])}" fill="none" stroke="${SERIES[k][1]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>`).join('')}
     <path d="${line(med[foco])}" fill="none" stroke="${SERIES[foco][1]}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
@@ -781,7 +882,8 @@ function drawChart() {
       ${nomes.map(k => `<div class="r"><span><i class="ln" style="background:${SERIES[k][1]}"></i>${SERIES[k][0]}</span><b>${M0(med[k][i])}</b></div>`).join('')}
       <div class="r"><span><i class="ln" style="background:${SERIES[foco][1]};opacity:.35;height:6px"></i>Faixa provável</span><b>${Mc(F.p10[i])} a ${Mc(F.p90[i])}</b></div>
       <div class="r"><span><i class="ln" style="background:var(--s3)"></i>100% do CDI</span><b>${M0(cdi[i])}</b></div>
-      <div class="r"><span><i class="ln" style="background:var(--ref)"></i>Investido</span><b>${M0(inv[i])}</b></div>`;
+      <div class="r"><span><i class="ln" style="background:var(--ref)"></i>Investido</span><b>${M0(inv[i])}</b></div>
+      ${metaL ? `<div class="r"><span><i class="ln" style="background:var(--ink2)"></i>Meta</span><b>${M0(metaL[i])}</b></div>` : ''}`;
     tip.style.display = 'block';
     const tw = tip.offsetWidth, left = xx + 14 + tw > W ? xx - tw - 14 : xx + 14;
     tip.style.left = Math.max(0, left) + 'px'; tip.style.top = m.t + 'px';
@@ -937,7 +1039,7 @@ $('#btnPerfil').onclick = async () => {
   perfil = v.p; sv(); renderPerfilChip(); loadPort(true);
 };
 $('#btnCfg').onclick = async () => {
-  const bk = JSON.stringify({pos, extra, perfil});
+  const bk = JSON.stringify({pos, extra, perfil, objetivo});
   const v = await ask({title: 'Backup e acesso', desc: 'Se você limpar os dados do navegador, as posições somem. Copie o texto abaixo e guarde; para restaurar, cole um backup e toque em Restaurar.',
     fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
     extraHtml: `<div class="btns" style="margin:0"><button class="btn sm" type="button" id="bkCopy">Copiar backup</button><button class="btn sm" type="button" id="bkOut">Trocar senha do app</button></div>`,
@@ -948,6 +1050,7 @@ $('#btnCfg').onclick = async () => {
     pos = Object.fromEntries(Object.entries(b.pos || {}).filter(([k]) => OKT.test(k)));
     extra = (b.extra || []).filter(k => OKT.test(k));
     if (['conservador', 'moderado', 'arrojado', 'não informado'].includes(b.perfil)) perfil = b.perfil;
+    if (typeof b.objetivo === 'string') objetivo = b.objetivo.slice(0, 600);
     sv(); location.reload();
   } catch { toast('Texto de backup inválido.'); }
 };
@@ -962,12 +1065,20 @@ async function loadPort(force) {
   st.portBusy = true; st.portErr = null; st.portT0 = Date.now();
   const my = st.portReq = Symbol();
   if (!st.port) { renderHero(); renderResumo(); renderInvestir(); renderSim(); }
-  else $$('#t-resumo>*, #t-investir>*').forEach(x => x.classList.add('stale'));
+  else { renderInvestir(); $$('#t-resumo>*, #t-investir>*').forEach(x => x.classList.add('stale')); $('#t-investir .obj-card')?.classList.remove('stale'); }
   const tick = setInterval(() => { if (!st.port) { const m = $('.loading-msg span:last-child', $('#t-resumo')); if (m) m.textContent = portMsg(); } }, 3000);
   try {
-    const p = await api('/api/portfolio', {pos, perfil});
+    const p = await api('/api/portfolio', {pos, perfil, objetivo});
     if (my !== st.portReq) return;
     st.port = p;
+    const mp = metaPrincipal(), an = p.objetivo_analise;
+    if (an && simCfg.objAplicado !== p.objetivo) {  // novo objetivo: a simulação adota o prazo e o aporte informados
+      if (mp?.prazo_anos) simCfg.anos = Math.min(Math.max(Math.round(mp.prazo_anos), 1), 30);
+      if (an.aporte_mensal) simCfg.mensal = an.aporte_mensal;
+      simCfg.objAplicado = p.objetivo; sv();
+      const sm = $('#sMen'); if (sm) sm.value = N(simCfg.mensal, 2);
+      if ($('#sAnos')) $('#t-sim').innerHTML = '';
+    }
   } catch (e) { if (my === st.portReq) st.portErr = e.message; }
   finally { clearInterval(tick); }
   if (my !== st.portReq) return;
