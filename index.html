@@ -1775,7 +1775,9 @@ async function loadPan() {
 /* ---------- contas de acesso ---------- */
 const ABAS = ['resumo', 'investir', 'sim', 'mercado', 'ativos', 'contas'];
 const LOGO = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>';
-const ultimoEu = () => { try { return JSON.parse(raw('ultimo_eu') || 'null'); } catch { return null; } };
+// última conta usada neste aparelho ("eu" é o nome que a versão anterior do app usava): permite recuperar a conta
+// com o mesmo id se o servidor perder os dados
+const ultimoEu = () => { try { const u = JSON.parse(raw('ultimo_eu') || raw('eu') || 'null'); return u?.id && u?.email ? {id: u.id, email: u.email} : null; } catch { return null; } };
 function lembrarEu(u) { if (u?.id) rawSet('ultimo_eu', JSON.stringify({id: u.id, email: u.email})); }
 const emailDoToken = c => { try { return JSON.parse(decodeURIComponent(escape(atob(c.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))))).email; } catch { return ''; } };
 let gisCarregado;
