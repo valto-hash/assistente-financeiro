@@ -5,12 +5,14 @@ De onde vem o Premium (vale o que terminar mais tarde):
 - Google Play Billing: assinatura comprada dentro do app Android (obrigatório para vender assinatura na Play Store);
 - Mercado Pago: assinatura feita pelo site (fora do app da Play Store);
 - código promocional: CODIGOS_PREMIUM="CODIGO:dias,OUTRO:30" (cada pessoa usa cada código uma vez);
-- administradores (ADMIN_EMAILS) e ASSINATURA=nao (app de uso pessoal): sempre Premium.
+- administradores (ADMIN_EMAILS) e ASSINATURA=nao (app de uso pessoal): sempre Premium;
+- código mestre (CODIGO_MESTRE, só no servidor, nunca no código): acesso completo e sem prazo para quem digitar o código
+  na opção escondida do app. Trocar o código no servidor tira o acesso de quem usou o código antigo.
 
 A verificação das compras é sempre feita no servidor, consultando a Google ou o Mercado Pago: o aparelho nunca
 decide sozinho que a pessoa é Premium.
 """
-import base64, hashlib, json, os, time
+import base64, hashlib, hmac, json, os, time
 from datetime import datetime
 
 import requests
@@ -69,6 +71,8 @@ def estado(uid):
     if usuarios.eh_admin(uid):
         return {"plano": "premium", "origem": "admin", "ate": None, "renova": False, "limites": None}
     d = _doc(uid)
+    if d.get("mestre") and d["mestre"] == _hash_mestre():
+        return {"plano": "premium", "origem": "acesso_completo", "ate": None, "renova": False, "limites": None}
     if "teste_inicio" not in d:  # o teste conta a partir do primeiro uso (inclusive de quem já tinha conta)
         d = _atualizar(uid, lambda x: x.setdefault("teste_inicio", time.time()))
     agora = time.time()
@@ -98,6 +102,23 @@ def resumo_publico(uid):
             "codigos": bool(os.getenv("CODIGOS_PREMIUM")), "assinatura_ligada": ligado(),
             "fontes": {f: {"ate": x.get("ate"), "renova": x.get("renova"), "produto": x.get("produto")}
                        for f, x in (d.get("fontes") or {}).items()}}
+
+
+# ---------------------------------------------------------------- código mestre (acesso completo sem pagar)
+
+def _hash_mestre():
+    codigo = os.getenv("CODIGO_MESTRE", "").strip()
+    return hashlib.sha256(("mestre:" + codigo).encode()).hexdigest() if len(codigo) >= 8 else None
+
+
+def ativar_mestre(uid, codigo):
+    """Libera o app completo, sem prazo, para quem sabe o CODIGO_MESTRE (mínimo de 8 caracteres)."""
+    esperado = os.getenv("CODIGO_MESTRE", "").strip()
+    if len(esperado) < 8 or not hmac.compare_digest((codigo or "").strip().encode(), esperado.encode()):
+        raise ValueError("Código inválido.")
+    h = _hash_mestre()
+    _atualizar(uid, lambda d: d.update(mestre=h, mestre_quando=time.time()))
+    return estado(uid)
 
 
 # ---------------------------------------------------------------- código promocional

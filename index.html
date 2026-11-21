@@ -714,7 +714,7 @@ function planoLinha() {
   const p = st.plano;
   if (!p || p.assinatura_ligada === false) return '';
   const dias = p.ate ? Math.max(Math.ceil((p.ate * 1000 - Date.now()) / 864e5), 0) : 0;
-  const txt = p.plano !== 'premium' ? 'Plano grátis' : p.origem === 'admin' ? 'Premium (administrador)' : p.origem === 'teste'
+  const txt = p.plano !== 'premium' ? 'Plano grátis' : p.origem === 'admin' ? 'Premium (administrador)' : p.origem === 'acesso_completo' ? 'Acesso completo' : p.origem === 'teste'
     ? `Teste grátis do Premium: ${dias} ${dias === 1 ? 'dia' : 'dias'}` : `Premium${p.ate ? (p.renova ? ' · renova em ' : ' até ') + dataCurta(p.ate) : ''}`;
   return `<p style="margin:0 0 10px">${pill(p.plano === 'premium' ? 'info' : '', p.plano === 'premium' ? 'spark' : '', txt)}</p>`;
 }
@@ -791,6 +791,22 @@ async function exportarTudo() {
     toast('Backup baixado: guarde com cuidado, ele tem dados pessoais');
   } catch (er) { toast(er.message); }
 }
+
+// opção escondida: 5 toques seguidos na versão do app pedem o código de acesso completo (CODIGO_MESTRE do servidor)
+let toquesVersao = [];
+document.addEventListener('click', async e => {
+  if (!e.target.closest('#versaoApp')) return;
+  const agora = Date.now();
+  toquesVersao = [...toquesVersao.filter(t => agora - t < 4000), agora];
+  if (toquesVersao.length < 5) return;
+  toquesVersao = [];
+  $('#dlg').close();
+  const v = await ask({title: 'Código de acesso', fields: [{name: 'c', label: 'Código', type: 'password'}], ok: 'Liberar',
+    validate: v => (v.c || '').trim() ? '' : 'Digite o código.'});
+  if (!v) return;
+  try { st.plano = await api('/api/plano/acesso', {codigo: v.c.trim()}); toast('Acesso completo liberado'); setTimeout(() => location.reload(), 900); }
+  catch (er) { toast(er.message); }
+});
 
 /* ---------- teste de perfil e objetivos ---------- */
 async function abrirTestePerfil(primeira) {
@@ -1946,7 +1962,8 @@ $('#btnConta').onclick = () => ask({title: eu?.nome || 'Minha conta', desc: eu?.
     <button class="btn perigo" type="button" data-conta="excluir">Excluir minha conta</button></div>
     <p class="mut xs" style="margin:0 0 6px"><a href="/privacidade" target="_blank" rel="noopener">Política de privacidade</a> · <a href="/termos" target="_blank" rel="noopener">Termos de uso</a></p>
     ${eu?.admin && st.armaz ? `<p class="mut xs" style="margin:0 0 6px">${st.armaz.persistente ? '✓ ' : '⚠ '}${esc(st.armaz.motivo)}</p>` : ''}
-    <p class="mut xs" style="margin:0">Análises: ${st.iaAtiva ? `com IA (${esc(modeloNome(st.modelos?.analises) || 'Claude')}), sempre conferida pelas regras. Carteira recomendada: ${esc(modeloNome(st.modelos?.decisoes) || 'Claude')}.` : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>`});
+    <p class="mut xs" style="margin:0">Análises: ${st.iaAtiva ? `com IA (${esc(modeloNome(st.modelos?.analises) || 'Claude')}), sempre conferida pelas regras. Carteira recomendada: ${esc(modeloNome(st.modelos?.decisoes) || 'Claude')}.` : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>
+    <p class="mut xs" id="versaoApp" style="margin:6px 0 0;user-select:none;-webkit-user-select:none;cursor:default">Versão ${esc(st.versao || '')}</p>`});
 function limparLocal() {
   const pre = `u:${eu?.id}:`;
   Object.keys(localStorage).filter(k => k.startsWith(pre)).forEach(k => rawSet(k, null));
@@ -2308,7 +2325,7 @@ async function novoAlerta(t, preco) {
   catch (e) { $('#fatal').textContent = e.message; $('#fatal').classList.remove('hide'); return; }
   $('#fatal').classList.add('hide');
   st.uni = w.universo || {};
-  st.iaAtiva = !!w.ia; st.modelos = w.modelos || null; st.plano = w.plano || null; st.armaz = w.armazenamento || null;
+  st.iaAtiva = !!w.ia; st.modelos = w.modelos || null; st.plano = w.plano || null; st.armaz = w.armazenamento || null; st.versao = w.versao || '';
   if (w.usuario) { eu = w.usuario; rawSet('eu', JSON.stringify(eu)); lembrarEu(eu); renderConta(); }
   navigator.storage?.persist?.().catch(() => {});  // pede ao navegador para nunca apagar os dados guardados neste aparelho
   restaurarPlay();

@@ -876,7 +876,7 @@ def watchlist(req: Request, authorization: str = Header("")):
     return {"tickers": WATCHLIST, "universo": {k: {"classe": v[0], "nome": v[1], "descricao": v[2], "setor": SETOR.get(k)}
                                                for k, v in UNIVERSO.items()},
             "rf": RF, "classes": NOME_CLASSE, "perfis": PERFIS, "ia": IA_ATIVA, "usuario": usuarios.publico(uid),
-            "plano": planos.resumo_publico(uid), "armazenamento": armazem.diagnostico() if usuarios.eh_admin(uid) else None,
+            "plano": planos.resumo_publico(uid), "versao": VERSAO, "armazenamento": armazem.diagnostico() if usuarios.eh_admin(uid) else None,
             "modelos": {"analises": MODEL, "decisoes": MODELO_DECISOES} if IA_ATIVA else None}
 
 
@@ -1957,6 +1957,19 @@ class AssinarReq(BaseModel):
 def plano_ver(req: Request, conferir: bool = False, authorization: str = Header("")):
     uid = auth(req, authorization)
     if conferir: planos.conferir_mp(uid)
+    return planos.resumo_publico(uid)
+
+
+@app.post("/api/plano/acesso")
+def plano_acesso(req: Request, r: CodigoPromoReq, authorization: str = Header("")):
+    """Opção escondida: o código mestre (CODIGO_MESTRE no servidor) libera o app completo sem pagar."""
+    uid = auth(req, authorization)
+    limitar(req)
+    try:
+        planos.ativar_mestre(uid, r.codigo)
+    except ValueError as e:
+        falhou(req)
+        raise HTTPException(400, str(e))
     return planos.resumo_publico(uid)
 
 

@@ -38,6 +38,7 @@ Todas estão em [.env.example](.env.example), com explicação. As principais:
 | `GOOGLE_CLIENT_ID` | Liga o "Entrar com o Google" (ID do cliente OAuth do tipo Aplicativo da Web, no Google Cloud). |
 | `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `SMTP_REMETENTE` | E-mail para o "esqueci minha senha" (código de 6 dígitos). |
 | `ASSINATURA`, `TESTE_GRATIS_DIAS`, `PRECO_MENSAL`, `PRECO_ANUAL`, `CODIGOS_PREMIUM` | Planos: `ASSINATURA=nao` deixa todos Premium (uso pessoal); dias de teste (7); preços (14,90 e 119,90); códigos promocionais `CODIGO:dias`. |
+| `CODIGO_MESTRE` | Seu código de acesso completo, sem pagar (mínimo 8 caracteres). No app: menu da conta, toque 5 vezes em "Versão" e digite o código. Nunca coloque o valor no código ou no GitHub; trocar o código revoga quem usou o antigo. |
 | `ANDROID_PACKAGE`, `ANDROID_SHA256`, `PLAY_PRODUTO_MENSAL`, `PLAY_PRODUTO_ANUAL`, `GOOGLE_PLAY_CONTA_SERVICO`, `RTDN_CHAVE` | App Android e assinatura pelo Google Play (veja o guia de publicação). |
 | `MERCADOPAGO_TOKEN` | Assinatura pelo site com o Mercado Pago (quem usa pelo navegador, fora do app da Play Store). |
 | `ANTHROPIC_API_KEY` | Opcional. Com ela, o Premium tem análises com IA (Claude). Sem ela, tudo funciona pelo motor de regras. `USAR_IA=nao` desliga a IA mesmo com a chave. |
