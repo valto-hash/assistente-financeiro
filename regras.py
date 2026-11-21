@@ -243,19 +243,25 @@ def alvo_classes(modelo, pan_classes, obj):
     return alvo, " ".join(motivos)
 
 
-def pontuacao(m, c):
-    """Quanto maior, melhor: tendência, retorno de 12 meses, dividendos (ações e FIIs) e menos oscilação."""
+def pontuacao(m, c, cdi=10.0):
+    """Qualidade de longo prazo (quanto maior, melhor), sem tentar adivinhar o momento: retorno anual de 3 anos acima
+    do CDI por unidade de risco, queda máxima e um pouco de peso para dividendos. O teste com 20 anos de histórico
+    mostrou que a tendência de curto prazo não acerta mais que o acaso, por isso ela não entra aqui."""
     if not m: return -9
-    s = {"alta": 1, "baixa": -1}.get(m.get("tendencia"), 0)
-    s += max(min((m.get("ret_12m") or 0) / 30, 1), -1)
-    if c in ("acao", "fii"): s += min((m.get("dy_12m") or 0) / 10, 1.2)
-    s -= max(((m.get("vol_aa") or 25) - 25) / 50, 0)
+    vol = max(m.get("vol_aa") or 25, 5)
+    r3 = m.get("ret_3a_aa")
+    r = r3 if r3 is not None else (m.get("ret_12m") or 0) * 0.5  # sem 3 anos de histórico, o último ano vale metade
+    s = max(min((r - (cdi or 10)) / vol, 2), -2)
+    s -= max((-(m.get("queda_max_12m") or 0) - 25) / 25, 0) * 0.5  # quedas acima de 25% em 12 meses pesam contra
+    if c in ("acao", "fii"): s += 0.3 * min((m.get("dy_12m") or 0) / 10, 1.2)
     return round(s, 2)
 
 
-def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
+def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None):
     """Escolhe os ativos de cada classe. cand: {código: {classe, nome, descricao, m(métricas)}}; atual: {código: R$}.
-    Núcleo em ETFs/títulos amplos; até 2 complementos individuais (no máximo 10% cada), preferindo o que você já tem."""
+    Núcleo em ETFs/títulos amplos; complementos individuais (no máximo 10% cada, um por setor) escolhidos pela
+    qualidade de longo prazo, preferindo o que você já tem (vender gera custo e IR)."""
+    setores = setores or {}
     pesos, motivos = {}, {}
     for c in CLASSES:
         alvo_c = alvo.get(c, 0)
@@ -263,8 +269,9 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
         meus = {a: v for a, v in atual.items() if cand.get(a, {}).get("classe") == c and v > 0}
         g = {}
         if c == "renda_fixa":
-            base = {"ALTA": {"TESOURO_SELIC": .6, "CDB_CDI": .4}, "MEDIA": {"TESOURO_SELIC": .45, "TESOURO_IPCA": .55}}.get(
-                liq, {"TESOURO_SELIC": .4, "TESOURO_IPCA": .6})
+            base = {"ALTA": {"TESOURO_SELIC": .6, "CDB_CDI": .4},
+                    "MEDIA": {"TESOURO_SELIC": .3, "LCI_LCA": .3, "TESOURO_IPCA": .4}}.get(
+                liq, {"TESOURO_SELIC": .3, "LCI_LCA": .15, "TESOURO_IPCA": .55})
             tot_meus = sum(meus.values())
             parte_meus = min(.5, tot_meus / max(sum(atual.values()), 1) * 100 / alvo_c) if tot_meus else 0
             for a, v in meus.items():
@@ -274,6 +281,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
                 g[a] = g.get(a, 0) + w * (1 - parte_meus)
             motivos.setdefault("TESOURO_SELIC", "Reserva e liquidez: rende a Selic, pode ser resgatado em 1 dia e quase não oscila.")
             motivos.setdefault("CDB_CDI", "Rende perto do CDI com garantia do FGC; boa opção para dinheiro com data marcada.")
+            motivos.setdefault("LCI_LCA", "Isenta de IR e com garantia do FGC: rendendo 90% do CDI, equivale a um CDB de cerca de 106% do CDI.")
             motivos.setdefault("TESOURO_IPCA", "Protege da inflação: paga IPCA mais um juro real fixo; ideal para prazos mais longos.")
         else:
             nucleo = {"acao": {"BOVA11": .6, "DIVO11": .4}, "fii": {"KNCR11": .5, "HGLG11": .5},
@@ -282,14 +290,19 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
                 nucleo = {next(iter(nucleo)): 1.0}
             individuais = c in ("acao", "fii")
             total_atual = max(sum(atual.values()), 1)
-            # 1º o que você já tem e não está com sinal de venda (evita custo e IR); depois os mais bem pontuados
-            meus_ok = sorted((a for a in meus if a not in nucleo and sinais.get(a) != "VENDER"), key=lambda a: -meus[a])
-            n_sat = 0 if alvo_c < 8 else 1 if alvo_c < 18 else 2
+            # 1º o que você já tem (evita custo e IR), menos o que tem qualidade muito ruim; depois os de melhor qualidade,
+            # um por setor. Sinais de curto prazo não tiram ninguém da carteira: no teste com o passado eles não acertaram mais que o acaso.
+            meus_ok = sorted((a for a in meus if a not in nucleo and pontuacao(cand[a].get("m"), c, cdi) > -1.2), key=lambda a: -meus[a])
+            n_sat = 0 if alvo_c < 8 else 1 if alvo_c < 18 else 2 if alvo_c < 28 else 3
             if individuais:
-                pont = {a: pontuacao(x.get("m"), c) for a, x in cand.items()
-                        if x.get("classe") == c and a not in nucleo and a not in meus and sinais.get(a) != "VENDER"}
-                novos = [a for a, s in sorted(pont.items(), key=lambda kv: -kv[1]) if s > 0]
-                escolhidos = meus_ok[:2] + novos[:max(n_sat - len(meus_ok[:2]), 0)]
+                pont = {a: pontuacao(x.get("m"), c, cdi) for a, x in cand.items()
+                        if x.get("classe") == c and a not in nucleo and a not in meus and a not in etfs}
+                usados = {setores.get(a) for a in meus_ok[:n_sat or 2]}
+                novos = []
+                for a, sc in sorted(pont.items(), key=lambda kv: -kv[1]):
+                    if sc <= -0.3 or (setores.get(a) and setores.get(a) in usados): continue
+                    novos.append(a); usados.add(setores.get(a))
+                escolhidos = meus_ok[:max(n_sat, 2)] + novos[:max(n_sat - len(meus_ok[:max(n_sat, 2)]), 0)]
             else:
                 escolhidos = meus_ok[:1]
             limite = (10 / alvo_c) if individuais else 0.5  # ação ou FII individual: no máximo 10% da carteira
@@ -301,13 +314,14 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
                     w = min(0.2, limite)
                 g[a] = w; parte += w
                 m = cand[a].get("m") or {}
-                dados = ", ".join(x for x in [f"tendência de {m.get('tendencia')}" if m.get("tendencia") else "",
+                dados = ", ".join(x for x in [f"{pct(m.get('ret_3a_aa'), sinal=True)} ao ano em 3 anos" if m.get("ret_3a_aa") is not None else
                                               f"{pct(m.get('ret_12m'), sinal=True)} em 12 meses" if m.get("ret_12m") is not None else "",
+                                              f"oscilação de {pct(m.get('vol_aa'), 0)} ao ano" if m.get("vol_aa") else "",
                                               f"{pct(m.get('dy_12m'))} de dividendos" if (m.get("dy_12m") or 0) > 1 else ""] if x)
-                motivos[a] = (f"Você já tem e ele não está com sinal de venda: fica como complemento de {NOME_MIN[c]}, "
-                              f"limitado para não concentrar{' (' + dados + ')' if dados else ''}." if a in meus else
-                              f"Complemento de {NOME_MIN[c]} com os melhores indicadores da lista{': ' + dados if dados else ''}; "
-                              "peso limitado para não concentrar.")
+                motivos[a] = (f"Você já tem: fica como complemento de {NOME_MIN[c]}, limitado para não concentrar "
+                              f"(vender agora geraria custo e talvez IR){' — ' + dados if dados else ''}." if a in meus else
+                              f"Complemento de {NOME_MIN[c]} com a melhor relação entre retorno e risco nos últimos anos"
+                              f"{' no setor ' + setores[a].lower() if setores.get(a) else ''}{': ' + dados if dados else ''}; peso limitado para não concentrar.")
             for a, w in nucleo.items():
                 g[a] = g.get(a, 0) + w * (1 - parte)
                 desc = cand.get(a, {}).get("descricao", "")
@@ -325,21 +339,25 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs):
 
 # ---------------------------------------------------------------- o que fazer com cada ativo que você já tem
 
-def acao_mantido(i, peso_alvo, total, sinal):
-    """i: {ticker, pct, valor, pl, pl_pct, classe}. Devolve (ação, motivo) coerentes com a carteira recomendada."""
+def acao_mantido(i, peso_alvo, total, sinal, aporte_mensal=0):
+    """i: {ticker, pct, valor, pl, pl_pct, classe}. Devolve (ação, motivo) coerentes com a carteira recomendada.
+    Só mexe quando o desvio passa da faixa de tolerância (5 p.p., ou 25% do peso recomendado se for menor) e, se
+    os próximos aportes resolvem o excesso em até 6 meses, prefere usá-los a vender (evita IR e custos)."""
     dif = (peso_alvo - i["pct"]) / 100 * total
-    folga = max(150, 0.02 * total)
+    faixa = min(5, 0.25 * max(peso_alvo, 4))
+    folga = max(150, faixa / 100 * total)
     if peso_alvo <= 0:
-        if sinal == "VENDER":
-            return "VENDER", "Os indicadores estão em baixa e o ativo ficou fora da carteira recomendada."
         return "VENDER", "Ficou fora da carteira recomendada: o dinheiro rende mais protegido ou diversificado nos ativos sugeridos."
+    if dif < -folga and aporte_mensal > 0 and -dif <= 6 * aporte_mensal and i["pct"] - peso_alvo < 10:
+        return "MANTER", (f"Pesa {pct(i['pct'])}, acima dos {pct(peso_alvo)} recomendados, mas não precisa vender: direcionando os "
+                          f"próximos aportes para o resto da carteira, o peso volta ao ideal em até 6 meses, sem IR nem custos.")
     if dif < -folga:
         if (i.get("pl_pct") or 0) > 30:
             return "REALIZAR_LUCRO", f"Já valorizou {pct(i['pl_pct'], 0)} e pesa mais do que o recomendado: vender uma parte garante parte do ganho."
         return "REDUZIR", f"Pesa {pct(i['pct'])} da carteira, acima dos {pct(peso_alvo)} recomendados: reduzir diminui a concentração."
     if dif > folga:
         return "AUMENTAR", f"Pesa {pct(i['pct'])}, abaixo dos {pct(peso_alvo)} recomendados."
-    return "MANTER", "Já está perto do peso recomendado."
+    return "MANTER", f"Está dentro da faixa de tolerância do peso recomendado ({pct(peso_alvo)} ± {pct(faixa)}): mexer agora só geraria custos."
 
 
 def ir_venda(t, c, valor_venda, pl_pct, etfs):
@@ -380,3 +398,12 @@ def fatos_metricas(m, c):
     rsi = m.get("rsi14")
     if rsi is not None: fs.append(fato("RSI (14 dias)", br(rsi, 0), "acima de 70: subiu rápido; abaixo de 30: caiu rápido"))
     return fs
+
+
+def dica_isencao(t, c, venda, pl_pct, etfs):
+    """Ações (não ETFs) vendidas até R$ 20 mil no mês têm o lucro isento de IR: dividir a venda pode evitar o imposto."""
+    if c != "acao" or t in etfs or venda <= 20000 or not pl_pct or pl_pct <= 0:
+        return None
+    meses = int(-(-venda // 20000))
+    ir = venda * pl_pct / (100 + pl_pct) * 0.15
+    return fato("Dica de IR", f"vender em {meses} meses (até R$ 20 mil por mês)", f"evita ≈ {brl(ir, 0)} de imposto")

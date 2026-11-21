@@ -1,0 +1,37 @@
+{
+  "packageId": "br.com.seudominio.financeiro",
+  "host": "app.seudominio.com.br",
+  "name": "Assistente Financeiro",
+  "launcherName": "Financeiro",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#0B2A5B",
+  "themeColorDark": "#0B2A5B",
+  "navigationColor": "#0B2A5B",
+  "navigationColorDark": "#0B2A5B",
+  "navigationDividerColor": "#0B2A5B",
+  "navigationDividerColorDark": "#0B2A5B",
+  "backgroundColor": "#0B2A5B",
+  "enableNotifications": true,
+  "startUrl": "/?origem=app",
+  "iconUrl": "https://app.seudominio.com.br/icone-512.png",
+  "maskableIconUrl": "https://app.seudominio.com.br/icone-512.png",
+  "monochromeIconUrl": "https://app.seudominio.com.br/icone-monocromatico.png",
+  "webManifestUrl": "https://app.seudominio.com.br/manifest.webmanifest",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {"path": "./chave-de-upload.keystore", "alias": "financeiro"},
+  "appVersionName": "2.0.0",
+  "appVersionCode": 1,
+  "minSdkVersion": 21,
+  "fallbackType": "customtabs",
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "shortcuts": [
+    {"name": "Onde investir", "shortName": "Investir", "url": "/?aba=investir", "chosenIconUrl": "https://app.seudominio.com.br/icone-192.png"},
+    {"name": "Contas do mês", "shortName": "Contas", "url": "/?aba=contas", "chosenIconUrl": "https://app.seudominio.com.br/icone-192.png"}
+  ],
+  "features": {
+    "playBilling": {"enabled": true}
+  },
+  "generatorApp": "bubblewrap-cli"
+}

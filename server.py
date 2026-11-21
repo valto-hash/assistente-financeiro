@@ -1,4 +1,4 @@
-import os, json, math, re, time, hmac, hashlib, threading, base64, uuid
+import os, copy, json, math, re, time, hmac, hashlib, threading, base64, uuid, smtplib, ssl
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
@@ -8,7 +8,9 @@ import anthropic
 import requests, pandas as pd, yfinance as yf
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from email.message import EmailMessage
+
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 import acertos
@@ -16,8 +18,12 @@ import armazem
 import avisos
 import checagem
 import contas as cmod
+import paginas
+import perfil as teste_perfil
+import planos
 import regras
 import usuarios
+from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNITS, UNIVERSO
 import simulacao as sim
 
 load_dotenv()
@@ -27,6 +33,9 @@ MODEL = os.getenv("MODEL", "claude-sonnet-5-5")
 # a carteira recomendada (as decisões de compra e venda) usa um modelo mais forte e pensa mais antes de responder
 MODELO_DECISOES = os.getenv("MODELO_DECISOES", "claude-opus-5-5")
 EFFORT_DECISOES = os.getenv("EFFORT_DECISOES", "high")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")  # ID do cliente OAuth (Web) do Google Cloud, para "Entrar com o Google"
+APP_NOME = os.getenv("APP_NOME", "Assistente Financeiro")
+VERSAO = "2.0.0"
 # A IA é opcional: sem ANTHROPIC_API_KEY (ou com USAR_IA=nao) o app usa o motor de regras (regras.py).
 USAR_IA = os.getenv("USAR_IA", "auto").strip().lower()
 IA_ATIVA = USAR_IA not in ("0", "nao", "não", "false", "off") and (
@@ -37,50 +46,15 @@ cache, fails = {}, {}  # as posições chegam do aparelho a cada pedido; a cópi
 _locks, _guard = {}, threading.Lock()
 
 YF = {"DOLAR": "USDBRL=X", "VOO": "VOO"}
-RF = {"TESOURO_SELIC": "Tesouro Selic", "PORQUINHO": "Porquinho do Inter", "TESOURO_IPCA": "Tesouro IPCA+", "CDB_CDI": "CDB/LCI pós-fixado"}
 NEWSQ = {"DOLAR": "dólar cotação hoje", "VOO": "S&P 500 Vanguard VOO"}
 CORE = ["renda_fixa", "acao", "fii", "exterior", "cambio"]
 NOME_CLASSE = {"renda_fixa": "Renda fixa", "acao": "Ações Brasil", "fii": "Fundos imobiliários", "exterior": "Exterior", "cambio": "Dólar e ouro"}
 
-# Lista de ativos que a IA pode recomendar (amplos e líquidos). Ela só escolhe daqui ou do que você já tem.
-UNIVERSO = {
-    "TESOURO_SELIC": ("renda_fixa", "Tesouro Selic", "Pós-fixado do governo com liquidez diária: base da reserva de emergência"),
-    "CDB_CDI": ("renda_fixa", "CDB/LCI pós-fixado (~100% do CDI)", "Renda fixa bancária com garantia do FGC; LCI/LCA são isentas de IR"),
-    "TESOURO_IPCA": ("renda_fixa", "Tesouro IPCA+ (longo prazo)", "Paga inflação + juro real: protege o poder de compra no longo prazo"),
-    "BOVA11": ("acao", "ETF Ibovespa", "As maiores empresas da B3 em uma única cota"),
-    "DIVO11": ("acao", "ETF Dividendos (IDIV)", "Cesta das empresas que mais pagam dividendos"),
-    "SMAL11": ("acao", "ETF Small Caps", "Empresas menores: mais risco e mais potencial de alta"),
-    "WEGE3": ("acao", "WEG", "Indústria de motores e energia, exportadora e com histórico de crescimento"),
-    "ITUB4": ("acao", "Itaú Unibanco", "Maior banco privado do país, rentabilidade alta e consistente"),
-    "BBAS3": ("acao", "Banco do Brasil", "Banco de controle estatal, barato e com dividendos altos"),
-    "PETR4": ("acao", "Petrobras", "Petróleo: dividendos altos, mas risco político e do preço do petróleo"),
-    "VALE3": ("acao", "Vale", "Mineração, ligada à China e ao preço do minério"),
-    "TAEE11": ("acao", "Taesa", "Transmissão de energia: receita previsível e dividendos"),
-    "EGIE3": ("acao", "Engie Brasil", "Geração de energia, perfil defensivo"),
-    "BBSE3": ("acao", "BB Seguridade", "Seguros, alta rentabilidade e dividendos"),
-    "ITSA4": ("acao", "Itaúsa", "Holding do Itaú, negociada com desconto"),
-    "HGLG11": ("fii", "CSHG Logística", "FII de galpões logísticos"),
-    "BTLG11": ("fii", "BTG Logística", "FII de galpões logísticos"),
-    "KNRI11": ("fii", "Kinea Renda Imobiliária", "FII híbrido: lajes corporativas e galpões"),
-    "XPML11": ("fii", "XP Malls", "FII de shoppings"),
-    "KNCR11": ("fii", "Kinea Rendimentos", "FII de recebíveis (CRI) atrelados ao CDI: ganha com juro alto"),
-    "MXRF11": ("fii", "Maxi Renda", "FII de recebíveis imobiliários, cota barata"),
-    "CPTS11": ("fii", "Capitânia Securities", "FII de recebíveis atrelados à inflação"),
-    "GARE11": ("fii", "Guardian Real Estate", "FII de imóveis de renda com contratos longos"),
-    "IVVB11": ("exterior", "ETF S&P 500 (em reais)", "As 500 maiores empresas dos EUA, com exposição ao dólar, comprado na B3"),
-    "NASD11": ("exterior", "ETF Nasdaq 100", "Tecnologia americana: mais crescimento e mais volatilidade"),
-    "VOO": ("exterior", "Vanguard S&P 500", "S&P 500 comprado direto nos EUA, em dólar e com taxa baixíssima"),
-    "DOLAR": ("cambio", "Dólar", "Proteção contra crises locais e desvalorização do real"),
-    "GOLD11": ("cambio", "ETF Ouro", "Ouro: proteção em crises e contra a inflação global"),
-}
 PADRAO = {"renda_fixa": {"TESOURO_SELIC": 0.5, "TESOURO_IPCA": 0.5}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4},
           "fii": {"HGLG11": 0.35, "KNRI11": 0.35, "KNCR11": 0.3}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}
 PERFIS = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},
           "moderado": {"renda_fixa": 45, "acao": 20, "fii": 15, "exterior": 15, "cambio": 5},
           "arrojado": {"renda_fixa": 25, "acao": 32, "fii": 15, "exterior": 22, "cambio": 6}}
-ETF_EXT = {"IVVB11", "NASD11", "SPXI11", "WRLD11", "ACWI11", "EURP11", "XINA11", "BNDX11", "QBTC11", "HASH11"}
-ETF_ACAO = {"BOVA11", "BOVV11", "BOVX11", "DIVO11", "SMAL11", "BRAX11", "PIBB11", "ECOO11", "NSDV11"}
-UNITS = {"TAEE11", "KLBN11", "SAPR11", "ALUP11", "SANB11", "BPAC11", "ENGI11", "TIET11", "IGTI11", "CPLE11", "AESB11"}
 TEMAS = {"juros": ("Copom Selic juros", "renda_fixa"), "inflacao": ("inflação IPCA", "renda_fixa"),
          "bolsa": ("Ibovespa bolsa de valores", "acao"), "fii": ("fundos imobiliários IFIX", "fii"),
          "exterior": ("Wall Street S&P 500 Fed", "exterior"), "cambio": ("dólar real câmbio", "cambio")}
@@ -119,7 +93,7 @@ def norm(t): return t.strip().upper().replace(" ", "_")
 
 def classe(t):
     if t in UNIVERSO: return UNIVERSO[t][0]
-    if t in RF: return "renda_fixa"
+    if t in RF or t in ETF_RF: return "renda_fixa"
     if t == "DOLAR" or t == "GOLD11": return "cambio"
     if t == "VOO" or t in ETF_EXT: return "exterior"
     if t in ETF_ACAO or t in UNITS: return "acao"
@@ -351,17 +325,18 @@ def sugestao(dec, p, alvo, stop, tem, consenso=None):
             ("VENDER", 1): "Considere reduzir ou sair", ("VENDER", 0): "Evite comprar agora"}.get((dec, int(tem)), "Manter e acompanhar")
 
 
-def market(t):  # análise de mercado, independe da sua posição (por isso pode ficar em cache)
-    return cached("m:" + t, 1800, lambda: _market(t), ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA, ttl_falha=120)
+def market(t, ia=True):  # análise de mercado, independe da sua posição (por isso pode ficar em cache)
+    ia = ia and IA_ATIVA
+    return cached(("m:" if ia else "m:r:") + t, 1800, lambda: _market(t, ia), ok=lambda v: v["fonte"] == "ia" or not ia, ttl_falha=120)
 
 
-def _market(t):
+def _market(t, ia=True):
     m = metrics(t)
     n = news(NEWSQ.get(t, t))
     regra = regras.analise_ativo(m)  # as regras sempre rodam: são a segunda opinião da IA
     dados = {"ativo": t, "nome": nome(t), "metricas": {k: v for k, v in m.items() if k != "serie"},
              "noticias": [x["titulo"] for x in n]}
-    a = ask_json(PROMPT, dados, SCH_ATIVO)
+    a = ask_json(PROMPT, dados, SCH_ATIVO) if ia else {}
     fonte = "ia" if a else "regras"
     if not a: a = regra  # sem IA (ou se ela falhar): indicadores de preço
     dec = str(a.get("decisao", "")).strip().upper()
@@ -392,18 +367,30 @@ def _market(t):
     return out
 
 
+def taxa_poupanca(selic):
+    """0,5% ao mês (+TR) com Selic acima de 8,5%; senão 70% da Selic."""
+    return round(((1.005 ** 12) - 1) * 100, 2) if selic is None or selic > 8.5 else round(selic * 0.7, 2)
+
+
 def rf(t, pos):
     r, saldo, pct = rates(), pos.saldo, pos.pct
+    juro_real = None
     if t == "TESOURO_IPCA":
         real = pct if 0 < pct < 20 else r["juro_real_longo"]
         ipca = r["ipca12"] if r["ipca12"] is not None else r["ipca_esperado"]
         taxa = round(((1 + ipca / 100) * (1 + real / 100) - 1) * 100, 2) if ipca is not None else None
         juro_real, pct = round(real, 2), real
+    elif t == "TESOURO_PREFIXADO":  # pct = taxa contratada, % ao ano
+        taxa = round(pct, 2) if 0 < pct < 40 else None
+    elif t == "POUPANCA":
+        taxa = taxa_poupanca(r["selic"])
     else:
         base = r["selic"] if t == "TESOURO_SELIC" else r["cdi"]
         taxa = round(base * pct / 100, 2) if base else None
+    if juro_real is None:
         juro_real = round(((1 + taxa / 100) / (1 + r["ipca12"] / 100) - 1) * 100, 2) if taxa and r["ipca12"] is not None else None
     return {"ticker": t, "nome": RF[t], "classe": "renda_fixa", "moeda": "BRL", "saldo": saldo, "pct": pct,
+            "isento": t in ("LCI_LCA", "POUPANCA"),
             "taxa": taxa, "juro_real": juro_real, "selic": r["selic"], "cdi": r["cdi"], "ipca12": r["ipca12"], "valor": saldo,
             "rend_ano": round(saldo * taxa / 100, 2) if taxa else None,
             "rend_mes": round(saldo * ((1 + taxa / 100) ** (1 / 12) - 1), 2) if taxa else None}
@@ -414,12 +401,15 @@ def taxa_rf(a, taxas):  # taxa nominal estimada (% a.a.) de um título de renda 
     if a == "TESOURO_IPCA":
         i = taxas["ipca_esperado"]
         return round(((1 + i / 100) * (1 + taxas["juro_real_longo"] / 100) - 1) * 100, 2) if i is not None else None
+    if a == "LCI_LCA": return round(taxas["cdi"] * 0.9, 2) if taxas["cdi"] else None
+    if a == "POUPANCA": return taxa_poupanca(taxas["selic"])
+    if a == "TESOURO_PREFIXADO": return None
     return taxas["cdi"] if a in RF else None
 
 
-def analyze(t, pos):
+def analyze(t, pos, ia=True):
     if t in RF: return rf(t, pos)
-    a = market(t)
+    a = market(t, ia)
     p, q, alvo, stop = a["metricas"]["preco"], pos.qtd or 1, a["alvo"], a["stop"]
     return {**a, "ticker": t, "nome": nome(t), "classe": classe(t), "moeda": "USD" if t == "VOO" else "BRL",
             "posicao": {"qtd": pos.qtd, "pm": pos.pm}, "base_qtd": q, "valor": round(p * pos.qtd, 2),
@@ -461,7 +451,9 @@ CENARIOS_PADRAO = [
 ]
 
 
-def panorama():
+def panorama(ia=True):
+    ia = ia and IA_ATIVA
+
     def calc():
         with ThreadPoolExecutor(8) as ex:
             fut = {k: ex.submit(news, q, 5) for k, (q, _) in TEMAS.items()}
@@ -476,16 +468,16 @@ def panorama():
             if m: mercado[rot] = {k: m[k] for k in ("ret_1m", "ret_12m", "vol_aa", "tendencia")}
         dados = {"hoje": date.today().isoformat(), "taxas": taxas, "mercado": mercado,
                  "manchetes": {k: [n["titulo"] for n in v] for k, v in noticias.items()}}
-        ia = ask_json(PROMPT_PANORAMA, dados, SCH_PANORAMA)
-        fonte = "ia" if ia else "regras"
+        ia_r = ask_json(PROMPT_PANORAMA, dados, SCH_PANORAMA) if ia else {}
+        fonte = "ia" if ia_r else "regras"
         reg = regras.panorama(taxas, mercado)  # sem IA: juro real e tendência dos índices
-        if not ia: ia = reg
+        if not ia_r: ia_r = reg
         conf = checagem.Conferencia(dados, reg, CENARIOS_PADRAO) if fonte == "ia" else None
         ok = conf.ok if conf else (lambda *_: True)
-        if not ok(str(ia.get("resumo", "")), "resumo"): ia["resumo"] = reg["resumo"]
+        if not ok(str(ia_r.get("resumo", "")), "resumo"): ia_r["resumo"] = reg["resumo"]
         classes = {}
         for c in CORE:
-            x = (ia.get("classes") or {}).get(c) or {}
+            x = (ia_r.get("classes") or {}).get(c) or {}
             if x and not ok(str(x.get("motivo", "")), "visão de " + NOME_CLASSE[c]): x = reg["classes"].get(c) or {}
             v = str(x.get("visao", "NEUTRA")).upper()
             classes[c] = {"nome": NOME_CLASSE[c], "visao": v if v in ("POSITIVA", "NEUTRA", "NEGATIVA") else "NEUTRA",
@@ -493,7 +485,7 @@ def panorama():
                           "noticias": [n for k, (_, cl) in TEMAS.items() if cl == c for n in noticias.get(k, [])][:6]}
         cen = []
         for nome_c in ("Base", "Otimista", "Pessimista"):
-            x = next((s for s in ia.get("cenarios", []) if isinstance(s, dict) and s.get("nome") == nome_c), None)
+            x = next((s for s in ia_r.get("cenarios", []) if isinstance(s, dict) and s.get("nome") == nome_c), None)
             if not x: cen = []; break
             if not ok(str(x.get("descricao", "")), "cenário " + nome_c): x = next(s for s in CENARIOS_PADRAO if s["nome"] == nome_c)
             aj = x.get("ajustes") or {}
@@ -503,13 +495,13 @@ def panorama():
             cen = [dict(s) for s in CENARIOS_PADRAO]
         tot = sum(s["prob"] for s in cen)
         for s in cen: s["prob"] = round(s["prob"] / tot * 100)
-        fatores = [str(f)[:240] for f in ia.get("fatores", [])][:5]
+        fatores = [str(f)[:240] for f in ia_r.get("fatores", [])][:5]
         fatores = [f for f in fatores if ok(f, "fatores")] or reg["fatores"]
-        return {"resumo": str(ia.get("resumo", ""))[:700], "classes": classes, "cenarios": cen,
+        return {"resumo": str(ia_r.get("resumo", ""))[:700], "classes": classes, "cenarios": cen,
                 "fatores": fatores, "taxas": taxas, "mercado": mercado,
                 "ia": fonte == "ia", "fonte": fonte, "checagem": conf.resumo() if conf else None,
                 "atualizado": time.strftime("%Y-%m-%dT%H:%M:%S")}
-    return cached("panorama", 7200, calc, ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA)
+    return cached("panorama" if ia else "panorama:r", 7200, calc, ok=lambda v: v["fonte"] == "ia" or not ia)
 
 
 # ---------------------------------------------------------------- carteira recomendada
@@ -650,6 +642,74 @@ CONTRA_PADRAO = {
 }
 
 
+PIOR_CRISE = {"conservador": -8.0, "moderado": -18.0, "arrojado": -30.0}  # perda tolerada na pior crise real (2008, 2015, 2020...)
+
+
+def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos):
+    """Testa a carteira com mais e menos risco (renda fixa x resto) em 2.000 cenários e nas crises reais e escolhe,
+    entre as que caem menos do que o perfil aceita na pior crise:
+    - com meta alcançável: a que mais vezes chega à meta (empate de até 2 p.p.: a menos arriscada);
+    - sem meta, ou com meta fora de alcance: a do perfil, reduzindo o risco só se a pior crise passar do limite."""
+    rf_ = {a: w for a, w in pesos.items() if classe(a) == "renda_fixa"}
+    risco = {a: w for a, w in pesos.items() if classe(a) != "renda_fixa"}
+    tr, tf = sum(risco.values()), sum(rf_.values())
+    if tr <= 0 or tf <= 0 or (inicial <= 0 and mensal <= 0):
+        return None
+    teto = min(100 - PERFIS[perfil_ef]["renda_fixa"] + 10, 95)  # no máximo 10 p.p. mais arriscada que o perfil
+    cands = {}
+    for d in (-30, -20, -10, 0, 10):
+        nr = min(max(tr + d, 0), teto if d > 0 else 100)
+        if d and abs(nr - tr) < 1: continue
+        cands[f"{nr:.0f}"] = {**{a: w * nr / tr for a, w in risco.items()}, **{a: w * (100 - nr) / tf for a, w in rf_.items()}}
+    anos_sim = int(min(max(round(anos or 10), 1), 30))
+    try:
+        taxas = rates()
+        macro = {"cdi": taxas["cdi"], "ipca": taxas["ipca_esperado"], "focus_selic": taxas["focus"]["selic"]}
+        posn = {norm(k): v for k, v in pos.items()}
+        ativos_ = {a: spec(a, posn.get(a)) for a in pesos}
+        out = sim.simular(cands, ativos_, macro, pan["cenarios"], "ponderado", inicial, mensal, anos_sim, meta=meta or 0)
+        crises = sim.estresse(cands, ativos_)
+    except Exception as e:
+        print("otimização da carteira falhou:", repr(e)[:200], flush=True)
+        return None
+    st_ = {k: v["stats"] for k, v in out["carteiras"].items()}
+    pior = {k: min((l["carteiras"][k]["ret"] for l in crises if k in l["carteiras"]), default=0.0) for k in st_}
+    nome_pior = {k: min(((l["carteiras"][k]["ret"], l["nome"]) for l in crises if k in l["carteiras"]), default=(0, ""))[1] for k in st_}
+    limite = PIOR_CRISE[perfil_ef]
+    ok = [k for k in st_ if pior[k] >= limite] or [min(st_, key=float)]
+    atual = f"{tr:.0f}"
+    perfil_ok = atual if atual in ok else max((k for k in ok if float(k) <= tr), key=float, default=min(ok, key=float))
+    melhor = max(ok, key=lambda k: (st_[k]["prob_meta"] or 0)) if meta else None
+    alcancavel = bool(meta and (st_[melhor]["prob_meta"] or 0) >= 5)
+    if alcancavel:
+        escolhido = min((k for k in ok if (st_[k]["prob_meta"] or 0) >= (st_[melhor]["prob_meta"] or 0) - 2), key=float)
+    else:
+        escolhido = perfil_ok
+    s_ = st_[escolhido]
+    nr = float(escolhido)
+    novos = {a: round(w, 2) for a, w in cands[escolhido].items() if w >= 0.01}
+    alvo2 = dict(alvo)
+    if abs(nr - tr) >= 1:
+        f_r, f_f = nr / tr, (100 - nr) / tf
+        alvo2 = {c: round(v * (f_f if c == "renda_fixa" else f_r), 1) for c, v in alvo.items()}
+    risco_txt = (f"na pior crise recente, {regras.minuscula_inicial(nome_pior[escolhido])}, ela teria variado "
+                 f"{regras.pct(pior[escolhido], 0, sinal=True)}, e o perfil {perfil_ef} aceita até {regras.pct(limite, 0)}")
+    if alcancavel:
+        texto = (f"Testei {len(cands)} níveis de risco em 2.000 cenários e nas crises reais: com {regras.pct(nr, 0)} fora da renda fixa, "
+                 f"a chance de chegar a {regras.brl(meta, 0)} (em valores de hoje) em {anos_sim} anos é de {regras.pct(s_['prob_meta'], 0)}, "
+                 f"a maior entre as que respeitam o seu perfil: {risco_txt}.")
+    elif meta:
+        texto = (f"Nenhum nível de risco aceitável para o seu perfil chega a {regras.brl(meta, 0)} (em valores de hoje) em {anos_sim} anos "
+                 f"com {regras.brl(mensal, 0)} por mês: a chance fica abaixo de 5%. Para chegar lá, aumente o aporte ou o prazo "
+                 f"(veja em Simular). Mantive o risco do seu perfil: {risco_txt}.")
+    else:
+        texto = f"Conferi a carteira nas crises reais: {risco_txt}."
+    return {"pesos": novos, "alvo": alvo2, "texto": texto, "escolhido": nr, "limite_pior_crise": limite, "anos": anos_sim,
+            "meta": meta or None, "alcancavel": alcancavel,
+            "candidatos": [{"risco": float(k), "prob_meta": v["prob_meta"], "pior_crise": pior[k], "mediana": v["p50"],
+                            "dentro_do_perfil": k in ok} for k, v in sorted(st_.items(), key=lambda kv: float(kv[0]))]}
+
+
 def resumo_regras(perfil_ef, alvo, obj_an):
     return (f"Carteira montada por regras para o perfil {perfil_ef}{' e o seu objetivo' if obj_an else ''}: "
             f"{regras.pct(alvo['renda_fixa'], 0)} em renda fixa e o restante dividido entre ações, FIIs, exterior e proteção, "
@@ -698,7 +758,7 @@ def explicar_novo(s, m, x, alvo, classes, pan, total):
     return {"porque": porque, "contra": str(x.get("contra", "")).strip()[:300] or contra_padrao(a, c), "fatos": fs[:10]}
 
 
-def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_ia, fonte, conf=None):
+def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_ia, fonte, conf=None, aporte=0):
     """O que fazer com cada ativo que você já tem, por quê, quanto movimentar e o IR estimado da venda."""
     ia = {norm(str(x.get("ativo", ""))): x for x in acoes_ia if isinstance(x, dict)} if fonte == "ia" else {}
     out = []
@@ -709,7 +769,7 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
         peso_alvo = pesos.get(t, 0)
         dif = peso_alvo / 100 * total - i["valor"]
         qtd = float((an.get("posicao") or {}).get("qtd") or 0)
-        pu = i["valor"] / qtd if qtd > 0 and c != "renda_fixa" else None  # preço de 1 cota hoje, em R$
+        pu = i["valor"] / qtd if qtd > 0 and t not in RF else None  # preço de 1 cota hoje, em R$
 
         def mover(acao):
             """Quanto dá para movimentar de verdade: cotas inteiras ao preço de hoje, sem vender mais do que você tem
@@ -721,7 +781,7 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
             n = round(n, 2 if t == "DOLAR" else 4) if t in FRACIONAVEIS else math.floor(n + 1e-9)
             if dif < 0: n = min(n, qtd)
             return math.copysign(n * pu, dif), n
-        acao_r, motivo_r = regras.acao_mantido({**i, "pl_pct": an.get("pl_pct")}, peso_alvo, total, i["sinal"])
+        acao_r, motivo_r = regras.acao_mantido({**i, "pl_pct": an.get("pl_pct")}, peso_alvo, total, i["sinal"], aporte)
         x = ia.get(t, {})
         acao = str(x.get("acao", "")).upper()
         coerente = (acao in VENDAS and dif < 0) or (acao == "AUMENTAR" and dif > 0) or acao == "MANTER"
@@ -763,6 +823,8 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
                                   + (f"{qtd_txt(t, cotas)} ≈ " if cotas is not None else "") + regras.brl(abs(mov)),
                                   f"{regras.brl(pu)} cada" if pu and t != "DOLAR" else ""))
         custo = regras.ir_venda(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT) if venda else None
+        dica = regras.dica_isencao(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT | ETF_RF)
+        if dica: fs.append(dica)
         porque = str(x.get("porque", "")).strip()[:600]
         if not porque:
             tend = regras.tendencia_txt(m)
@@ -793,12 +855,17 @@ def home(): return FileResponse(os.path.join(PASTA, "index.html"))
 
 
 ESTATICOS = {"sw.js": "text/javascript", "manifest.webmanifest": "application/manifest+json", "icone-192.png": "image/png",
-             "icone-512.png": "image/png", "apple-touch-icon.png": "image/png"}
+             "icone-512.png": "image/png", "apple-touch-icon.png": "image/png", "icone-monocromatico.png": "image/png",
+             "tela-celular-1.png": "image/png", "tela-celular-2.png": "image/png", "tela-celular-3.png": "image/png",
+             "tela-larga-1.png": "image/png"}
 
 
 @app.get("/{nome}")
 def estatico(nome: str):
-    """Arquivos do app instalável (PWA): service worker das notificações, manifest e ícones."""
+    """Arquivos do app instalável (PWA) e páginas públicas (privacidade, termos, exclusão de conta)."""
+    paginas_ = {"privacidade": paginas.privacidade, "termos": paginas.termos,
+                "excluir-conta": lambda: paginas.excluir_conta(GOOGLE_CLIENT_ID), "offline.html": lambda: paginas.OFFLINE}
+    if nome in paginas_: return HTMLResponse(paginas_[nome](), headers={"Cache-Control": "no-cache"})
     if nome not in ESTATICOS: raise HTTPException(404, "não encontrado")
     return FileResponse(os.path.join(PASTA, "static", nome), media_type=ESTATICOS[nome], headers={"Cache-Control": "no-cache"})
 
@@ -806,8 +873,10 @@ def estatico(nome: str):
 @app.get("/api/watchlist")
 def watchlist(req: Request, authorization: str = Header("")):
     uid = auth(req, authorization)
-    return {"tickers": WATCHLIST, "universo": {k: {"classe": v[0], "nome": v[1], "descricao": v[2]} for k, v in UNIVERSO.items()},
-            "classes": NOME_CLASSE, "perfis": PERFIS, "ia": IA_ATIVA, "usuario": usuarios.publico(uid),
+    return {"tickers": WATCHLIST, "universo": {k: {"classe": v[0], "nome": v[1], "descricao": v[2], "setor": SETOR.get(k)}
+                                               for k, v in UNIVERSO.items()},
+            "rf": RF, "classes": NOME_CLASSE, "perfis": PERFIS, "ia": IA_ATIVA, "usuario": usuarios.publico(uid),
+            "plano": planos.resumo_publico(uid), "armazenamento": armazem.diagnostico() if usuarios.eh_admin(uid) else None,
             "modelos": {"analises": MODEL, "decisoes": MODELO_DECISOES} if IA_ATIVA else None}
 
 
@@ -815,7 +884,7 @@ def watchlist(req: Request, authorization: str = Header("")):
 def analyze_ep(req: Request, r: AnReq, authorization: str = Header("")):
     uid = auth(req, authorization)
     t = norm(r.ticker)
-    try: a = analyze(t, r.pos)
+    try: a = analyze(t, r.pos, IA_ATIVA and planos.premium(uid))
     except Exception as e: raise HTTPException(502, str(e))
     if r.pos.qtd > 0 and (a.get("alvo") or a.get("stop")):
         nv = {"alvo": a.get("alvo"), "stop": a.get("stop"), "quando": time.time()}
@@ -856,7 +925,7 @@ def acertos_ep(req: Request, authorization: str = Header("")):
 @app.get("/api/outlook")
 def outlook(req: Request, authorization: str = Header("")):
     uid = auth(req, authorization)
-    try: return panorama()
+    try: return panorama(planos.premium(uid))
     except Exception as e: raise HTTPException(502, str(e))
 
 
@@ -864,17 +933,23 @@ def outlook(req: Request, authorization: str = Header("")):
 def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
     uid = auth(req, authorization)
     held = {norm(t): p for t, p in r.pos.items() if p.qtd > 0 or p.saldo > 0}
+    prem = planos.premium(uid)
+    usar_ia = IA_ATIVA and prem  # a IA (que custa por uso) é do plano Premium
+    cortados = []
+    if not prem and len(held) > planos.GRATIS["ativos"]:  # plano grátis: só os primeiros ativos entram na análise
+        cortados = list(held)[planos.GRATIS["ativos"]:]
+        held = dict(list(held.items())[:planos.GRATIS["ativos"]])
     perfil_ef = r.perfil if r.perfil in PERFIS else "moderado"
     objetivo = " ".join(r.objetivo.split())[:600]
     orc = orcamento(uid)
-    key = ("p:" + json.dumps({t: p.model_dump() for t, p in sorted(held.items())}) + r.perfil[:30] + "|" + objetivo +
+    key = (f"p:{int(usar_ia)}:" + json.dumps({t: p.model_dump() for t, p in sorted(held.items())}) + r.perfil[:30] + "|" + objetivo +
            f"|{orc['contas_mensais']}|{orc['reserva_meses']}|{orc['renda_mensal']}")
 
     def calc():
         with ThreadPoolExecutor(8) as ex:
-            f_pan, f_univ = ex.submit(panorama), ex.submit(universo)
+            f_pan, f_univ = ex.submit(panorama, usar_ia), ex.submit(universo)
             def seguro(tp):
-                try: return analyze(*tp)
+                try: return analyze(*tp, usar_ia)
                 except Exception: return None
             analises = {t: a for t, a in zip(held, ex.map(seguro, held.items())) if a}
             pan, univ = f_pan.result(), f_univ.result()
@@ -924,10 +999,11 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
             "ativos_permitidos": lista}
         ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else "") + (PROMPT_ORCAMENTO if tem_orc else ""), dados, schema,
-                      effort=EFFORT_DECISOES, model=MODELO_DECISOES, max_tokens=32000)
+                      effort=EFFORT_DECISOES, model=MODELO_DECISOES, max_tokens=32000) if usar_ia else {}
         atual = {i["ticker"]: i["valor"] for i in itens}
         sinais = {i["ticker"]: i["sinal"] for i in itens}
         fonte = "ia" if ia.get("carteira") else "regras"
+        otimizacao = None
         if fonte == "ia":
             alvo, pesos, motivos, origem = montar_carteira(ia, perfil_ef, atual, sinais, bool(objetivo))
             obj_an, alvo_motivo, resumo = (ler_objetivo(ia.get("objetivo_analise")) if objetivo else None), str(ia.get("alvo_motivo", ""))[:400], str(ia.get("resumo", ""))[:600]
@@ -942,9 +1018,19 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                 mm = an.get("metricas") or {}
                 cand.setdefault(t, {"classe": an["classe"], "nome": an.get("nome", t), "descricao": "",
                                     "m": {"tendencia": (regras.tendencia_txt(mm) or "").split(":")[0] or None, "ret_12m": mm.get("ret_12m"),
-                                          "vol_aa": mm.get("volatilidade_anual"), "dy_12m": mm.get("dividend_yield_12m")} if mm else None})
-            pesos, motivos = regras.escolher_ativos(alvo, cand, atual, sinais, (obj_an or {}).get("liquidez"), ETF_ACAO | ETF_EXT)
+                                          "vol_aa": mm.get("volatilidade_anual"), "dy_12m": mm.get("dividend_yield_12m"),
+                                          "queda_max_12m": mm.get("queda_max_12m")} if mm else None})
+            pesos, motivos = regras.escolher_ativos(alvo, cand, atual, sinais, (obj_an or {}).get("liquidez"), ETF_ACAO | ETF_EXT | ETF_RF,
+                                                    taxas.get("cdi") or 10.0, SETOR)
             origem, textos = {}, {}
+            # alocação pela meta: testa versões mais e menos arriscadas em 2.000 cenários e fica com a melhor dentro do risco aceito
+            meta_p = ((obj_an or {}).get("metas") or [{}])[0]
+            aporte_p = (obj_an or {}).get("aporte_mensal") or max(orc.get("sobra") or 0, 0)
+            otimizacao = otimizar_risco(pesos, alvo, perfil_ef, meta_p.get("valor_alvo") or 0, meta_p.get("prazo_anos") or 0,
+                                        total, aporte_p, pan, r.pos)
+            if otimizacao:
+                pesos, alvo = otimizacao.pop("pesos"), otimizacao.pop("alvo")
+                alvo_motivo += " " + otimizacao["texto"]
             if obj_an: obj_an["influencia"] = alvo_motivo
             resumo = resumo_regras(perfil_ef, alvo, obj_an)
         reserva_ativo = garantir_reserva(pesos, motivos, alvo, atual, orc, total)
@@ -987,7 +1073,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                              "tendencia": m.get("tendencia"), "serie": m.get("serie"),
                              "taxa_aa": an.get("taxa") or taxa_rf(a, taxas),
                              "valor_atual": atual.get(a, 0), "novo": a not in atual,
-                             "fracionavel": a in RF or a in FRACIONAVEIS})
+                             "fracionavel": a in RF or a in FRACIONAVEIS, "setor": SETOR.get(a)})
             x = textos.get(a, {})
             sugerida[-1].update(explicar_novo(sugerida[-1], m or (an.get("metricas") or {}), x, alvo, classes, pan, total))
         if reserva_ativo:  # o ativo da reserva mostra quanto dela já existe
@@ -995,7 +1081,8 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             s_r["motivo"] = motivos[reserva_ativo]
             s_r["fatos"].insert(0, regras.fato("Reserva de emergência", f"{regras.brl(reserva_atual, 0)} de {regras.brl(orc['reserva_alvo'], 0)}",
                                                f"{orc['reserva_meses']} meses de contas de {regras.brl(orc['contas_mensais'], 0)}"))
-        acoes = explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, ia.get("acoes", []), fonte, conf)
+        aporte_m = ((obj_an or {}).get("aporte_mensal") or max(orc.get("sobra") or 0, 0))
+        acoes = explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, ia.get("acoes", []), fonte, conf, aporte_m)
         falta_reserva = max(orc["reserva_alvo"] - reserva_atual, 0)
         alertas = []
         if orc["renda_mensal"] and orc["contas_mensais"] > orc["renda_mensal"]:
@@ -1005,7 +1092,10 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             cobre = round(reserva_atual / orc["contas_mensais"], 1) if orc["contas_mensais"] else 0
             alertas.append(f"Sua reserva de emergência cobre {regras.br(cobre, 1)} {'mês' if 0 < cobre < 2 else 'meses'} das suas contas; o ideal são "
                            f"{orc['reserva_meses']}. Faltam {regras.brl(falta_reserva, 0)}: complete-a antes de investir em ativos de risco.")
-        alertas += [f"{i['ticker']} representa {i['pct']:.1f}% da carteira (concentração alta)".replace(".", ",") for i in itens if i["pct"] > 30 and len(itens) > 1]
+        # concentração só preocupa em papel individual (ação ou FII); título público e ETF amplo já são diversificados
+        alertas += [f"{i['ticker']} representa {regras.pct(i['pct'])} da carteira (concentração alta em uma única empresa ou fundo)"
+                    for i in itens if i["pct"] > 25 and len(itens) > 1 and i["classe"] in ("acao", "fii")
+                    and i["ticker"] not in ETF_ACAO | ETF_EXT | ETF_RF]
         alertas += [f"Não consegui cotar {t} agora; ele ficou fora das contas." for t in falhou]
         return {"vazio": not held, "total": round(total, 2), "pl": round(sum(i["pl"] for i in itens), 2),
                 "classes": classes, "ativos": sorted(itens, key=lambda i: -i["valor"]),
@@ -1013,21 +1103,38 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                 "alvo": alvo, "alvo_perfil": PERFIS[perfil_ef], "alvo_motivo": alvo_motivo,
                 "sugerida": sugerida, "acoes": acoes, "resumo": resumo,
                 "alertas": (alertas + ia_alertas)[:4],
-                "ia": fonte == "ia", "fonte": fonte, "ia_configurada": IA_ATIVA, "classes_padrao": list(origem), "usd": usd,
+                "ia": fonte == "ia", "fonte": fonte, "ia_configurada": usar_ia, "classes_padrao": list(origem), "usd": usd,
                 "modelo": MODELO_DECISOES if fonte == "ia" else None, "checagem": conf.resumo() if conf else None,
+                "otimizacao": otimizacao,
                 "objetivo": objetivo, "objetivo_analise": obj_an,
                 "orcamento": {**orc, "reserva_atual": reserva_atual, "reserva_falta": round(falta_reserva, 2),
                               "meses_cobertos": round(reserva_atual / orc["contas_mensais"], 1) if orc["contas_mensais"] else None,
                               "reserva_ativo": reserva_ativo}}
     try:
-        res = cached(key, 1800, calc, ok=lambda v: v["fonte"] == "ia" or not IA_ATIVA)
+        res = cached(key, 1800, calc, ok=lambda v: v["fonte"] == "ia" or not usar_ia)
     except Exception as e:
         raise HTTPException(502, str(e))
     # guarda a carteira recomendada da pessoa: usada nos avisos de rebalanceamento e de bons momentos de compra
     pesos_alvo = {s["ticker"]: s["peso"] for s in res["sugerida"]}
     avisos.atualizar("niveis", uid, {"ativos": {}}, lambda d: d.update(alvo=res["alvo"], pesos=pesos_alvo,
                                                                       recomendados=[t for t in pesos_alvo if t not in held]))
-    return res
+    if prem:
+        return {**res, "premium": True}
+    return visao_gratis(res, cortados)
+
+
+def visao_gratis(res, cortados):
+    """Plano grátis: a carteira recomendada aparece, mas o quanto vender e comprar de cada ativo é do Premium."""
+    r = copy.deepcopy(res)
+    for d in r["acoes"]:
+        if d["acao"] != "MANTER":
+            d.update(cotas=None, preco_cota=None, valor=0, custo=None, bloqueado=True)
+            d["fatos"] = [f for f in d["fatos"] if f["rotulo"] != "Para chegar ao recomendado"]
+    if cortados:
+        r["alertas"] = [f"Plano grátis: só {planos.GRATIS['ativos']} ativos entram na análise. Ficaram de fora: "
+                        f"{', '.join(cortados[:6])}{'…' if len(cortados) > 6 else ''}. Assine o Premium para analisar todos."] + r["alertas"]
+    r["premium"] = False
+    return r
 
 
 def spec(a, p):
@@ -1036,7 +1143,11 @@ def spec(a, p):
     if a == "TESOURO_IPCA":
         return {"classe": c, "tipo": "ipca", "real": p.pct if p and 0 < p.pct < 20 else rates()["juro_real_longo"]}
     if a in RF:
-        return {"classe": c, "tipo": "pos", "fator": min(max((p.pct if p and p.pct else 100) / 100, 0), 2)}
+        cdi = rates()["cdi"] or 10.0
+        if a == "TESOURO_PREFIXADO": fator = (p.pct if p and 0 < p.pct < 40 else cdi) / cdi
+        elif a == "POUPANCA": fator = taxa_poupanca(rates()["selic"]) / cdi
+        else: fator = (p.pct if p and p.pct and not (a == "LCI_LCA" and p.pct == 100 and not p.saldo) else (90 if a == "LCI_LCA" else 100)) / 100
+        return {"classe": c, "tipo": "pos", "fator": min(max(fator, 0), 2)}
     return {"classe": c, "tipo": "mercado"}
 
 
@@ -1051,21 +1162,23 @@ def simulate(req: Request, r: SimReq, authorization: str = Header("")):
         p = {norm(a): float(w) for a, w in pesos.items() if OKT.match(norm(a)) and w and w > 0}
         if p: carts[nm[:20]] = dict(list(p.items())[:30])
     if not carts: raise HTTPException(400, "nenhuma carteira para simular")
-    anos = min(max(int(r.anos), 1), 30)
+    prem = planos.premium(uid)
+    anos = min(max(int(r.anos), 1), 30 if prem else planos.GRATIS["sim_anos"])
     inicial, mensal = min(max(r.inicial, 0), 1e10), min(max(r.mensal, 0), 1e9)
-    meta = min(max(r.meta, 0), 1e10)
+    meta = min(max(r.meta, 0), 1e10) if prem else 0
     pos = {norm(k): v for k, v in r.pos.items()}
     ativos = {a: spec(a, pos.get(a)) for c in carts.values() for a in c}
-    key = "s:" + hashlib.sha256(json.dumps([carts, ativos, inicial, mensal, anos, r.cenario, meta], sort_keys=True).encode()).hexdigest()
+    key = f"s:{int(prem)}:" + hashlib.sha256(json.dumps([carts, ativos, inicial, mensal, anos, r.cenario, meta], sort_keys=True).encode()).hexdigest()
 
     def calc():
-        pan, taxas = panorama(), rates()
+        pan, taxas = panorama(prem), rates()
         macro = {"cdi": taxas["cdi"], "ipca": taxas["ipca_esperado"], "focus_selic": taxas["focus"]["selic"]}
         out = sim.simular(carts, ativos, macro, pan["cenarios"], r.cenario, inicial, mensal, anos, meta=meta)
         try: out["estresse"] = sim.estresse(carts, ativos)
         except Exception: out["estresse"] = []
         out["cenarios"] = [{k: s[k] for k in ("nome", "prob", "descricao", "ajustes")} for s in pan["cenarios"]]
         out["cenario"] = r.cenario
+        out["limite_anos"] = None if prem else planos.GRATIS["sim_anos"]
         out["nomes"] = {a: nome(a) for a in ativos}
         return out
     try:
@@ -1174,7 +1287,7 @@ def limpar_conta(r, cid=None, anterior=None):
             "pagamentos": (anterior or {}).get("pagamentos", {})}
 
 
-LIQUIDOS = ("TESOURO_SELIC", "CDB_CDI", "PORQUINHO")  # renda fixa que dá para resgatar em 1 dia: onde fica a reserva
+LIQUIDOS = ("TESOURO_SELIC", "CDB_CDI", "PORQUINHO", "POUPANCA")  # renda fixa que dá para resgatar em 1 dia: onde fica a reserva
 FIN_PADRAO = {"renda_mensal": 0, "dia_renda": 0, "reserva_meses": 6, "separar_contas": False, "renda_origem": ""}
 
 
@@ -1251,6 +1364,8 @@ def contas_listar(req: Request, authorization: str = Header("")):
 def contas_criar(req: Request, r: list[ContaReq], authorization: str = Header("")):
     uid = auth(req, authorization)
     novas = [limpar_conta(c) for c in r[:30]]
+    if not planos.premium(uid) and len(itens_contas(uid)) + len(novas) > planos.GRATIS["contas"]:
+        raise HTTPException(402, f"No plano grátis dá para cadastrar até {planos.GRATIS['contas']} contas. Assine o Premium para cadastrar todas.")
     d = avisos.atualizar("contas", uid, {"itens": []}, lambda d: d.update(itens=(d["itens"] + novas)[:200]))
     return {"itens": d["itens"]}
 
@@ -1310,7 +1425,9 @@ TIPOS_ARQUIVO = {b"%PDF": "application/pdf", b"\x89PNG": "image/png", b"\xff\xd8
 @app.post("/api/contas/ler-arquivo")
 async def contas_ler_arquivo(req: Request, arquivo: UploadFile = File(...), authorization: str = Header("")):
     """Lê um boleto ou fatura em PDF (sem IA, pelo texto) ou em foto/PDF escaneado (com IA)."""
-    auth(req, authorization)
+    uid = auth(req, authorization)
+    if not planos.premium(uid):
+        raise HTTPException(402, "Ler boletos e faturas em PDF ou foto é do Premium. No grátis, digite ou cole o código de barras.")
     conteudo = await arquivo.read(8 * 1024 * 1024 + 1)
     if len(conteudo) > 8 * 1024 * 1024: raise HTTPException(413, "Arquivo maior que 8 MB.")
     mime = next((m for k, m in TIPOS_ARQUIVO.items() if conteudo.startswith(k)), None)
@@ -1345,6 +1462,8 @@ async def contas_ler_arquivo(req: Request, arquivo: UploadFile = File(...), auth
 async def contas_extrato(req: Request, arquivo: UploadFile = File(...), authorization: str = Header("")):
     """Lê um extrato (OFX ou CSV) e sugere as contas que se repetem todo mês."""
     uid = auth(req, authorization)
+    if not planos.premium(uid):
+        raise HTTPException(402, "Importar o extrato do banco é do Premium.")
     conteudo = await arquivo.read(5 * 1024 * 1024 + 1)
     if len(conteudo) > 5 * 1024 * 1024: raise HTTPException(413, "Extrato maior que 5 MB.")
     try:
@@ -1397,11 +1516,13 @@ def verificar_avisos(uid):
 def _verificar(uid):
     cfg, est = avisos.config(uid), avisos.estado(uid)
     est.setdefault("sinal", {}); est.setdefault("enviados", {}); est.setdefault("pendente", {})
+    prem = planos.premium(uid)
     pos = (((armazem.ler("carteira", uid) or {}).get("dados")) or {}).get("pos") or {}
     niv = ((armazem.ler("niveis", uid) or {}).get("dados")) or {}
     held = {t: p for t, p in pos.items() if (p.get("qtd") or 0) > 0 and t not in RF}
     recomendados = [t for t in niv.get("recomendados", []) if t not in RF and t not in held]
     tickers = set(held) | (set(recomendados) if cfg["recomendados"] else set()) | {a["ticker"] for a in cfg["precos"] if a.get("ativo")}
+    if not prem: tickers = set()  # plano grátis: só avisos de vencimento das contas
     novos, br = [], regras.br
     rot = lambda t: "Dólar" if t == "DOLAR" else t
 
@@ -1436,7 +1557,7 @@ def _verificar(uid):
             if IA_ATIVA:
                 concordam = None
                 if time.time() - pend[t]["checado"] >= 6 * 3600:
-                    try: a = market(t)
+                    try: a = market(t, True)
                     except Exception: a = None
                     if a and a.get("fonte") == "ia":
                         pend[t].update(checado=time.time(), ia=a["decisao"])
@@ -1468,7 +1589,7 @@ def _verificar(uid):
             avisar(f"preco:{a['id']}", "preco", f"{rot(a['ticker'])} chegou a {moeda} {br(p)}",
                    f"Seu alerta: preço {'abaixo' if a['condicao'] == 'abaixo' else 'acima'} de {moeda} {br(a['valor'])}.", "ativos")
             disparados.append(a["id"])
-    if cfg["rebalancear"] and niv.get("alvo") and held and all(t in precos for t in held):
+    if prem and cfg["rebalancear"] and niv.get("alvo") and held and all(t in precos for t in held):
         valores, usd = {}, None
         for t, pp in pos.items():
             if t in RF: v = pp.get("saldo") or 0
@@ -1581,6 +1702,8 @@ def avisos_config(req: Request, r: AvisosCfgReq, authorization: str = Header("")
 @app.post("/api/avisos/preco")
 def avisos_preco(req: Request, r: PrecoReq, authorization: str = Header("")):
     uid = auth(req, authorization)
+    if not planos.premium(uid):
+        raise HTTPException(402, "Alertas de preço são do Premium.")
     t = norm(r.ticker)
     if not OKT.match(t) or t in RF: raise HTTPException(400, "Código inválido para alerta de preço.")
     if r.condicao not in ("abaixo", "acima") or not (0 < r.valor < 1e7): raise HTTPException(400, "Alerta inválido.")
@@ -1635,6 +1758,24 @@ class CadastroReq(BaseModel):
     email: str = ""
     senha: str = ""
     convite: str = ""
+    uid_anterior: str = ""  # id que o aparelho guardava, para recuperar a conta se o servidor perdeu os dados
+
+
+class GoogleReq(BaseModel):
+    credencial: str
+    convite: str = ""
+    uid_anterior: str = ""
+    somente_entrar: bool = False
+
+
+class EsqueciReq(BaseModel):
+    email: str = ""
+
+
+class RedefinirReq(BaseModel):
+    email: str = ""
+    codigo: str = ""
+    senha: str = ""
 
 
 class LoginReq(BaseModel):
@@ -1650,18 +1791,103 @@ class SenhaReq(BaseModel):
 @app.get("/api/conta/config")
 def conta_config():
     """O que a tela de entrada precisa saber antes do login."""
-    return {"exige_convite": bool(usuarios.convite()), "ia": IA_ATIVA}
+    return {"exige_convite": bool(usuarios.convite()), "ia": IA_ATIVA, "google_client_id": GOOGLE_CLIENT_ID or None,
+            "recuperacao": smtp_configurado(), "app": APP_NOME, "versao": VERSAO, "teste_dias": planos.teste_dias(),
+            "assinatura": planos.ligado()}
 
 
 @app.post("/api/conta/cadastrar")
 def conta_cadastrar(req: Request, r: CadastroReq):
     limitar(req)
     try:
-        uid = usuarios.cadastrar(r.nome, r.email, r.senha, r.convite)
+        uid = usuarios.cadastrar(r.nome, r.email, r.senha, r.convite, r.uid_anterior)
     except usuarios.ConviteInvalido as e:
         falhou(req)
         raise HTTPException(400, str(e))
     except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid)}
+
+
+def verificar_google(credencial):
+    """Confere a assinatura, o emissor, a validade e o destinatário do ID token do Google. Devolve os dados da pessoa."""
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as greq
+    ids = [x.strip() for x in GOOGLE_CLIENT_ID.split(",") if x.strip()]
+    return id_token.verify_oauth2_token(credencial, greq.Request(), audience=ids if len(ids) > 1 else ids[0], clock_skew_in_seconds=10)
+
+
+@app.post("/api/conta/google")
+def conta_google(req: Request, r: GoogleReq):
+    limitar(req)
+    if not GOOGLE_CLIENT_ID: raise HTTPException(404, "Login com o Google não está configurado neste servidor.")
+    try:
+        info = verificar_google(r.credencial)
+    except Exception as e:
+        falhou(req)
+        print("login com Google recusado:", repr(e)[:200], flush=True)
+        raise HTTPException(401, "Não consegui confirmar o login com o Google. Tente de novo.")
+    if r.somente_entrar:
+        g = armazem.ler("google", str(info.get("sub")))
+        idx = armazem.ler("email", usuarios.normalizar_email(info.get("email")))
+        uid = (g or idx or {}).get("dados", {}).get("uid")
+        if not uid or not armazem.ler("usuario", uid): raise HTTPException(404, "Não há conta do app para este Google.")
+        return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid), "nova": False}
+    try:
+        uid, nova = usuarios.entrar_google(info, r.convite, r.uid_anterior)
+    except usuarios.ConviteInvalido as e:
+        raise HTTPException(403, {"precisa_convite": True, "msg": str(e) if r.convite else "Para criar a conta, informe o código de convite."})
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid), "nova": nova}
+
+
+def smtp_configurado():
+    return bool(os.getenv("SMTP_HOST") and (os.getenv("SMTP_REMETENTE") or os.getenv("SMTP_USUARIO")))
+
+
+def enviar_email(para, assunto, texto):
+    msg = EmailMessage()
+    msg["From"] = os.getenv("SMTP_REMETENTE") or os.getenv("SMTP_USUARIO")
+    msg["To"], msg["Subject"] = para, assunto
+    msg.set_content(texto)
+    host, porta = os.getenv("SMTP_HOST"), int(os.getenv("SMTP_PORTA", "587"))
+    ctx = ssl.create_default_context()
+    with (smtplib.SMTP_SSL(host, porta, context=ctx, timeout=20) if porta == 465 else smtplib.SMTP(host, porta, timeout=20)) as srv:
+        if porta != 465: srv.starttls(context=ctx)
+        if os.getenv("SMTP_USUARIO"): srv.login(os.getenv("SMTP_USUARIO"), os.getenv("SMTP_SENHA", ""))
+        srv.send_message(msg)
+
+
+@app.post("/api/conta/esqueci")
+def conta_esqueci(req: Request, r: EsqueciReq):
+    """Envia um código de 6 dígitos para o e-mail. Responde igual exista ou não a conta (não revela quem tem conta)."""
+    limitar(req)
+    if not smtp_configurado():
+        raise HTTPException(503, "A recuperação por e-mail não está configurada neste servidor."
+                                 + (" Se a conta usa este e-mail no Google, entre com o Google." if GOOGLE_CLIENT_ID else
+                                    " Fale com quem administra o app."))
+    falhou(req)  # conta como tentativa: limita pedidos em sequência
+    r_ = usuarios.pedir_codigo(r.email)
+    if r_:
+        codigo, nome_ = r_
+        try:
+            enviar_email(usuarios.normalizar_email(r.email), f"{APP_NOME}: código para criar uma nova senha",
+                         f"Olá, {nome_}.\n\nSeu código para criar uma nova senha no {APP_NOME} é: {codigo}\n\n"
+                         "Ele vale por 30 minutos. Se você não pediu, ignore este e-mail: sua senha continua a mesma.")
+        except Exception as e:
+            print("falha ao enviar e-mail de recuperação:", repr(e)[:200], flush=True)
+            raise HTTPException(502, "Não consegui enviar o e-mail agora. Tente de novo em alguns minutos.")
+    return {"ok": True}
+
+
+@app.post("/api/conta/redefinir")
+def conta_redefinir(req: Request, r: RedefinirReq):
+    limitar(req)
+    try:
+        uid = usuarios.redefinir_senha(r.email, r.codigo, r.senha)
+    except ValueError as e:
+        falhou(req)
         raise HTTPException(400, str(e))
     return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid)}
 
@@ -1702,8 +1928,8 @@ def conta_senha(req: Request, r: SenhaReq, authorization: str = Header("")):
 def conta_excluir(req: Request, r: LoginReq, authorization: str = Header("")):
     """Exclui a conta e todos os dados dela. Pede a senha de novo para evitar exclusão acidental."""
     uid = auth(req, authorization)
-    if usuarios.entrar(usuarios.publico(uid)["email"], r.senha) != uid:
-        raise HTTPException(400, "Senha incorreta.")
+    if not usuarios.confirmar_exclusao(uid, r.senha):
+        raise HTTPException(400, "Senha incorreta." if usuarios.publico(uid)["tem_senha"] else "Digite EXCLUIR para confirmar.")
     usuarios.excluir(uid)
     return {"ok": True}
 
@@ -1711,3 +1937,177 @@ def conta_excluir(req: Request, r: LoginReq, authorization: str = Header("")):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+
+
+# ---------------------------------------------------------------- planos e assinatura
+
+class CodigoPromoReq(BaseModel):
+    codigo: str = ""
+
+
+class PlayReq(BaseModel):
+    token: str = ""
+
+
+class AssinarReq(BaseModel):
+    periodo: str = "mensal"
+
+
+@app.get("/api/plano")
+def plano_ver(req: Request, conferir: bool = False, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if conferir: planos.conferir_mp(uid)
+    return planos.resumo_publico(uid)
+
+
+@app.post("/api/plano/codigo")
+def plano_codigo(req: Request, r: CodigoPromoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    limitar(req)
+    try:
+        planos.resgatar_codigo(uid, r.codigo)
+    except ValueError as e:
+        falhou(req)
+        raise HTTPException(400, str(e))
+    return planos.resumo_publico(uid)
+
+
+@app.post("/api/assinatura/google")
+def assinatura_google(req: Request, r: PlayReq, authorization: str = Header("")):
+    """Recebe o token da compra feita pelo Google Play (Digital Goods API) e confere direto com a Google."""
+    uid = auth(req, authorization)
+    try:
+        planos.verificar_play(uid, r.token)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        print("falha ao verificar compra no Google Play:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui confirmar a compra com o Google Play agora. Ela será conferida de novo em seguida.")
+    return planos.resumo_publico(uid)
+
+
+@app.post("/api/assinatura/google/notificacao")
+async def assinatura_google_notificacao(req: Request, chave: str = ""):
+    """Notificações em tempo real do Google Play (Pub/Sub, assinatura push com ?chave=RTDN_CHAVE)."""
+    esperado = os.getenv("RTDN_CHAVE", "")
+    if not esperado or not hmac.compare_digest(chave.encode(), esperado.encode()): raise HTTPException(403, "chave inválida")
+    try: planos.notificacao_play(await req.json())
+    except Exception as e: print("falha na notificação do Google Play:", repr(e)[:300], flush=True)
+    return {"ok": True}
+
+
+@app.post("/api/assinatura/mercadopago")
+def assinatura_mp(req: Request, r: AssinarReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    base = os.getenv("APP_URL", "").rstrip("/") or str(req.base_url).rstrip("/")
+    try:
+        url = planos.criar_assinatura_mp(uid, r.periodo, base + "/?assinatura=mercadopago")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        print("falha ao criar assinatura no Mercado Pago:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui abrir o pagamento agora. Tente de novo em alguns minutos.")
+    return {"url": url}
+
+
+@app.post("/api/assinatura/mercadopago/notificacao")
+async def assinatura_mp_notificacao(req: Request):
+    """Aviso do Mercado Pago. Só serve de gatilho: o estado da assinatura é sempre consultado na API do Mercado Pago."""
+    q = dict(req.query_params)
+    try: corpo = await req.json()
+    except Exception: corpo = {}
+    tipo = corpo.get("type") or q.get("type") or q.get("topic") or ""
+    pid = (corpo.get("data") or {}).get("id") or q.get("data.id") or q.get("id")
+    if pid and "preapproval" in tipo and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", str(pid)):
+        try: planos.atualizar_mp(str(pid))
+        except Exception as e: print("falha ao atualizar assinatura do Mercado Pago:", repr(e)[:300], flush=True)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- teste de perfil e objetivos
+
+class TesteReq(BaseModel):
+    respostas: dict = {}
+
+
+@app.get("/api/perfil/perguntas")
+def perfil_perguntas():
+    return {"perguntas": teste_perfil.PERGUNTAS}
+
+
+@app.get("/api/perfil/teste")
+def perfil_teste_ver(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    d = armazem.ler("perfil_teste", uid)
+    return d["dados"] if d else None
+
+
+@app.post("/api/perfil/teste")
+def perfil_teste(req: Request, r: TesteReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    res = teste_perfil.avaliar(r.respostas)
+    armazem.gravar("perfil_teste", uid, {**res, "quando": time.time()})
+    if res["renda"]:  # a renda informada no teste vai para o orçamento
+        avisos.atualizar("financas", uid, dict(FIN_PADRAO), lambda d: d.update(renda_mensal=res["renda"], renda_origem="teste"))
+    return res
+
+
+# ---------------------------------------------------------------- administração (ADMIN_EMAILS)
+
+def admin(req, authorization):
+    uid = auth(req, authorization)
+    if not usuarios.eh_admin(uid): raise HTTPException(403, "Só para administradores (ADMIN_EMAILS).")
+    return uid
+
+
+@app.get("/api/admin/resumo")
+def admin_resumo(req: Request, authorization: str = Header("")):
+    admin(req, authorization)
+    us = armazem.listar("usuario")
+    agora = time.time()
+    prem = sum(1 for uid, _ in us if planos.estado(uid)["plano"] == "premium")
+    return {"usuarios": len(us), "premium": prem, "novos_7_dias": sum(1 for _, d in us if agora - (d.get("criado") or 0) < 7 * 86400),
+            "armazenamento": armazem.diagnostico(), "ia": IA_ATIVA, "versao": VERSAO}
+
+
+@app.get("/api/admin/exportar")
+def admin_exportar(req: Request, authorization: str = Header("")):
+    """Baixa todos os dados (JSON Lines) para levar a outro servidor. Contém dados pessoais: guarde com cuidado."""
+    admin(req, authorization)
+    return StreamingResponse(armazem.exportar_linhas(), media_type="application/x-ndjson",
+                             headers={"Content-Disposition": f'attachment; filename="backup-{date.today()}.jsonl"'})
+
+
+@app.post("/api/admin/importar")
+async def admin_importar(req: Request, arquivo: UploadFile = File(...), sobrescrever: bool = False, authorization: str = Header("")):
+    admin(req, authorization)
+    conteudo = (await arquivo.read(200 * 1024 * 1024)).decode("utf-8")
+    try:
+        g, p = armazem.importar_linhas(conteudo.splitlines(), sobrescrever)
+    except Exception as e:
+        raise HTTPException(400, f"Arquivo inválido: {e}")
+    return {"importados": g, "mantidos": p}
+
+
+# ---------------------------------------------------------------- saúde, app Android (TWA) e páginas públicas
+
+@app.get("/api/saude")
+def saude():
+    d = armazem.diagnostico()
+    return {"ok": True, "versao": VERSAO, "armazenamento": d["modo"], "persistente": d["persistente"], "ia": IA_ATIVA}
+
+
+@app.get("/.well-known/assetlinks.json")
+def assetlinks():
+    """Prova para o Android de que o app da Play Store e este site são do mesmo dono (some a barra do navegador)."""
+    pacote = os.getenv("ANDROID_PACKAGE", "")
+    digitais = [x.strip() for x in os.getenv("ANDROID_SHA256", "").split(",") if x.strip()]
+    if not pacote or not digitais: return JSONResponse([])
+    return JSONResponse([{"relation": ["delegate_permission/common.handle_all_urls"],
+                          "target": {"namespace": "android_app", "package_name": pacote, "sha256_cert_fingerprints": digitais}}])
+
+
+@app.on_event("startup")
+def avisar_armazenamento():
+    d = armazem.diagnostico()
+    print(("ARMAZENAMENTO OK: " if d["persistente"] else "ATENÇÃO, DADOS EM RISCO: ") + d["motivo"], flush=True)

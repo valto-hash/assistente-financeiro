@@ -1,0 +1,42 @@
+# App completo num servidor seu (VPS, computador em casa, Oracle Cloud grátis...): app + PostgreSQL + HTTPS automático.
+#   1. Aponte o DNS do seu domínio para o IP do servidor.
+#   2. Copie .env.example para .env e preencha (DOMINIO, POSTGRES_SENHA e o resto).
+#   3. docker compose up -d --build
+# Os dados ficam no volume "banco" e sobrevivem a atualizações (docker compose up -d --build de novo).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://app:${POSTGRES_SENHA:?defina POSTGRES_SENHA no .env}@banco:5432/app
+      APP_URL: https://${DOMINIO:?defina DOMINIO no .env}
+    depends_on:
+      banco:
+        condition: service_healthy
+  banco:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_SENHA}
+      POSTGRES_DB: app
+    volumes:
+      - banco:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      retries: 10
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMINIO: ${DOMINIO}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificados:/data
+    depends_on: [app]
+volumes:
+  banco:
+  certificados:
