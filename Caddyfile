@@ -1,0 +1,6 @@
+# Caddy pede e renova o certificado HTTPS sozinho (Let's Encrypt). HTTPS é obrigatório para o app Android,
+# o login com o Google, as notificações e a instalação como app.
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy app:8000
+}

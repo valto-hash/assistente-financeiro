@@ -8,23 +8,54 @@ Dois modos, escolhidos por variáveis de ambiente:
 
 A versão permite gravação otimista: quem grava informa a versão em que se baseou; se outro aparelho gravou antes,
 a gravação é recusada (conflito) em vez de sobrescrever em silêncio.
+
+Para mudar de servidor sem perder nada:  python armazem.py exportar backup.jsonl  (no servidor antigo)
+                                         python armazem.py importar backup.jsonl  (no novo, com as mesmas variáveis)
 """
-import hashlib, json, os, re, tempfile, threading
+import hashlib, json, os, re, sys, tempfile, threading
 from datetime import datetime, timezone
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 DATA_DIR = os.getenv("DATA_DIR", "")
 _lock = threading.RLock()
 _criada = False
+_pool = None
 
 
 def modo():
     return "banco" if DATABASE_URL else "arquivo"
 
 
+def _num_volume(caminho):
+    """True se a pasta está num disco montado à parte (volume), e não no disco do próprio contêiner."""
+    p = os.path.abspath(caminho)
+    while True:
+        if os.path.ismount(p):
+            return p != "/"
+        pai = os.path.dirname(p)
+        if pai == p:
+            return False
+        p = pai
+
+
+def diagnostico():
+    """Os dados sobrevivem a um novo deploy (atualização do app)? Devolve {"modo", "persistente", "motivo"}."""
+    if DATABASE_URL:
+        return {"modo": "banco", "persistente": True, "motivo": "Os dados ficam no banco PostgreSQL (DATABASE_URL)."}
+    pasta = os.path.abspath(_pasta())
+    if DATA_DIR and _num_volume(pasta):
+        return {"modo": "arquivo", "persistente": True, "motivo": f"Os dados ficam em {pasta}, num disco persistente."}
+    hospedagem = any(os.getenv(v) for v in ("RENDER", "K_SERVICE", "FLY_APP_NAME", "RAILWAY_ENVIRONMENT", "DYNO")) \
+        or os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+    if not hospedagem:
+        return {"modo": "arquivo", "persistente": True, "motivo": f"Os dados ficam em {pasta}, no disco deste computador."}
+    return {"modo": "arquivo", "persistente": False,
+            "motivo": f"Os dados ficam em {pasta}, no disco temporário do servidor: são APAGADOS a cada atualização (deploy). "
+                      "Configure DATABASE_URL com um PostgreSQL (ex.: Neon, gratuito) ou monte um disco persistente em DATA_DIR."}
+
+
 def persistente():
-    """Banco de dados, ou uma pasta configurada de propósito (presumivelmente um volume), sobrevivem a novos deploys."""
-    return bool(DATABASE_URL or DATA_DIR)
+    return diagnostico()["persistente"]
 
 
 def _agora():
@@ -43,14 +74,20 @@ def _arquivo(col, id_):
 
 
 def _conectar():
-    global _criada
-    import psycopg  # só é necessário quando DATABASE_URL está definido
-    c = psycopg.connect(DATABASE_URL, connect_timeout=10, autocommit=True)
-    if not _criada:
-        c.execute("""create table if not exists docs (col text not null, id text not null, versao integer not null,
-                     atualizado timestamptz not null, dados jsonb not null, primary key (col, id))""")
-        _criada = True
-    return c
+    """Conexão do pool (reaproveitada entre pedidos: abrir uma conexão nova com um banco remoto custa caro)."""
+    global _criada, _pool
+    with _lock:
+        if _pool is None:
+            from psycopg_pool import ConnectionPool  # só é necessário quando DATABASE_URL está definido
+            _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=int(os.getenv("DB_CONEXOES", "8")), open=True,
+                                   kwargs={"autocommit": True, "connect_timeout": 10},
+                                   check=ConnectionPool.check_connection, max_idle=300)
+        if not _criada:
+            with _pool.connection() as c:
+                c.execute("""create table if not exists docs (col text not null, id text not null, versao integer not null,
+                             atualizado timestamptz not null, dados jsonb not null, primary key (col, id))""")
+            _criada = True
+    return _pool.connection()
 
 
 def _reg(id_, versao, atualizado, dados):
@@ -166,3 +203,68 @@ def migrar_legado(uid):
     except Exception as e:  # a migração nunca impede o cadastro
         print("migração da carteira antiga falhou:", repr(e), flush=True)
         return False
+
+
+# ---------------------------------------------------------------- exportar e importar (mudança de servidor)
+
+def todos():
+    """Todos os documentos, de todas as coleções: [{"col", "id", "versao", "atualizado", "dados"}]."""
+    if DATABASE_URL:
+        with _conectar() as c:
+            rows = c.execute("select col, id, versao, atualizado, dados from docs order by col, id").fetchall()
+        return [{"col": r[0], **_reg(r[1], r[2], r[3], r[4])} for r in rows]
+    out, raiz = [], _pasta()
+    for col in sorted(os.listdir(raiz)) if os.path.isdir(raiz) else []:
+        pasta = os.path.join(raiz, col)
+        if not os.path.isdir(pasta):
+            continue
+        for nome in sorted(os.listdir(pasta)):
+            if nome.endswith(".json"):
+                try:
+                    with open(os.path.join(pasta, nome), encoding="utf-8") as f:
+                        out.append({"col": col, **json.load(f)})
+                except (OSError, ValueError):
+                    continue
+    return out
+
+
+def exportar_linhas():
+    for d in todos():
+        yield json.dumps(d, ensure_ascii=False) + "\n"
+
+
+def importar_linhas(linhas, sobrescrever=False):
+    """Grava os documentos exportados. Por padrão não sobrescreve o que já existe. Devolve (gravados, pulados)."""
+    gravados = pulados = 0
+    for ln in linhas:
+        ln = ln.strip()
+        if not ln:
+            continue
+        d = json.loads(ln)
+        if not sobrescrever and ler(d["col"], d["id"]):
+            pulados += 1
+            continue
+        gravar(d["col"], d["id"], d["dados"])
+        gravados += 1
+    return gravados, pulados
+
+
+if __name__ == "__main__":
+    uso = "uso: python armazem.py exportar ARQUIVO.jsonl | importar ARQUIVO.jsonl [--sobrescrever] | diagnostico"
+    if len(sys.argv) < 2:
+        sys.exit(uso)
+    cmd = sys.argv[1]
+    if cmd == "diagnostico":
+        print(json.dumps(diagnostico(), ensure_ascii=False, indent=2))
+    elif cmd == "exportar" and len(sys.argv) > 2:
+        n = 0
+        with open(sys.argv[2], "w", encoding="utf-8") as f:
+            for ln in exportar_linhas():
+                f.write(ln); n += 1
+        print(f"{n} documentos exportados para {sys.argv[2]} ({modo()})")
+    elif cmd == "importar" and len(sys.argv) > 2:
+        with open(sys.argv[2], encoding="utf-8") as f:
+            g, p = importar_linhas(f, "--sobrescrever" in sys.argv)
+        print(f"{g} documentos importados, {p} já existiam e foram mantidos ({modo()})")
+    else:
+        sys.exit(uso)

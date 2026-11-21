@@ -1,0 +1,127 @@
+"""Lista de ativos que o app conhece e pode recomendar (amplos, líquidos e com histórico de preços).
+
+UNIVERSO: código -> (classe, nome, descrição). SETOR: código -> setor (para organizar a tela de escolha e para
+não concentrar a carteira num só setor). Títulos de renda fixa sem cotação em bolsa ficam em RF.
+"""
+
+RF = {"TESOURO_SELIC": "Tesouro Selic", "TESOURO_IPCA": "Tesouro IPCA+", "TESOURO_PREFIXADO": "Tesouro Prefixado",
+      "CDB_CDI": "CDB pós-fixado", "LCI_LCA": "LCI/LCA (isenta de IR)", "POUPANCA": "Poupança", "PORQUINHO": "Porquinho do Inter"}
+
+UNIVERSO = {
+    # ---------------- renda fixa
+    "TESOURO_SELIC": ("renda_fixa", "Tesouro Selic", "Pós-fixado do governo com liquidez diária: base da reserva de emergência"),
+    "CDB_CDI": ("renda_fixa", "CDB pós-fixado (~100% do CDI)", "Renda fixa bancária com garantia do FGC até R$ 250 mil por banco"),
+    "LCI_LCA": ("renda_fixa", "LCI/LCA (~90% do CDI)", "Isenta de IR e com garantia do FGC; costuma ter carência de 90 dias ou mais"),
+    "TESOURO_IPCA": ("renda_fixa", "Tesouro IPCA+ (longo prazo)", "Paga inflação + juro real: protege o poder de compra no longo prazo"),
+    "IMAB11": ("renda_fixa", "ETF IMA-B (títulos IPCA+)", "Cesta de Tesouro IPCA+ de vários prazos, negociada na bolsa"),
+    "B5P211": ("renda_fixa", "ETF IMA-B 5 (IPCA+ curtos)", "Tesouro IPCA+ com vencimento em até 5 anos: oscila menos que o IMA-B"),
+    # ---------------- ETFs de ações brasileiras
+    "BOVA11": ("acao", "ETF Ibovespa", "As maiores empresas da B3 em uma única cota"),
+    "BOVV11": ("acao", "ETF Ibovespa (Itaú)", "Também replica o Ibovespa, com taxa baixa"),
+    "DIVO11": ("acao", "ETF Dividendos (IDIV)", "Cesta das empresas que mais pagam dividendos"),
+    "SMAL11": ("acao", "ETF Small Caps", "Empresas menores: mais risco e mais potencial de alta"),
+    # ---------------- ações
+    "ITUB4": ("acao", "Itaú Unibanco", "Maior banco privado do país, rentabilidade alta e consistente"),
+    "BBAS3": ("acao", "Banco do Brasil", "Banco de controle estatal, barato e com dividendos altos"),
+    "BBDC4": ("acao", "Bradesco", "Grande banco de varejo em recuperação de rentabilidade"),
+    "SANB11": ("acao", "Santander Brasil", "Banco de varejo controlado pelo grupo espanhol"),
+    "BPAC11": ("acao", "BTG Pactual", "Banco de investimento e gestão de patrimônio, em crescimento"),
+    "ITSA4": ("acao", "Itaúsa", "Holding do Itaú, negociada com desconto"),
+    "B3SA3": ("acao", "B3", "A própria bolsa: ganha com o volume de negócios"),
+    "BBSE3": ("acao", "BB Seguridade", "Seguros, alta rentabilidade e dividendos"),
+    "CXSE3": ("acao", "Caixa Seguridade", "Seguros e previdência vendidos na rede da Caixa"),
+    "PSSA3": ("acao", "Porto Seguro", "Seguros de auto e residência, com negócios financeiros"),
+    "PETR4": ("acao", "Petrobras", "Petróleo: dividendos altos, mas risco político e do preço do petróleo"),
+    "PRIO3": ("acao", "PRIO", "Petroleira independente de baixo custo"),
+    "VBBR3": ("acao", "Vibra Energia", "Distribuição de combustíveis (antiga BR Distribuidora)"),
+    "VALE3": ("acao", "Vale", "Mineração, ligada à China e ao preço do minério"),
+    "GGBR4": ("acao", "Gerdau", "Siderurgia com operações no Brasil e nos EUA"),
+    "SUZB3": ("acao", "Suzano", "Maior produtora de celulose do mundo, exportadora"),
+    "KLBN11": ("acao", "Klabin", "Papel e embalagens, exportadora"),
+    "EGIE3": ("acao", "Engie Brasil", "Geração de energia, perfil defensivo"),
+    "TAEE11": ("acao", "Taesa", "Transmissão de energia: receita previsível e dividendos"),
+    "EQTL3": ("acao", "Equatorial", "Distribuição de energia e saneamento, em expansão"),
+    "CMIG4": ("acao", "Cemig", "Energia de Minas Gerais, dividendos altos"),
+    "ALUP11": ("acao", "Alupar", "Transmissão de energia, receita regulada"),
+    "ISAE4": ("acao", "ISA Energia", "Transmissão de energia em São Paulo, dividendos"),
+    "CPFE3": ("acao", "CPFL Energia", "Distribuição e geração de energia, dividendos"),
+    "SBSP3": ("acao", "Sabesp", "Saneamento de São Paulo, privatizada em 2024"),
+    "SAPR11": ("acao", "Sanepar", "Saneamento do Paraná, dividendos"),
+    "WEGE3": ("acao", "WEG", "Indústria de motores e energia, exportadora e com histórico de crescimento"),
+    "RAIL3": ("acao", "Rumo", "Ferrovias de transporte de grãos"),
+    "ABEV3": ("acao", "Ambev", "Bebidas: geração de caixa forte e perfil defensivo"),
+    "LREN3": ("acao", "Lojas Renner", "Varejo de moda"),
+    "RADL3": ("acao", "Raia Drogasil", "Maior rede de farmácias do país"),
+    "ASAI3": ("acao", "Assaí", "Atacarejo (supermercado de atacado)"),
+    "VIVT3": ("acao", "Telefônica Vivo", "Telecomunicações, dividendos estáveis"),
+    "TIMS3": ("acao", "TIM", "Telefonia móvel, dividendos"),
+    "RDOR3": ("acao", "Rede D'Or", "Maior rede de hospitais privados do país"),
+    "RENT3": ("acao", "Localiza", "Aluguel de carros e gestão de frotas"),
+    "TOTS3": ("acao", "Totvs", "Software de gestão para empresas"),
+    "SLCE3": ("acao", "SLC Agrícola", "Produção de grãos e algodão"),
+    "CYRE3": ("acao", "Cyrela", "Incorporadora de imóveis de média e alta renda"),
+    "MULT3": ("acao", "Multiplan", "Shoppings de alto padrão"),
+    # ---------------- fundos imobiliários
+    "HGLG11": ("fii", "CSHG Logística", "FII de galpões logísticos"),
+    "BTLG11": ("fii", "BTG Logística", "FII de galpões logísticos"),
+    "XPLG11": ("fii", "XP Log", "FII de galpões logísticos"),
+    "VILG11": ("fii", "Vinci Logística", "FII de galpões logísticos"),
+    "LVBI11": ("fii", "VBI Logístico", "FII de galpões logísticos"),
+    "XPML11": ("fii", "XP Malls", "FII de shoppings"),
+    "VISC11": ("fii", "Vinci Shopping Centers", "FII de shoppings"),
+    "HSML11": ("fii", "HSI Malls", "FII de shoppings"),
+    "KNRI11": ("fii", "Kinea Renda Imobiliária", "FII híbrido: lajes corporativas e galpões"),
+    "PVBI11": ("fii", "VBI Prime Properties", "FII de lajes corporativas de alto padrão"),
+    "BRCR11": ("fii", "BTG Corporate Office", "FII de lajes corporativas"),
+    "HGRU11": ("fii", "CSHG Renda Urbana", "FII de imóveis de varejo com contratos longos"),
+    "TRXF11": ("fii", "TRX Real Estate", "FII de imóveis de varejo alugados a grandes redes"),
+    "GARE11": ("fii", "Guardian Real Estate", "FII de imóveis de renda com contratos longos"),
+    "ALZR11": ("fii", "Alianza Trust", "FII de imóveis com contratos atípicos de longo prazo"),
+    "KNCR11": ("fii", "Kinea Rendimentos", "FII de recebíveis (CRI) atrelados ao CDI: ganha com juro alto"),
+    "KNIP11": ("fii", "Kinea Índices de Preços", "FII de recebíveis (CRI) atrelados à inflação"),
+    "KNSC11": ("fii", "Kinea Securities", "FII de recebíveis imobiliários"),
+    "MXRF11": ("fii", "Maxi Renda", "FII de recebíveis imobiliários, cota barata"),
+    "CPTS11": ("fii", "Capitânia Securities", "FII de recebíveis atrelados à inflação"),
+    "RECR11": ("fii", "REC Recebíveis", "FII de recebíveis imobiliários"),
+    "HGCR11": ("fii", "CSHG Recebíveis", "FII de recebíveis imobiliários"),
+    "VGIR11": ("fii", "Valora RE", "FII de recebíveis atrelados ao CDI"),
+    # ---------------- exterior
+    "IVVB11": ("exterior", "ETF S&P 500 (em reais)", "As 500 maiores empresas dos EUA, com exposição ao dólar, comprado na B3"),
+    "WRLD11": ("exterior", "ETF Mundo (FTSE All-World)", "Ações de mais de 40 países em uma cota"),
+    "ACWI11": ("exterior", "ETF MSCI ACWI", "Ações do mundo todo, desenvolvidos e emergentes"),
+    "NASD11": ("exterior", "ETF Nasdaq 100", "Tecnologia americana: mais crescimento e mais volatilidade"),
+    "XINA11": ("exterior", "ETF China", "Grandes empresas chinesas: risco alto"),
+    "VOO": ("exterior", "Vanguard S&P 500", "S&P 500 comprado direto nos EUA, em dólar e com taxa baixíssima"),
+    # ---------------- proteção
+    "DOLAR": ("cambio", "Dólar", "Proteção contra crises locais e desvalorização do real"),
+    "GOLD11": ("cambio", "ETF Ouro", "Ouro: proteção em crises e contra a inflação global"),
+}
+
+SETOR = {
+    "TESOURO_SELIC": "Tesouro Direto", "TESOURO_IPCA": "Tesouro Direto", "CDB_CDI": "Bancária", "LCI_LCA": "Bancária",
+    "IMAB11": "ETF de renda fixa", "B5P211": "ETF de renda fixa",
+    "BOVA11": "ETF", "BOVV11": "ETF", "DIVO11": "ETF", "SMAL11": "ETF",
+    "ITUB4": "Bancos", "BBAS3": "Bancos", "BBDC4": "Bancos", "SANB11": "Bancos", "BPAC11": "Bancos", "ITSA4": "Bancos",
+    "B3SA3": "Serviços financeiros", "BBSE3": "Seguros", "CXSE3": "Seguros", "PSSA3": "Seguros",
+    "PETR4": "Petróleo e gás", "PRIO3": "Petróleo e gás", "VBBR3": "Petróleo e gás",
+    "VALE3": "Mineração e siderurgia", "GGBR4": "Mineração e siderurgia", "SUZB3": "Papel e celulose", "KLBN11": "Papel e celulose",
+    "EGIE3": "Energia elétrica", "TAEE11": "Energia elétrica", "EQTL3": "Energia elétrica", "CMIG4": "Energia elétrica",
+    "ALUP11": "Energia elétrica", "ISAE4": "Energia elétrica", "CPFE3": "Energia elétrica",
+    "SBSP3": "Saneamento", "SAPR11": "Saneamento", "WEGE3": "Indústria", "RAIL3": "Logística",
+    "ABEV3": "Consumo", "LREN3": "Varejo", "RADL3": "Varejo", "ASAI3": "Varejo",
+    "VIVT3": "Telecomunicações", "TIMS3": "Telecomunicações", "RDOR3": "Saúde", "RENT3": "Locação", "TOTS3": "Tecnologia",
+    "SLCE3": "Agronegócio", "CYRE3": "Imobiliário", "MULT3": "Imobiliário",
+    "HGLG11": "Logística", "BTLG11": "Logística", "XPLG11": "Logística", "VILG11": "Logística", "LVBI11": "Logística",
+    "XPML11": "Shoppings", "VISC11": "Shoppings", "HSML11": "Shoppings",
+    "KNRI11": "Lajes e híbridos", "PVBI11": "Lajes e híbridos", "BRCR11": "Lajes e híbridos",
+    "HGRU11": "Renda urbana", "TRXF11": "Renda urbana", "GARE11": "Renda urbana", "ALZR11": "Renda urbana",
+    "KNCR11": "Recebíveis (papel)", "KNIP11": "Recebíveis (papel)", "KNSC11": "Recebíveis (papel)", "MXRF11": "Recebíveis (papel)",
+    "CPTS11": "Recebíveis (papel)", "RECR11": "Recebíveis (papel)", "HGCR11": "Recebíveis (papel)", "VGIR11": "Recebíveis (papel)",
+    "IVVB11": "ETF", "WRLD11": "ETF", "ACWI11": "ETF", "NASD11": "ETF", "XINA11": "ETF", "VOO": "ETF nos EUA",
+    "DOLAR": "Moeda", "GOLD11": "Ouro",
+}
+
+ETF_EXT = {"IVVB11", "NASD11", "SPXI11", "WRLD11", "ACWI11", "EURP11", "XINA11", "BNDX11", "QBTC11", "HASH11"}
+ETF_ACAO = {"BOVA11", "BOVV11", "BOVX11", "DIVO11", "SMAL11", "BRAX11", "PIBB11", "ECOO11", "NSDV11"}
+ETF_RF = {"IMAB11", "B5P211", "IRFM11", "FIXA11", "IB5M11"}
+UNITS = {"TAEE11", "KLBN11", "SAPR11", "ALUP11", "SANB11", "BPAC11", "ENGI11", "TIET11", "IGTI11", "CPLE11", "AESB11"}

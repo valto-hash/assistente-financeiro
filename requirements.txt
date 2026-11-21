@@ -6,7 +6,9 @@ numpy
 requests
 anthropic
 python-dotenv
-psycopg[binary]
+psycopg[binary,pool]
 python-multipart
 pypdf
 pywebpush
+google-auth
+openpyxl

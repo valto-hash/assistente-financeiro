@@ -1,0 +1,8 @@
+.git
+.env
+dados
+__pycache__
+*.pyc
+loja
+android
+docs
