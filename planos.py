@@ -28,6 +28,9 @@ RECURSOS = {  # o que o Premium libera (para a tela de planos)
     "simulacao": "Simulação completa: até 30 anos, metas e cenários (grátis: até 10 anos)",
     "avisos": "Avisos de compra, venda, alvo, stop, preço e rebalanceamento",
     "contas": "Contas do mês ilimitadas (grátis: até 5), leitura de boleto em PDF/foto e de extrato",
+    "b3": "Importar da B3: posição, preço médio, rentabilidade real e proventos recebidos",
+    "gastos": "Importar o extrato do banco e a fatura do cartão para os gastos por categoria",
+    "ranking": "Ranking completo de ações e FIIs (grátis: 5 por lista)",
 }
 PLAY_STATES_ATIVOS = {"SUBSCRIPTION_STATE_ACTIVE", "SUBSCRIPTION_STATE_IN_GRACE_PERIOD"}
 

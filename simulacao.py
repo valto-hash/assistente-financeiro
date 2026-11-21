@@ -40,6 +40,7 @@ CRISES = [  # (nome, início, fim, CDI médio aproximado no período, % a.a.)
 ]
 
 _hist: dict = {}   # código -> (timestamp, fechamentos ajustados na moeda original, dividendos, giro diário em R$ milhões)
+_splits: dict = {}  # código -> desdobramentos e bonificações (fator por data), usados na rentabilidade com histórico
 _lock = threading.Lock()
 
 
@@ -124,8 +125,30 @@ def baixar(codigos):
                         dv = dv[dv > 0]
                     except Exception:
                         pass
+                    try:
+                        sp = _sem_tz(df["Stock Splits"][s].fillna(0).astype(float))
+                        _splits[c] = sp[sp > 0]
+                    except Exception:
+                        _splits[c] = pd.Series(dtype=float)
                     _hist[c] = (agora, close, dv, giro)
     return {c: _hist[c][1] for c in codigos if c in _hist}
+
+
+def dividendos(codigo):
+    """Proventos por cota (data-com), já baixados por `baixar`."""
+    baixar([codigo])
+    return _hist.get(codigo, (0, None, pd.Series(dtype=float), None))[2]
+
+
+def desdobramentos(codigo):
+    baixar([codigo])
+    return _splits.get(codigo, pd.Series(dtype=float))
+
+
+def ultimo_preco(codigo):
+    baixar([codigo])
+    c = _hist.get(codigo, (0, pd.Series(dtype=float)))[1]
+    return float(c.iloc[-1]) if c is not None and len(c) else None
 
 
 def fechamentos_brl(codigos):

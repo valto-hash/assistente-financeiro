@@ -10,3 +10,5 @@ psycopg[binary,pool]
 python-multipart
 pypdf
 pywebpush
+google-auth
+openpyxl

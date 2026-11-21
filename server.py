@@ -18,6 +18,9 @@ import armazem
 import avisos
 import checagem
 import contas as cmod
+import fundamentos
+import gastos as gmod
+import investimentos as inv
 import paginas
 import perfil as teste_perfil
 import planos
@@ -1520,6 +1523,213 @@ async def contas_extrato(req: Request, arquivo: UploadFile = File(...), authoriz
             "rendas": cmod.rendas(trans)}
 
 
+# ---------------------------------------------------------------- gastos do dia a dia (lançamentos, categorias e limites)
+
+class GastoReq(BaseModel):
+    data: str
+    descricao: str
+    valor: float
+    categoria: str | None = None
+
+
+class GastoEdReq(BaseModel):
+    data: str | None = None
+    descricao: str | None = None
+    valor: float | None = None
+    categoria: str | None = None
+    semelhantes: bool = False
+
+
+@app.get("/api/gastos")
+def gastos_ver(req: Request, mes: str = "", authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if mes and not re.fullmatch(r"20\d{2}-(0[1-9]|1[0-2])", mes): raise HTTPException(400, "Mês inválido (use AAAA-MM).")
+    return {**gmod.resumo(uid, mes or None), "premium": planos.premium(uid)}
+
+
+@app.post("/api/gastos")
+def gastos_criar(req: Request, r: list[GastoReq], authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if not 0 < len(r) <= 200: raise HTTPException(400, "Envie de 1 a 200 lançamentos.")
+    try:
+        criados, _ = gmod.adicionar(uid, [x.model_dump() for x in r])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"criados": criados}
+
+
+@app.put("/api/gastos/{gid}")
+def gastos_editar(gid: str, req: Request, r: GastoEdReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try:
+        it, n = gmod.editar(uid, gid, r.model_dump(exclude={"semelhantes"}), r.semelhantes)
+    except KeyError:
+        raise HTTPException(404, "Lançamento não encontrado.")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"item": it, "alterados": n}
+
+
+@app.delete("/api/gastos/{gid}")
+def gastos_apagar(gid: str, req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try: gmod.apagar(uid, gid)
+    except KeyError: raise HTTPException(404, "Lançamento não encontrado.")
+    return {"ok": True}
+
+
+@app.put("/api/gastos-limites")
+def gastos_limites(req: Request, r: dict[str, float], authorization: str = Header("")):
+    uid = auth(req, authorization)
+    return {"limites": gmod.definir_limites(uid, r)}
+
+
+@app.post("/api/gastos/importar")
+async def gastos_importar(req: Request, arquivo: UploadFile = File(...), authorization: str = Header("")):
+    """Extrato do banco ou fatura do cartão (OFX ou CSV) -> lançamentos com categoria; não duplica o que já existe."""
+    uid = auth(req, authorization)
+    if not planos.premium(uid):
+        raise HTTPException(402, "Importar o extrato do banco é do Premium.")
+    conteudo = await arquivo.read(5 * 1024 * 1024 + 1)
+    if len(conteudo) > 5 * 1024 * 1024: raise HTTPException(413, "Extrato maior que 5 MB.")
+    try:
+        trans = cmod.ler_extrato(conteudo, arquivo.filename or "")
+    except Exception as e:
+        print("falha ao ler extrato:", repr(e), flush=True)
+        trans = []
+    if not trans: raise HTTPException(422, "Não reconheci este extrato. Exporte em OFX (recomendado) ou CSV com colunas de data, descrição e valor.")
+    criados, repetidos = gmod.adicionar(uid, gmod.do_extrato(trans), origem="extrato")
+    cats = {}
+    for x in criados:
+        if x["valor"] < 0: cats[x["categoria"]] = round(cats.get(x["categoria"], 0) - x["valor"], 2)
+    meses = sorted({x["data"][:7] for x in criados})
+    return {"novos": len(criados), "repetidos": repetidos, "por_categoria": dict(sorted(cats.items(), key=lambda kv: -kv[1])),
+            "meses": meses, "rendas": cmod.rendas(trans)}
+
+
+# ---------------------------------------------------------------- rentabilidade, proventos e importação da B3
+
+class RentReq(BaseModel):
+    pos: dict[str, Pos] = {}
+
+
+def _b3(uid):
+    return ((armazem.ler("b3", uid) or {}).get("dados")) or {}
+
+
+@app.post("/api/rentabilidade")
+def rentabilidade_ep(req: Request, r: RentReq, authorization: str = Header("")):
+    """Rentabilidade da carteira contra CDI, Ibovespa e IPCA, e os proventos. Com o histórico da B3, rentabilidade real."""
+    uid = auth(req, authorization)
+    pos = {norm(t): p.model_dump() for t, p in r.pos.items() if p.qtd > 0 or p.saldo > 0}
+    if not pos: return {"vazio": True}
+    b3 = _b3(uid)
+    cdi = rates().get("cdi") or 10.0
+    specs = {t: spec(t, Pos(**p)) for t, p in pos.items()}
+    chave = "rent:" + json.dumps(pos, sort_keys=True) + f":{b3.get('importado', 0)}"
+
+    def calc():
+        atual = inv.rentabilidade_atual(pos, specs, cdi)
+        hist = inv.rentabilidade_historico(b3["movs"], cdi) if b3.get("movs") else None
+        usd = usd_brl() if any(t in sim.EM_USD for t in pos) else None
+        prov = inv.proventos_b3(b3["proventos"], pos) if b3.get("proventos") else inv.proventos_estimados(pos, usd)
+        return {"atual": atual, "historico": hist, "proventos": prov,
+                "b3": {"importado": b3.get("importado"), "movs": len(b3.get("movs", [])), "proventos": len(b3.get("proventos", []))} if b3 else None}
+    try:
+        return cached(chave, 3600, calc)
+    except Exception as e:
+        raise HTTPException(502, str(e))
+
+
+@app.post("/api/b3/importar")
+async def b3_importar(req: Request, arquivo: UploadFile = File(...), authorization: str = Header("")):
+    """Planilha da Área do Investidor da B3 (Posição, Movimentação ou Negociação) -> posições, preço médio e proventos."""
+    uid = auth(req, authorization)
+    if not planos.premium(uid):
+        raise HTTPException(402, "Importar da B3 é do Premium.")
+    conteudo = await arquivo.read(8 * 1024 * 1024 + 1)
+    if len(conteudo) > 8 * 1024 * 1024: raise HTTPException(413, "Arquivo maior que 8 MB.")
+    try:
+        lido = inv.ler_b3(conteudo, arquivo.filename or "")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        print("falha ao ler planilha da B3:", repr(e)[:300], flush=True)
+        raise HTTPException(422, "Não consegui ler esta planilha. Baixe de novo na Área do Investidor da B3, no formato Excel.")
+    ant = _b3(uid)
+    chave_m = lambda m: (m["data"], m["ticker"], m["tipo"], round(m["qtd"], 6), round(m.get("preco") or 0, 4))
+    chave_p = lambda p: (p["data"], p["ticker"], p["tipo"], p["valor"])
+    movs = {chave_m(m): m for m in ant.get("movs", []) + lido["movs"]}
+    provs = {chave_p(p): p for p in ant.get("proventos", []) + lido["proventos"]}
+    dados = {"movs": sorted(movs.values(), key=lambda m: m["data"]), "proventos": sorted(provs.values(), key=lambda p: p["data"]),
+             "importado": time.time(), "posicao": lido["posicao"] or ant.get("posicao", {})}
+    armazem.gravar("b3", uid, dados)
+    medio = inv.custo_medio(dados["movs"])
+    sugestao, avisos_ = {}, []
+    base = lido["posicao"] or {t: x["qtd"] for t, x in medio.items() if x["qtd"] > 0}
+    for t, q in base.items():
+        pm = medio.get(t, {}).get("pm") or 0
+        if t in medio and abs(medio[t]["qtd"] - q) > 1e-6 and lido["posicao"]:
+            avisos_.append(f"{t}: o histórico importado soma {regras.br(medio[t]['qtd'], 0)} cotas e a B3 mostra {regras.br(q, 0)}. "
+                           "Pode faltar parte do histórico (a B3 mostra só alguns anos) ou ter havido desdobramento: confira o preço médio.")
+        sugestao[t] = {"qtd": q, "pm": pm}
+    for t, v in lido["rf"].items():
+        sugestao[t] = {"saldo": v}
+    sem_pm = [t for t, x in sugestao.items() if "qtd" in x and not x["pm"]]
+    if sem_pm:
+        avisos_.append("Sem o preço médio de " + ", ".join(sem_pm[:8]) + (" e outros" if len(sem_pm) > 8 else "")
+                       + ": importe também a Negociação ou a Movimentação, ou informe em Editar.")
+    if lido["ignorados"]:
+        avisos_.append(f"{lido['ignorados']} linhas não entraram (ex.: subscrição, leilão de frações ou produtos sem código de negociação).")
+    return {"tipos": lido["tipos"], "posicoes": sugestao, "movimentacoes": len(lido["movs"]), "proventos": len(lido["proventos"]),
+            "avisos": avisos_[:6], "total_movs": len(dados["movs"]), "total_proventos": len(dados["proventos"])}
+
+
+@app.delete("/api/b3")
+def b3_apagar(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    armazem.apagar("b3", uid)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- fundamentos e ranking
+
+def _ranking(c):
+    return cached("ranking:" + c, 12 * 3600, lambda: fundamentos.ranking(UNIVERSO, SETOR, ETF_ACAO | ETF_EXT | ETF_RF, c),
+                  ok=lambda v: bool(v["linhas"]), ttl_falha=300)
+
+
+@app.get("/api/fundamentos/{t}")
+def fundamentos_ep(t: str, req: Request, authorization: str = Header("")):
+    auth(req, authorization)
+    t = norm(t)
+    if not OKT.match(t) or t in RF: raise HTTPException(400, "Código inválido.")
+    c = classe(t)
+    if c not in ("acao", "fii") or t in ETF_ACAO | ETF_EXT | ETF_RF:
+        raise HTTPException(404, "Indicadores de balanço existem só para ações e FIIs (ETFs e títulos não têm).")
+    try:
+        rank = _ranking(c)
+    except Exception:
+        rank = None
+    try:
+        return cached(f"fund:{t}", 6 * 3600, lambda: fundamentos.ficha(t, c, SETOR.get(t), rank), ok=lambda v: bool(v["preco"]))
+    except Exception as e:
+        raise HTTPException(502, str(e))
+
+
+@app.get("/api/ranking")
+def ranking_ep(req: Request, tipo: str = "acao", authorization: str = Header("")):
+    """Indicadores de todas as ações (ou FIIs) da lista, para ordenar e comparar. No grátis, só as 5 primeiras linhas."""
+    uid = auth(req, authorization)
+    if tipo not in ("acao", "fii"): raise HTTPException(400, "Use tipo=acao ou tipo=fii.")
+    try:
+        r = _ranking(tipo)
+    except Exception as e:
+        raise HTTPException(502, str(e))
+    prem = planos.premium(uid)
+    return {**r, "linhas": r["linhas"] if prem else r["linhas"][:5], "total": len(r["linhas"]), "premium": prem}
+
+
 # ---------------------------------------------------------------- avisos (compra/venda, preços, rebalanceamento, contas)
 
 def vencimentos(it, hoje):
@@ -1658,6 +1868,11 @@ def _verificar(uid):
                     avisar(f"conta:{it['id']}:{ym}:hoje", "conta", f"{it['nome']} vence hoje", f"Conta{valor}. Já pagou? Marque no app.", "contas")
                 elif -5 <= dias < 0:
                     avisar(f"conta:{it['id']}:{ym}:atrasada", "conta", f"{it['nome']} venceu", f"Venceu em {venc:%d/%m}{valor} e ainda não foi marcada como paga.", "contas")
+    if cfg["contas"]:  # limite de gasto por categoria: avisa ao passar de 80% e de 100% no mês
+        for a in gmod.alertas_limite(uid):
+            titulo = f"{a['categoria']}: passou do limite" if a["nivel"] == 100 else f"{a['categoria']}: {a['usado']}% do limite"
+            avisar(f"gasto:{a['categoria']}:{a['mes']}:{a['nivel']}", "conta", titulo,
+                   f"Você gastou R$ {br(a['valor'], 0)} de R$ {br(a['limite'], 0)} neste mês.", "contas")
     est["enviados"] = {k: v for k, v in est["enviados"].items() if time.time() - v < 120 * 86400}
     est["verificado"] = time.time()
     armazem.gravar("avisos_estado", uid, est)

@@ -412,6 +412,47 @@ body.travado{overflow:hidden}
 #toast.on{opacity:1}
 @media (min-width:820px){#toast{bottom:24px}}
 @media (forced-colors:active){.seg>div,.dot,.meter i{border:1px solid CanvasText}}
+/* gastos, rentabilidade, proventos, fundamentos e ranking */
+.gcat{margin:12px 0}
+.gcat-h{display:flex;justify-content:space-between;gap:8px;font-size:14px}
+.gcat-h b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.gbar{height:8px;border-radius:99px;background:var(--line2);overflow:hidden;margin-top:5px}
+.gbar i{display:block;height:100%;border-radius:99px;background:var(--acc)}
+.gbar i.warn{background:var(--warn)}.gbar i.bad{background:var(--dn)}
+.gcat-d{font-size:12px;color:var(--mut);margin-top:3px}
+.lanc{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line2)}
+.lanc:last-child{border-bottom:0}
+.lanc .ds{flex:1;min-width:0}
+.lanc .ds b{display:block;font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lanc .vl{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+.lanc .vl.rec{color:var(--up)}
+.lanc .cat{border:1px solid var(--line);background:var(--sf2);color:var(--ink2);border-radius:99px;padding:2px 9px;font:inherit;font-size:12px;cursor:pointer;margin-top:3px;max-width:100%}
+.lanc .x{border:0;background:none;color:var(--mut);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;min-width:32px;min-height:32px}
+.dia-l{font-size:12px;font-weight:600;color:var(--mut);margin:12px 0 0}
+.barras{display:flex;align-items:flex-end;gap:4px;height:120px;margin:10px 0 4px}
+.barras .b{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;height:100%;min-width:0}
+.barras .b i{display:block;width:100%;max-width:30px;border-radius:5px 5px 0 0;background:var(--c-fii);min-height:1px}
+.barras .b .par{display:flex;align-items:flex-end;justify-content:center;gap:2px;width:100%;flex:1}
+.barras .b .par i{width:45%;max-width:16px}
+.barras .b small{font-size:10px;color:var(--mut);white-space:nowrap}
+.legenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:6px}
+.legenda span{display:inline-flex;align-items:center;gap:6px}
+.legenda i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.rent-tbl td small{display:block;font-size:11px;color:var(--mut);font-weight:400}
+.graf svg{width:100%;height:auto;display:block;margin-top:8px}
+.graf text{font-size:11px;fill:var(--mut)}
+.fund-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:8px}
+.fund-grid .fi{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--sf2)}
+.fund-grid .fi .l{font-size:12px;color:var(--mut)}
+.fund-grid .fi .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.fund-grid .fi .r{font-size:11px;color:var(--mut)}
+.rk-tbl tbody tr{cursor:pointer}
+.rk-tbl tbody tr:hover td{background:var(--sf2)}
+.rk-tbl td small{display:block;font-size:11px;color:var(--mut)}
+.rk-tbl th button{border:0;background:none;font:inherit;color:inherit;cursor:pointer;padding:0}
+.rk-tbl th[aria-sort] button{color:var(--acc)}
+.rk-ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.rk-ctl select{font:inherit;font-size:14px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--sf);color:var(--ink);max-width:100%}
 </style>
 </head>
 <body>
@@ -447,7 +488,7 @@ body.travado{overflow:hidden}
       <h2>Meus ativos</h2>
       <p class="lead sm">Você opera na sua corretora e anota aqui. Seus ativos ficam salvos na sua conta e aparecem em qualquer aparelho em que você entrar.</p>
       <div id="syncInfo" class="sync" aria-live="polite"></div>
-      <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button></div>
+      <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button><button class="btn" type="button" id="btnB3" style="flex:0 1 240px">Importar da B3</button></div>
     </div>
     <div id="list" class="grid2"></div>
   </section>
@@ -456,6 +497,8 @@ body.travado{overflow:hidden}
 <div id="auth" class="auth hide" role="dialog" aria-modal="true" aria-label="Entrar no Assistente Financeiro"></div>
 <input type="file" id="arqConta" accept="application/pdf,image/*" hidden>
 <input type="file" id="arqExtrato" accept=".ofx,.csv,.txt,text/csv,application/x-ofx" hidden>
+<input type="file" id="arqGastos" accept=".ofx,.csv,.txt,text/csv,application/x-ofx" hidden>
+<input type="file" id="arqB3" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
 <dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
 <div id="toast" role="status" aria-live="polite"></div>
 
@@ -976,6 +1019,309 @@ function escolhaHtml(e) {
     <p class="mut xs">Viés de sobrevivência: a lista tem só empresas e fundos que existem hoje e estão entre os maiores; os que quebraram ou encolheram ficaram de fora. Isso faz todos os números parecerem melhores do que foram de verdade, por isso a comparação justa é entre os escolhidos e a lista toda, que têm o mesmo viés. As janelas de 12 meses se sobrepõem: ${N(meses)} meses equivalem a cerca de ${N(Math.round(meses / 12))} anos de teste independentes.</p>`;
 }
 
+/* ---------- gastos do dia a dia (lançamentos, categorias e limites) ---------- */
+st.gastos = {};  // resumo por mês 'AAAA-MM'
+const ymG = ({ano, mes}) => `${ano}-${String(mes + 1).padStart(2, '0')}`;  // mês dos gastos, 'AAAA-MM'
+const FORA_GASTOS = ['Fatura do cartão', 'Investimentos'];
+function mudarMes(d) {
+  let {ano: a, mes: m} = st.mesContas; m += d;
+  if (m < 0) { m = 11; a--; } if (m > 11) { m = 0; a++; }
+  st.mesContas = {ano: a, mes: m}; renderContas();
+}
+async function loadGastos(force) {
+  const ym = ymG(st.mesContas);
+  if ((st.gastos[ym] && !force) || loadGastos.busy === ym) return;
+  loadGastos.busy = ym;
+  try { st.gastos[ym] = await api('/api/gastos?mes=' + ym); st.gastosErr = null; } catch (e) { st.gastosErr = e.message; }
+  loadGastos.busy = null;
+  if (ymG(st.mesContas) === ym) renderGastos();
+}
+function renderGastos() { const el = $('#gastosCard'); if (el) { el.innerHTML = gastosHtml(); ligarGastos(); } }
+function gastosHtml() {
+  const ym = ymG(st.mesContas), g = st.gastos[ym], {ano, mes} = st.mesContas;
+  const cab = `<div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Gastos de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>`;
+  if (!g) return `<div class="card">${cab}${st.gastosErr ? `<p class="err-box">${esc(st.gastosErr)}</p>` : busy('Somando seus gastos…') + sk(3)}</div>`;
+  const btns = `<div class="btns"><button class="btn primary" type="button" data-gnovo="-1">+ Gasto</button><button class="btn" type="button" data-gnovo="1">+ Receita</button>
+    <button class="btn" type="button" id="gImp">${premium() ? '' : ICON.cadeado}Importar extrato ou fatura</button><button class="btn" type="button" id="gLim">Limites por categoria</button></div>`;
+  if (!g.tem_dados) return `<div class="card">${cab}<p class="lead">Anote o que entra e o que sai e veja para onde vai o seu dinheiro. O app separa por categoria sozinho (iFood vai para Alimentação fora, Uber para Transporte…) e aprende quando você corrige.</p>
+    <ul class="ink2 sm" style="padding-left:18px"><li><b>+ Gasto</b> ou <b>+ Receita</b>: lance à mão, em segundos.</li><li><b>Importar extrato ou fatura</b> (OFX ou CSV do banco ou do cartão): tudo de uma vez, sem duplicar.</li><li><b>Limites por categoria</b>: o app avisa quando você passa de 80% e de 100% no mês.</li></ul>${btns}</div>`;
+  const maxV = Math.max(...g.categorias.map(c => Math.max(c.valor, c.limite || 0)), 1);
+  const cats = g.categorias.map(c => {
+    const u = c.usado, cls_ = u == null ? '' : u >= 100 ? 'bad' : u >= 80 ? 'warn' : '';
+    const w = c.limite ? Math.min(u, 100) : c.valor / maxV * 100;
+    const comp = c.mes_anterior == null ? '' : c.mes_anterior ? `${c.valor >= c.mes_anterior ? '+' : '−'}${N(Math.abs(c.valor / c.mes_anterior * 100 - 100), 0)}% que no mês anterior` : c.valor ? 'não teve no mês anterior' : '';
+    const quanto = c.limite ? `${N(u, 0)}% do limite` : `${N(c.pct, 0)}% dos gastos`;
+    return `<div class="gcat"><div class="gcat-h"><span>${esc(c.categoria)}</span><b>${M(c.valor)}${c.limite ? `<span class="mut" style="font-weight:400"> de ${M(c.limite)}</span>` : ''}</b></div>
+      <div class="gbar" role="img" aria-label="${esc(c.categoria)}: ${quanto}"><i class="${cls_}" style="width:${w.toFixed(1)}%"></i></div>
+      <div class="gcat-d">${quanto}${comp ? ' · ' + comp : ''}</div></div>`;
+  }).join('');
+  const hmax = Math.max(...g.historico.flatMap(h => [h.receitas, h.gastos]), 1);
+  const hist = g.historico.length >= 2 ? `<h3>Últimos meses</h3><div class="barras" role="img" aria-label="Receitas e gastos dos últimos meses">${g.historico.map(h => `<div class="b" title="${MESES[+h.mes.slice(5) - 1]}: entrou ${M(h.receitas)}, gastou ${M(h.gastos)}"><div class="par"><i style="height:${(h.receitas / hmax * 100).toFixed(1)}%;background:var(--up)"></i><i style="height:${(h.gastos / hmax * 100).toFixed(1)}%;background:var(--dn)"></i></div><small>${MESES[+h.mes.slice(5) - 1].slice(0, 3)}</small></div>`).join('')}</div>
+    <div class="legenda"><span><i style="background:var(--up)"></i>Entrou</span><span><i style="background:var(--dn)"></i>Gastou</span></div>` : '';
+  const porDia = {};
+  g.itens.forEach(x => (porDia[x.data] ||= []).push(x));
+  const dia = d => { const t = new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {weekday: 'long', day: 'numeric', month: 'long'}); return t[0].toUpperCase() + t.slice(1); };
+  const lancs = Object.entries(porDia).map(([d, xs]) => `<p class="dia-l">${dia(d)}</p>${xs.map(x => `<div class="lanc"><div class="ds"><b>${esc(x.descricao)}</b><button type="button" class="cat" data-gcat="${x.id}" aria-label="Categoria: ${esc(x.categoria)}. Trocar">${esc(x.categoria)} ▾</button></div>
+      <span class="vl ${x.valor > 0 ? 'rec' : ''}">${x.valor > 0 ? '+' + M(x.valor) : M(-x.valor)}</span><button type="button" class="x" data-gdel="${x.id}" aria-label="Apagar ${esc(x.descricao)}">×</button></div>`).join('')}`).join('');
+  const fora = g.investido || g.faturas ? `<p class="mut xs" style="margin:8px 0 0">${[g.investido ? `Aplicado: ${M(g.investido)}` : '', g.faturas ? `faturas de cartão pagas: ${M(g.faturas)}` : ''].filter(Boolean).join(' · ')}. Não entram em “Gastou”: aplicar é guardar dinheiro, e a fatura é a soma das compras do cartão (importe a fatura para ver em que você gastou).</p>` : '';
+  const obsCls = {good: 'good', warn: 'warn', bad: 'warn', info: ''};
+  return `<div class="card">${cab}
+    <div class="tiles"><div class="tile"><div class="l">Entrou</div><div class="v tn">${M(g.receitas)}</div></div>
+      <div class="tile"><div class="l">Gastou</div><div class="v tn">${M(g.gastos)}</div>${g.media_gastos_3m ? `<div class="d">média dos meses anteriores: ${M(g.media_gastos_3m)}</div>` : ''}</div>
+      <div class="tile main"><div class="l">Sobrou na conta</div><div class="v tn ${g.saldo < 0 ? 'dn' : ''}">${M(g.saldo)}</div></div></div>
+    ${fora}
+    ${g.observacoes.map(o => `<div class="note ${obsCls[o.tipo] || ''}">${o.tipo === 'good' ? ICON.check : o.tipo === 'info' ? ICON.info : ICON.warn}<div>${esc(o.texto)}</div></div>`).join('')}
+    ${btns}
+    ${g.categorias.length ? `<div class="grid2 top" style="margin-top:6px"><div><h3>Por categoria</h3>${cats}</div><div>${hist}</div></div>` : ''}
+    ${g.itens.length ? `<details ${g.itens.length <= 12 ? 'open' : ''} style="margin-top:10px"><summary>Lançamentos do mês (${g.itens.length})</summary>${lancs}<p class="mut xs" style="margin:8px 0 0">Toque na categoria para corrigir: o app aprende e usa a correção nos próximos lançamentos parecidos.</p></details>`
+      : `<p class="mut sm">Nenhum lançamento em ${MESES[mes]}.</p>`}
+  </div>`;
+}
+function ligarGastos() {
+  const el = $('#gastosCard'); if (!el) return;
+  $$('[data-mes]', el).forEach(b => b.onclick = () => mudarMes(+b.dataset.mes));
+  $$('[data-gnovo]', el).forEach(b => b.onclick = () => novoLanc(+b.dataset.gnovo));
+  $$('[data-gcat]', el).forEach(b => b.onclick = () => trocarCategoria(b.dataset.gcat));
+  $$('[data-gdel]', el).forEach(b => b.onclick = () => apagarLanc(b.dataset.gdel));
+  const imp = $('#gImp', el); if (imp) imp.onclick = () => premium() ? $('#arqGastos').click() : abrirPlanos('Importar o extrato do banco ou a fatura do cartão é do Premium. No grátis, lance à mão.');
+  const lim = $('#gLim', el); if (lim) lim.onclick = editarLimites;
+}
+const gastosDoMes = () => st.gastos[ymG(st.mesContas)];
+function recarregarGastos() { st.gastos = {}; loadGastos(true); }
+async function novoLanc(sinal) {
+  const g = gastosDoMes(), cats = (sinal < 0 ? g?.despesas : g?.receitas_cat) || [];
+  const v = await ask({title: sinal < 0 ? 'Novo gasto' : 'Nova receita', ok: 'Adicionar',
+    fields: [{name: 'd', label: 'Descrição', ph: sinal < 0 ? 'Ex.: Mercado, iFood, Uber' : 'Ex.: Salário, freela'},
+      {name: 'v', label: 'Valor', prefix: 'R$', mode: 'decimal'},
+      {name: 'dt', label: 'Data', type: 'date', value: isoLocal(hojeD())},
+      {name: 'c', label: 'Categoria', type: 'select', value: '', options: [['', 'Automática (pela descrição)'], ...cats.map(c => [c, c])]}],
+    validate: v => !v.d.trim() ? 'Escreva uma descrição.' : !(num(v.v) > 0) ? 'Informe o valor.' : !v.dt ? 'Informe a data.' : ''});
+  if (!v) return;
+  try {
+    const it = (await api('/api/gastos', [{data: v.dt, descricao: v.d, valor: sinal * num(v.v), categoria: v.c || null}])).criados[0];
+    st.mesContas = {ano: +v.dt.slice(0, 4), mes: +v.dt.slice(5, 7) - 1};
+    st.gastos = {}; renderContas(); toast(`${sinal < 0 ? 'Gasto' : 'Receita'} em ${it.categoria}`);
+  } catch (e) { toast(e.message); }
+}
+async function trocarCategoria(id) {
+  const g = gastosDoMes(), x = g?.itens.find(i => i.id === id);
+  if (!x) return;
+  const v = await ask({title: 'Categoria', desc: `${x.descricao} · ${M(Math.abs(x.valor))}`, ok: 'Salvar',
+    fields: [{name: 'c', label: 'Categoria', type: 'select', value: x.categoria, options: (x.valor < 0 ? g.despesas : g.receitas_cat).map(c => [c, c])},
+      {name: 's', type: 'checks', options: [{value: '1', checked: true, label: 'Usar para os lançamentos parecidos', desc: 'Vale para os que já estão aqui e para os próximos.'}]}]});
+  if (!v || v.c === x.categoria) return;
+  try {
+    const r = await api(`/api/gastos/${id}`, {categoria: v.c, semelhantes: v.s.includes('1')}, 'PUT');
+    recarregarGastos(); toast(r.alterados > 1 ? `${r.alterados} lançamentos agora em ${v.c}` : `Agora em ${v.c}`);
+  } catch (e) { toast(e.message); }
+}
+async function apagarLanc(id) {
+  const x = gastosDoMes()?.itens.find(i => i.id === id);
+  if (!x || !await ask({title: 'Apagar lançamento?', desc: `${x.descricao} · ${M(Math.abs(x.valor))} · ${diaBR(x.data)}`, ok: 'Apagar'})) return;
+  try { await api(`/api/gastos/${id}`, null, 'DELETE'); recarregarGastos(); toast('Lançamento apagado'); } catch (e) { toast(e.message); }
+}
+async function editarLimites() {
+  const g = gastosDoMes(); if (!g) return;
+  const cats = g.despesas.filter(c => !FORA_GASTOS.includes(c));
+  const ref = Object.fromEntries(g.categorias.map(c => [c.categoria, c.media_3m || c.valor]));
+  const v = await ask({title: 'Limites por categoria', ok: 'Salvar',
+    desc: 'Quanto você quer gastar por mês em cada categoria. Deixe em branco para não ter limite. O app avisa ao passar de 80% e de 100%.',
+    fields: cats.map((c, i) => ({name: 'c' + i, label: c, prefix: 'R$', mode: 'decimal', value: g.limites[c] ? N(g.limites[c], 2) : '',
+      hint: ref[c] ? `Média recente: ${M(ref[c])}` : ''}))});
+  if (!v) return;
+  const lim = {};
+  cats.forEach((c, i) => { const x = num(v['c' + i]); if (x > 0) lim[c] = x; });
+  try { await api('/api/gastos-limites', lim, 'PUT'); recarregarGastos(); toast('Limites salvos'); } catch (e) { toast(e.message); }
+}
+$('#arqGastos').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  toast('Lendo os lançamentos…');
+  try {
+    const r = await api('/api/gastos/importar', fd);
+    const top = Object.entries(r.por_categoria).slice(0, 4).map(([c, v]) => `${c} ${M(v)}`).join(', ');
+    if (r.meses.length) { const u = r.meses[r.meses.length - 1]; st.mesContas = {ano: +u.slice(0, 4), mes: +u.slice(5) - 1}; }
+    st.gastos = {}; renderContas();
+    ask({title: r.novos ? `${r.novos} lançamentos importados` : 'Nada novo neste arquivo', ok: 'Ver gastos', cancelar: false,
+      desc: r.novos ? `Separados por categoria${top ? ': ' + top : ''}. ${r.repetidos ? `${r.repetidos} já estavam no app e não foram duplicados. ` : ''}Toque na categoria de um lançamento para corrigir: o app aprende.`
+        : `Os ${r.repetidos} lançamentos deste arquivo já estavam no app.`});
+  } catch (er) { toast(er.message); }
+};
+
+/* ---------- rentabilidade e proventos ---------- */
+function linhaSvg(serie, linhas, rotulo) {
+  const W = 640, H = 220, pl = 46, pr = 8, pt = 10, pb = 24, n = serie.datas.length;
+  const vals = linhas.flatMap(([k]) => (serie[k] || []).filter(v => v != null));
+  if (n < 2 || !vals.length) return '';
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 2) { hi += 1; lo -= 1; }
+  const X = i => pl + i / (n - 1) * (W - pl - pr), Y = v => pt + (hi - v) / (hi - lo) * (H - pt - pb);
+  const bruto = (hi - lo) / 4, mag = 10 ** Math.floor(Math.log10(bruto)), passo = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= bruto);
+  const grade = [];
+  for (let g = Math.ceil((lo - 100) / passo) * passo; g <= hi - 100 + 1e-9; g += passo) grade.push(100 + g);  // linhas em valores redondos (ex.: -10%, 0%, +10%)
+  const fmtD = d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {month: 'short', year: '2-digit'}).replace('. de ', '/').replace(' de ', '/');
+  const xs = [0, Math.floor((n - 1) / 2), n - 1];
+  const caminho = k => (serie[k] || []).map((v, i) => v == null ? null : `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).filter(Boolean).join(' L');
+  return `<div class="graf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(rotulo)}">
+    ${grade.map(g => `<line x1="${pl}" x2="${W - pr}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}" style="stroke:var(--line2)"/><text x="${pl - 6}" y="${(Y(g) + 4).toFixed(1)}" text-anchor="end">${g - 100 > 0 ? '+' : ''}${N(g - 100, 0)}%</text>`).join('')}
+    ${xs.map(i => `<text x="${X(i).toFixed(1)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}">${esc(fmtD(serie.datas[i]))}</text>`).join('')}
+    ${linhas.map(([k, , cor, tr]) => caminho(k) ? `<path d="M${caminho(k)}" fill="none" style="stroke:${cor};stroke-width:${tr ? 1.6 : 2.5}${tr ? ';stroke-dasharray:5 4' : ''}" stroke-linejoin="round"/>` : '').join('')}
+  </svg></div><div class="legenda">${linhas.filter(([k]) => caminho(k)).map(([, nome, cor]) => `<span><i style="background:${cor}"></i>${esc(nome)}</span>`).join('')}</div>`;
+}
+async function loadRent(force) {
+  const k = JSON.stringify(pos);
+  if (!force && st.rentK === k && (st.rent || st.rentBusy)) return;
+  st.rentK = k; st.rentBusy = true; st.rentErr = null; renderRent();
+  try { st.rent = await api('/api/rentabilidade', {pos}); } catch (e) { st.rentErr = e.message; st.rent = null; }
+  st.rentBusy = false; renderRent();
+}
+function renderRent() { const el = $('#rentCard'); if (el) { el.innerHTML = rentHtml(); ligarRent(); } }
+function rentHtml() {
+  const r = st.rent;
+  if (!r) return !st.rentErr && !st.rentBusy ? '' : `<div class="card"><h2>Rentabilidade</h2>${st.rentErr ? `<p class="err-box">${esc(st.rentErr)}</p><div class="btns"><button class="btn" type="button" onclick="loadRent(true)">Tentar de novo</button></div>` : busy('Calculando a rentabilidade…') + sk(3)}</div>`;
+  if (r.vazio) return '';
+  const modo = st.rentModo !== 'atual' && r.historico ? 'historico' : 'atual', x = r[modo];
+  const seg = r.historico ? `<div class="chips" role="group" aria-label="Tipo de rentabilidade" style="margin-top:8px"><button type="button" data-rmodo="historico" aria-pressed="${modo === 'historico'}">Desde a primeira compra</button><button type="button" data-rmodo="atual" aria-pressed="${modo === 'atual'}">Carteira de hoje</button></div>` : '';
+  const expl = modo === 'historico'
+    ? `Seu resultado real em ações, FIIs e ETFs desde ${diaBR(x.desde)}, pelas compras e vendas importadas da B3. Dinheiro novo não conta como rendimento (método Dietz modificado), e os proventos estão incluídos.${x.ao_ano != null ? ` Equivale a ${P(x.ao_ano, 1, false)} ao ano.` : ''} Renda fixa fora da B3 não entra.`
+    : `Quanto a sua carteira de hoje (mesmas quantidades e saldos) rendeu em cada período, com os proventos. Não é o seu resultado real, porque você pode ter comprado em outras datas${r.historico ? '' : ': para ele, importe as suas compras e vendas da B3 em Ativos'}.`;
+  const linhas = x.periodos.map(p => `<tr><td>${esc(p.rotulo)}</td><td class="${cl(p.carteira)}"><b>${P(p.carteira)}</b>${p.pct_cdi != null ? `<small>${N(p.pct_cdi)}% do CDI</small>` : ''}</td><td>${P(p.cdi)}</td><td class="${cl(p.ibov)}">${P(p.ibov)}</td><td>${P(p.ipca)}</td></tr>`).join('');
+  const contrib = modo === 'atual' && x.por_ativo?.length ? `<details style="margin-top:8px"><summary>Por ativo, em 12 meses</summary><div class="scroll-x"><table class="tbl" style="margin-top:6px"><thead><tr><th>Ativo</th><th>Rendeu</th><th>Ganho</th><th>Peso hoje</th></tr></thead><tbody>
+    ${x.por_ativo.map(a => `<tr><td>${esc(rot(a.ticker))}</td><td class="${cl(a.ret)}">${P(a.ret)}</td><td class="${cl(a.ganho)}">${M(a.ganho)}</td><td>${P(a.peso, 1, false)}</td></tr>`).join('')}</tbody></table></div></details>` : '';
+  const p = r.proventos, pmax = Math.max(...p.por_mes.map(m => m.valor), 1);
+  return `<div class="grid2">
+    <div class="card"><h2>Rentabilidade</h2>${seg}
+      <p class="lead sm">${esc(expl)}</p>
+      <div class="scroll-x"><table class="tbl rent-tbl" style="margin-top:6px"><thead><tr><th>Período</th><th>Carteira</th><th>CDI</th><th>Ibovespa</th><th>IPCA</th></tr></thead><tbody>${linhas}</tbody></table></div>
+      ${linhaSvg(x.serie, [['carteira', 'Sua carteira', 'var(--acc)'], ['cdi', 'CDI', 'var(--up)', 1], ['ibov', 'Ibovespa', 'var(--c-acao)', 1]], 'Evolução da carteira contra CDI e Ibovespa')}
+      ${x.fora?.length ? `<p class="mut xs">Sem histórico de preço, ficaram de fora: ${esc(x.fora.join(', '))}.</p>` : ''}
+      ${contrib}
+      <p class="mut xs" style="margin:8px 0 0">${x.cdi_real ? 'CDI' : 'CDI estimado pela taxa atual'} e ${x.ipca_real ? 'IPCA' : 'IPCA (sem dados agora)'} do Banco Central; preços do Yahoo Finance, ajustados por proventos. Rentabilidade passada não garante rentabilidade futura.</p>
+    </div>
+    <div class="card"><h2>Proventos</h2>
+      <p class="lead sm">${p.fonte === 'b3' ? `Dividendos, JCP e rendimentos que caíram na sua conta, pela Movimentação da B3${p.desde ? ` (desde ${diaBR(p.desde)})` : ''}.` : 'Estimativa com as quantidades de hoje e os proventos pagos por cota nos últimos 12 meses (pela data-com). Para os valores que caíram de verdade, importe a Movimentação da B3 em Ativos.'}</p>
+      <div class="tiles"><div class="tile"><div class="l">Últimos 12 meses</div><div class="v tn">${M(p.total_12m)}</div></div><div class="tile"><div class="l">Média por mês</div><div class="v tn">${M(p.media_mensal)}</div></div>
+        <div class="tile main"><div class="l">Próximos 12 meses</div><div class="v tn">${M(p.projecao_12m)}</div><div class="d">se pagarem o mesmo por cota</div></div></div>
+      <div class="barras" role="img" aria-label="Proventos por mês nos últimos 12 meses">${p.por_mes.map(m => `<div class="b" title="${MESES[+m.mes.slice(5) - 1]} de ${m.mes.slice(0, 4)}: ${M(m.valor)}"><i style="height:${(m.valor / pmax * 100).toFixed(1)}%"></i><small>${MESES[+m.mes.slice(5) - 1].slice(0, 3)}</small></div>`).join('')}</div>
+      ${p.por_ativo.length ? `<div class="scroll-x"><table class="tbl" style="margin-top:8px"><thead><tr><th>Ativo</th><th>12 meses</th><th>Sobre o preço pago</th>${p.fonte === 'b3' ? '' : '<th>Sobre o preço de hoje</th>'}</tr></thead><tbody>
+        ${p.por_ativo.map(a => `<tr><td>${esc(rot(a.ticker))}</td><td>${M(a.valor)}</td><td>${a.yoc != null ? P(a.yoc, 1, false) : '—'}</td>${p.fonte === 'b3' ? '' : `<td>${a.dy != null ? P(a.dy, 1, false) : '—'}</td>`}</tr>`).join('')}</tbody></table></div>`
+        : '<p class="mut sm">Nenhum provento nos últimos 12 meses.</p>'}
+    </div></div>`;
+}
+function ligarRent() { $$('#rentCard [data-rmodo]').forEach(b => b.onclick = () => { st.rentModo = b.dataset.rmodo; renderRent(); }); }
+
+/* ---------- importar da B3 ---------- */
+$('#btnB3').onclick = async () => {
+  if (!premium()) return abrirPlanos('Importar a carteira, as compras e vendas e os proventos da B3 é do Premium.');
+  const v = await ask({title: 'Importar da B3', ok: 'Escolher arquivo',
+    desc: 'Entre na Área do Investidor da B3 (investidor.b3.com.br), vá em Extratos e baixe em Excel:',
+    extraHtml: `<ul class="ink2 sm" style="padding-left:18px;margin:0"><li><b>Posição:</b> o que você tem hoje, inclusive Tesouro Direto.</li>
+      <li><b>Negociação:</b> suas compras e vendas, para o preço médio e a rentabilidade real.</li>
+      <li><b>Movimentação:</b> dividendos, JCP e rendimentos que caíram na conta.</li></ul>
+      <p class="mut sm" style="margin:0">Envie um de cada vez, em qualquer ordem: o app junta tudo e não duplica. A planilha é lida e descartada; ficam só as operações e os proventos.</p>`});
+  if (v) $('#arqB3').click();
+};
+$('#arqB3').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  toast('Lendo a planilha da B3…');
+  try {
+    const r = await api('/api/b3/importar', fd), ps = Object.entries(r.posicoes);
+    const TIPO = {posicao: 'Posição', negociacao: 'Negociação', movimentacao: 'Movimentação', tesouro: 'Tesouro Direto', renda_fixa: 'Renda fixa'};
+    const desc = `${[...new Set(r.tipos)].map(t => TIPO[t] || t).join(', ')}.${r.movimentacoes ? ` ${r.movimentacoes} compras e vendas.` : ''}${r.proventos ? ` ${r.proventos} proventos recebidos.` : ''}`;
+    const opc = ps.map(([t, x]) => ({value: t, checked: true, label: rot(t),
+      desc: x.saldo != null ? `saldo ${M(x.saldo)}${pos[t]?.saldo ? ` (hoje no app: ${M(pos[t].saldo)})` : ''}`
+        : `${N(x.qtd, 4)} cotas${x.pm ? ` · preço médio ${M(x.pm)}` : ''}${pos[t]?.qtd ? ` (hoje no app: ${N(pos[t].qtd, 4)})` : ''}`}));
+    const v = await ask({title: 'Planilha da B3 lida', desc, ok: ps.length ? 'Atualizar carteira' : 'Fechar', cancelar: !!ps.length,
+      fields: ps.length ? [{name: 'a', type: 'checks', label: 'Atualizar estes ativos na sua carteira', options: opc}] : [],
+      extraHtml: r.avisos.map(a => `<div class="note warn">${ICON.warn}<div>${esc(a)}</div></div>`).join('')});
+    if (v && ps.length) {
+      const sel = new Set(v.a);
+      for (const [t, x] of ps) {
+        if (!sel.has(t)) continue;
+        pos[t] = x.saldo != null ? {saldo: x.saldo, pct: pos[t]?.pct ?? (t === 'LCI_LCA' ? 90 : 100)} : {qtd: x.qtd, pm: x.pm || pos[t]?.pm || 0};
+        if (!document.getElementById('r-' + t)) { if (!extra.includes(t)) extra.push(t); addRow(t); }
+        load(t);
+      }
+      sv(); posChanged(); toast('Carteira atualizada com os dados da B3');
+    }
+    st.rentK = null;
+  } catch (er) { toast(er.message); }
+};
+
+/* ---------- fundamentos e ranking ---------- */
+const temFundamentos = a => ['acao', 'fii'].includes(a.classe) && !/^ETF/.test(st.uni[a.ticker]?.setor || '') && !RF[a.ticker];
+const FMT = (v, f) => v == null ? '—' : f === 'pct' ? P(v, 1, false) : f === 'x' ? N(v, 2)
+  : f === 'bi' ? (v >= 1 ? `R$ ${N(v, 1)} bi` : `R$ ${N(v * 1000, 0)} mi`) : f === 'mi' ? (v >= 1 ? `R$ ${N(v, v >= 10 ? 0 : 1)} mi` : `R$ ${N(v * 1000, 0)} mil`) : N(v, 2);
+function fundHtml(f) {
+  const prov = f.proventos || {}, anos = prov.anos || [], max = Math.max(...anos.map(a => a.valor || 0), 1e-4);
+  const setor = f.comparado_com?.startsWith('setor');
+  return `${f.prejuizo ? `<div class="note warn">${ICON.warn}<div>A empresa teve prejuízo nos últimos 12 meses, por isso não há P/L.</div></div>` : ''}
+    ${f.pl_inconsistente ? `<p class="mut xs" style="margin:6px 0 0">P/L escondido: o lucro e o preço da fonte não batem entre si para este ativo, e um número errado seria pior que nenhum.</p>` : ''}
+    <div class="fund-grid">${f.indicadores.map(x => `<div class="fi" title="${esc(x.ajuda)}"><div class="l">${esc(x.rotulo)}</div><div class="v">${FMT(x.valor, x.formato)}</div>${x.referencia != null ? `<div class="r">${setor ? 'setor' : 'mediana'}: ${FMT(x.referencia, x.formato)}</div>` : ''}</div>`).join('')}</div>
+    ${f.comparado_com ? `<p class="mut xs" style="margin:6px 0 0">Comparado com a mediana ${setor ? 'do' : 'das'} ${esc(f.comparado_com)}.</p>` : ''}
+    ${anos.length && !prov.anos_pagou && !anos.some(a => a.valor) ? `<p class="mut sm" style="margin-top:12px">Sem proventos registrados na fonte nos últimos ${N(anos.length)} anos.</p>` : ''}
+    ${anos.length && anos.some(a => a.valor) ? `<h3 style="margin-top:12px">Proventos por ${f.classe === 'fii' ? 'cota' : 'ação'}, por ano</h3>
+      <div class="barras" role="img" aria-label="Proventos por ano">${anos.map(a => `<div class="b" title="${a.ano}: ${a.valor == null ? 'sem dado' : 'R$ ' + N(a.valor, 2)}${a.parcial ? ' (até hoje)' : ''}">${a.valor == null ? '<small>s/d</small>' : `<i style="height:${(a.valor / max * 100).toFixed(1)}%${a.parcial ? ';opacity:.45' : ''}"></i>`}<small>${String(a.ano).slice(2)}</small></div>`).join('')}</div>
+      <p class="mut xs" style="margin:4px 0 0">Pagou em ${N(prov.anos_pagou)} de ${N(prov.anos_total)} anos completos${prov.dy_5a != null ? ` · dividend yield médio de 5 anos: ${P(prov.dy_5a, 1, false)}` : ''}${prov.cresc_div != null ? ` · os proventos ${prov.cresc_div >= 0 ? 'cresceram' : 'caíram'} ${P(Math.abs(prov.cresc_div), 1, false)} ao ano em 5 anos` : ''}. O ano atual aparece mais claro (até hoje)${prov.sem_dado?.length ? '; “s/d” é ano sem dado na fonte' : ''}.</p>` : ''}
+    <details style="margin-top:8px"><summary>O que é cada indicador</summary><ul class="ink2 sm" style="padding-left:18px">${f.indicadores.map(x => `<li><b>${esc(x.rotulo)}:</b> ${esc(x.ajuda)}</li>`).join('')}</ul></details>
+    <p class="mut xs" style="margin:6px 0 0">${esc(f.fonte)} Indicadores são dados, não recomendação de compra ou venda.</p>`;
+}
+document.addEventListener('toggle', async e => {
+  const d = e.target;
+  if (!d.matches?.('details.fund') || !d.open || d.dataset.ok) return;
+  d.dataset.ok = '1';
+  const body = $('.fund-body', d);
+  try { body.innerHTML = fundHtml(await api('/api/fundamentos/' + encodeURIComponent(d.dataset.fund))); }
+  catch (er) { body.innerHTML = `<p class="mut sm">${esc(er.message)}</p>`; delete d.dataset.ok; }
+}, true);
+async function abrirFund(t) {
+  const d = $('#dlg');
+  d.innerHTML = `<div class="dlg"><h3 id="dlgTitle">${esc(rot(t))}</h3><div id="fundDlg">${busy('Buscando o balanço…')}</div><div class="row-btns"><button type="button" class="btn primary" data-x>Fechar</button></div></div>`;
+  $('[data-x]', d).onclick = () => d.close(); d.oncancel = null;
+  d.showModal();
+  try {
+    const f = await api('/api/fundamentos/' + encodeURIComponent(t));
+    $('#fundDlg', d).innerHTML = `<p class="mut sm" style="margin:0 0 6px">${esc(f.nome || '')}${f.setor ? ' · ' + esc(f.setor) : ''}${f.preco ? ' · ' + M(f.preco) : ''}</p>` + fundHtml(f);
+  } catch (er) { $('#fundDlg', d).innerHTML = `<p class="err-box">${esc(er.message)}</p>`; }
+}
+st.rk = {tipo: 'acao', ordem: 'dy', desc: true, setor: '', dados: {}, err: null};
+async function loadRank(tipo) {
+  if (loadRank.busy === tipo) return;
+  loadRank.busy = tipo; st.rk.err = null;
+  try { st.rk.dados[tipo] = await api('/api/ranking?tipo=' + tipo); } catch (e) { st.rk.err = e.message; }
+  loadRank.busy = null;
+  if (st.rk.tipo === tipo) renderRank();
+}
+function renderRank() { const el = $('#rankCard'); if (el) { el.innerHTML = rankHtml(); ligarRank(); } }
+function rankHtml() {
+  const R = st.rk, d = R.dados[R.tipo];
+  const tabs = `<div class="chips" role="group" aria-label="Tipo de ativo"><button type="button" data-rkt="acao" aria-pressed="${R.tipo === 'acao'}">Ações</button><button type="button" data-rkt="fii" aria-pressed="${R.tipo === 'fii'}">FIIs</button></div>`;
+  if (!d) return `<div class="card">${tabs}${R.err ? `<p class="err-box">${esc(R.err)}</p><div class="btns"><button class="btn" type="button" onclick="loadRank(st.rk.tipo)">Tentar de novo</button></div>` : busy('Buscando os balanços…') + sk(4)}</div>`;
+  const cols = d.colunas, k = cols.includes(R.ordem) ? R.ordem : 'dy';
+  const setores = [...new Set(d.linhas.map(l => l.setor))].sort();
+  const val = l => l.ind[k];
+  const linhas = d.linhas.filter(l => !R.setor || l.setor === R.setor)
+    .sort((a, b) => val(a) == null ? 1 : val(b) == null ? -1 : (R.desc ? val(b) - val(a) : val(a) - val(b)));
+  const curto = {dy: 'DY', pl: 'P/L', pvp: 'P/VP', roe: 'ROE', margem: 'Margem', div_ebitda: 'Dív./EBITDA', margem_ebitda: 'Mg. EBITDA', payout: 'Payout', cresc_receita: 'Receita', valor_mercado: 'Valor', giro: 'Liquidez', ret_12m: '12 meses'};
+  return `<div class="card">${tabs}
+    <p class="lead sm" style="margin-top:8px">Indicadores ${R.tipo === 'acao' ? 'das ações' : 'dos FIIs'} da lista do app, lado a lado. Toque no nome de uma coluna para ordenar e numa linha para ver os detalhes e os dividendos por ano.</p>
+    <div class="rk-ctl"><label class="sm">Setor <select id="rkSetor"><option value="">Todos</option>${setores.map(x => `<option ${x === R.setor ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label></div>
+    <div class="scroll-x"><table class="tbl rk-tbl" style="margin-top:6px"><thead><tr><th>Ativo</th>${cols.map(c => `<th ${c === k ? `aria-sort="${R.desc ? 'descending' : 'ascending'}"` : ''}><button type="button" data-rko="${c}" title="${esc(d.rotulos[c])}">${esc(curto[c] || d.rotulos[c])}${c === k ? (R.desc ? ' ↓' : ' ↑') : ''}</button></th>`).join('')}</tr></thead>
+      <tbody>${linhas.map(l => `<tr data-rkf="${esc(l.ticker)}" tabindex="0"><td><b>${esc(l.ticker)}</b><small>${esc(l.setor)}</small></td>${cols.map(c => `<td>${FMT(l.ind[c], d.formatos[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    ${d.premium ? '' : `<div class="note">${ICON.cadeado}<div>No plano grátis aparecem ${N(d.linhas.length)} de ${N(d.total)} ${R.tipo === 'acao' ? 'ações' : 'FIIs'}. <a href="#" onclick="abrirPlanos('O ranking completo, com todos os ativos e filtros, é do Premium.');return false">Ranking completo no Premium</a>.</div></div>`}
+    <p class="mut xs" style="margin:8px 0 0">Ordenar por um indicador não é recomendação: um dividend yield alto pode ser pagamento que não se repete, e um P/L baixo pode refletir lucro em queda. Dados do Yahoo Finance; preço, dividendos e liquidez calculados pelo app.</p></div>`;
+}
+function ligarRank() {
+  const el = $('#rankCard'); if (!el) return;
+  $$('[data-rkt]', el).forEach(b => b.onclick = () => { st.rk.tipo = b.dataset.rkt; st.rk.setor = ''; renderRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo); });
+  $$('[data-rko]', el).forEach(b => b.onclick = () => { const c = b.dataset.rko; if (st.rk.ordem === c) st.rk.desc = !st.rk.desc; else { st.rk.ordem = c; st.rk.desc = !['pl', 'pvp', 'div_ebitda'].includes(c); } renderRank(); });
+  const s_ = $('#rkSetor', el); if (s_) s_.onchange = () => { st.rk.setor = s_.value; renderRank(); };
+  $$('[data-rkf]', el).forEach(tr => { tr.onclick = () => abrirFund(tr.dataset.rkf); tr.onkeydown = ev => { if (ev.key === 'Enter') abrirFund(tr.dataset.rkf); }; });
+}
+
 /* ---------- abas ---------- */
 function go(t) {
   st.tab = t; rawSet('tab', t);
@@ -1068,8 +1414,9 @@ function renderResumo() {
       <div class="btns"><button class="btn primary" type="button" onclick="go('investir')">Ver onde investir</button><button class="btn" type="button" onclick="go('sim')">Simular o futuro</button></div>
       ${p.fonte === 'regras' && !p.ia_configurada ? `<p class="mut xs" style="margin:12px 0 0">Recomendações por regras, a partir de dados de mercado (juros, inflação, risco e retorno de longo prazo de cada ativo), do seu perfil e do seu objetivo.${st.iaAtiva && !premium() ? ' <a href="#" onclick="abrirPlanos();return false">Análises com IA</a> são do Premium.' : ''}</p>` : ''}
     </div>
-  </div><div id="resumoContas"></div>`;
-  renderResumoContas();
+  </div><div id="rentCard">${rentHtml()}</div><div id="resumoContas"></div>`;
+  renderResumoContas(); ligarRent();
+  if (!p.vazio) loadRent();
 }
 function avisosTopo() {
   let h = '';
@@ -1593,8 +1940,11 @@ function renderMercado() {
       ${c.ajuste ? `<p class="mut xs">Ajuste aplicado na simulação: ${c.ajuste > 0 ? '+' : ''}${N(c.ajuste, 1)} p.p. no próximo ano.</p>` : ''}
       ${c.noticias.length ? `<details style="margin-top:8px"><summary>${c.noticias.length} manchetes</summary><ul class="news">${c.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}${n.fonte ? `<small>${esc(n.fonte)}</small>` : ''}</li>`).join('')}</ul></details>` : ''}
     </div>`; }).join('')}</div>
+  <div class="sect-t">Ranking de ações e FIIs</div>
+  <div id="rankCard">${rankHtml()}</div>
   <div class="sect-t">Confiabilidade</div>
   <div id="acertos">${acertosHtml()}</div>`;
+  ligarRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo);
 }
 
 /* ---------- Meus ativos ---------- */
@@ -1630,6 +1980,7 @@ function card(a) {
       <ul class="news">${a.noticias.map(n => `<li>${String(n.link).startsWith('https://') ? `<a href="${esc(n.link)}" target="_blank" rel="noopener">${esc(n.titulo)}</a>` : esc(n.titulo)}</li>`).join('')}</ul>
       ${checagemHtml(a.checagem)}
     </details>
+    ${temFundamentos(a) ? `<details class="fund" data-fund="${esc(a.ticker)}" style="margin-top:8px"><summary>Fundamentos e dividendos por ano</summary><div class="fund-body">${busy('Buscando o balanço…')}</div></details>` : ''}
     <div class="btns"><button class="btn sm" type="button" onclick="order('${a.ticker}','COMPRAR',${m.preco})">Registrei compra</button>
       <button class="btn sm" type="button" onclick="order('${a.ticker}','VENDER',${m.preco})">Registrei venda</button>
       <button class="btn sm" type="button" onclick="edit('${a.ticker}','${a.classe}')">Editar posição</button>
@@ -2131,7 +2482,7 @@ function renderContas() {
         ${c.linha ? `<button class="btn sm" type="button" data-cp="${esc(c.linha)}">Copiar código</button>` : ''}
         <button class="btn sm ghost" type="button" data-ed="${c.id}">Editar</button><button class="btn sm ghost" type="button" data-rm="${c.id}">Excluir</button></div></div>`;
   };
-  el.innerHTML = `${orcamentoHtml()}<div class="card">
+  el.innerHTML = `<div id="gastosCard">${gastosHtml()}</div>${orcamentoHtml()}<div class="card">
       <div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Contas de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>
       <div class="tiles"><div class="tile"><div class="l">Total do mês</div><div class="v tn">${M(total)}</div><div class="d">${lista.length} ${lista.length === 1 ? 'conta' : 'contas'}</div></div>
         <div class="tile"><div class="l">Já pago</div><div class="v tn">${M(pago)}</div><div class="d">${(n => `${n} ${n === 1 ? 'paga' : 'pagas'}`)(lista.filter(c => c.pago).length)}</div></div>
@@ -2146,7 +2497,8 @@ function renderContas() {
     : `<div class="card"><h2>Nenhuma conta neste mês</h2><p class="lead">Cadastre as contas que você paga todo mês (luz, água, internet, aluguel, cartão…) e o app avisa antes de cada vencimento. Quatro jeitos:</p>
         <ul class="ink2" style="padding-left:18px"><li><b>Adicionar conta:</b> digite nome, valor e vencimento.</li><li><b>Ler boleto:</b> cole a linha digitável e o app descobre valor, vencimento e banco.</li>
         <li><b>Enviar PDF ou foto</b> do boleto ou da fatura.</li><li><b>Achar contas no extrato:</b> envie o extrato do banco (OFX ou CSV) e o app identifica o que se repete todo mês.</li></ul></div>`}`;
-  $$('[data-mes]', el).forEach(b => b.onclick = () => { let {ano: a, mes: m} = st.mesContas; m += +b.dataset.mes; if (m < 0) { m = 11; a--; } if (m > 11) { m = 0; a++; } st.mesContas = {ano: a, mes: m}; renderContas(); });
+  $$('[data-mes]', el).forEach(b => b.onclick = () => mudarMes(+b.dataset.mes));
+  ligarGastos(); if (!st.gastos[ymG(st.mesContas)]) loadGastos();
   $('#cNova', el).onclick = () => editarConta();
   $('#fEd', el)?.addEventListener('click', editarFinancas);
   $('#cBoleto', el).onclick = lerBoleto;

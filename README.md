@@ -57,6 +57,26 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   perder a conta, basta criar a conta de novo com o mesmo e-mail (ou entrar com o Google): ela volta com o mesmo
   identificador e o aparelho reenvia os dados.
 
+## Gastos, rentabilidade e fundamentos
+
+- **Gastos do dia a dia** (aba Contas): lançamentos à mão ou importados do extrato do banco e da fatura do cartão (OFX
+  ou CSV), com categoria automática pela descrição (iFood -> Alimentação fora, Uber -> Transporte...). Quando a pessoa
+  corrige uma categoria, o app aprende e aplica aos parecidos. Limite por categoria com aviso ao passar de 80% e de
+  100%, comparação com o mês anterior e com a média, e gráfico dos últimos meses. Pagamento de fatura e aplicações não
+  contam como gasto (a fatura é a soma das compras; aplicar é guardar). Importar o mesmo extrato duas vezes não duplica.
+- **Rentabilidade e proventos** (Resumo): a carteira contra CDI, Ibovespa e IPCA em 1, 3, 6, 12 e 24 meses, com
+  gráfico e "% do CDI". Sem histórico, mede a carteira de hoje; com as compras e vendas importadas da B3, mostra o
+  resultado real desde a primeira compra (Dietz modificado, mês a mês). Proventos dos últimos 12 meses por mês e por
+  ativo, com retorno sobre o preço pago, e a projeção dos próximos 12 meses.
+- **Importar da B3** (Ativos): planilhas da Área do Investidor (Posição, Negociação e Movimentação, em Excel ou CSV),
+  reconhecidas pelo nome das colunas. Soma o mesmo ativo em corretoras diferentes, lê Tesouro Direto e CDB/LCI/LCA,
+  calcula o preço médio e guarda os proventos recebidos. Não duplica ao importar de novo. A planilha é descartada.
+- **Fundamentos e ranking** (Ativos e Mercado): P/L, P/VP, dividend yield, ROE, margens, dívida líquida/EBITDA, payout,
+  crescimento da receita, valor de mercado e liquidez, cada um com a mediana do setor e uma explicação; proventos por
+  ano (10 anos), dividend yield médio de 5 anos e crescimento dos proventos. Ranking das ações e dos FIIs da lista,
+  ordenável e filtrável por setor. Os balanços vêm do Yahoo Finance, que tem falhas para empresas brasileiras: preço,
+  dividend yield e liquidez são calculados pelo app, e o P/L só aparece quando duas contas independentes batem.
+
 ## Regras de gestão de risco
 
 Valem com ou sem IA (e a IA recebe as mesmas regras e só os ativos que passam nelas):
