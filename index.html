@@ -926,6 +926,7 @@ function acertosHtml() {
     <p class="mut xs">${esc(r.criterio)} “p.p.” é quanto o sinal ganhou do CDI, em média, em pontos percentuais. ${t.cdi_real ? 'CDI histórico do Banco Central.' : 'Sem acesso ao histórico do CDI agora: usei a taxa atual.'}
       A IA não entra neste teste: ela lê as notícias de hoje e já sabe o que aconteceu depois, então testá-la no passado daria um resultado falso. Resultados passados não garantem resultados futuros.</p>`
     : `<p class="mut sm">Não consegui baixar o histórico de preços agora. <a href="#" onclick="st.acertos=null;loadAcertos(true);return false">Tentar de novo</a></p>`}
+    ${escolhaHtml(r.escolha)}
     <h3>Sinais do próprio app</h3>
     ${!h.total ? `<p class="mut sm" style="margin:-4px 0 0">Cada sinal de compra ou venda que o app der a partir de agora fica guardado com a data e o preço, e é conferido depois de 3, 6 e 12 meses.</p>`
     : `<p class="mut sm" style="margin:-4px 0 0">${N(h.total)} ${h.total === 1 ? 'sinal guardado' : 'sinais guardados'} desde ${diaBR(h.desde)}${h.pendentes ? `; ${N(h.pendentes)} ainda ${h.pendentes === 1 ? 'aguarda' : 'aguardam'} 3 meses para a primeira conferência` : ''}.</p>
@@ -935,11 +936,44 @@ function acertosHtml() {
       ${h.ultimos?.length ? `<details style="margin-top:8px"><summary>Últimos sinais</summary><ul class="sinais">${h.ultimos.map(x => `<li><b>${esc(rot(x.ticker))}</b><span>${esc(nomeDec(x.decisao))}</span><span class="mut">${x.fonte === 'ia' ? 'IA' : 'Regras'}${x.consenso === 'concordam' ? ' + regras' : x.consenso === 'divergem' ? ' (regras discordaram)' : ''} · ${diaBR(x.data)}</span><span class="st">${stH(x)}</span></li>`).join('')}</ul></details>` : ''}`}
     <h3>Como o app se protege dos erros</h3>
     <ul class="ink2 sm protege">
+      <li><b>Dados limpos:</b> cotações erradas do Yahoo (um dia com preço absurdo, desdobramento não ajustado) são corrigidas antes de qualquer conta.</li>
+      <li><b>Liquidez:</b> um ativo novo só é sugerido se negociar ao menos R$ 10 milhões por dia (ações) ou R$ 2 milhões (FIIs). Se um que você já tem negocia pouco, o app avisa.</li>
+      <li><b>Nada de modismo:</b> ativo novo precisa de 3 anos de histórico na bolsa.</li>
+      <li><b>Peso pelo risco:</b> nenhum papel individual passa de 10% da carteira, no máximo um novo por setor, e quem oscila mais que o normal entra com peso menor. Se um setor passa de 25% da carteira, o app avisa.</li>
+      <li><b>Armadilha de dividendos:</b> dividendos altos demais para durar (pagamento extraordinário ou preço despencando) recebem aviso, para você não escolher um ativo só por isso.</li>
       <li><b>Segunda opinião:</b> ${st.iaAtiva ? 'cada análise da IA é comparada com a das regras. Quando discordam, o app mostra “opiniões divergentes, confiança baixa” e não manda aviso de compra ou venda.' : 'sem IA configurada, os avisos usam só as regras. Com a IA, eles só saem quando as duas concordam.'}</li>
       <li><b>Checagem dos números:</b> todo número citado num texto da IA precisa existir nos dados que o app calculou; se não existir, o texto é trocado pela explicação das regras.</li>
       ${r.modelo_decisoes ? `<li><b>Modelo mais forte nas decisões:</b> a carteira recomendada (o que comprar, manter e vender) é montada pelo ${esc(modeloNome(r.modelo_decisoes))}, que pensa com mais calma antes de responder.</li>` : ''}
     </ul>
   </div>`;
+}
+
+// teste da regra que escolhe as ações e os FIIs: escolhidos x comprar a lista toda, com o veredito honesto
+function escolhaHtml(e) {
+  const E = e?.classes || {}, cls = ['acao', 'fii'].filter(c => E[c]);
+  if (!cls.length) return '';
+  const NM = {acao: ['Ações', 'ações', 'as ações escolhidas'], fii: ['FIIs', 'FIIs', 'os FIIs escolhidos']};
+  const sg = v => `${v > 0 ? '+' : ''}${N(v, 1)}`;
+  const nota = c => {
+    const x = E[c], [, nome, quem] = NM[c];
+    const fim = c === 'acao' ? 'Por isso as ações escolhidas são só complemento, com no máximo 10% cada, e o núcleo fica em ETFs.'
+      : 'Por isso o app usa poucos FIIs individuais e prefere FIIs grandes de segmentos diferentes.';
+    const txt = x.veredito === 'ajudou'
+      ? `${NM[c][0]}: ajudou, mas pouco. ${quem[0].toUpperCase() + quem.slice(1)} renderam em média ${sg(x.vantagem_media)} p.p. ao ano acima da lista toda e ganharam dela em ${P(x.bate_media, 0, false)} dos meses (${sg(x.metade1.vantagem)} p.p. até ${x.metade1.ate}; ${sg(x.metade2.vantagem)} p.p. desde ${x.metade2.desde}). ${fim}`
+      : x.veredito === 'pouco'
+        ? `${NM[c][0]}: vantagem pequena e instável. ${quem[0].toUpperCase() + quem.slice(1)} renderam em média ${sg(x.vantagem_media)} p.p. ao ano acima da lista toda, mas ganharam dela em só ${P(x.bate_media, 0, false)} dos meses. ${fim}`
+        : `${NM[c][0]}: não ajudou. ${quem[0].toUpperCase() + quem.slice(1)} renderam ${sg(x.vantagem_media)} p.p. ao ano em relação à lista toda e ganharam dela em ${P(x.bate_media, 0, false)} dos meses: escolher ${nome} pelo histórico não funcionou. ${fim}`;
+    const cdi = x.media_aa < x.cdi_aa ? ` No mesmo período, os ${nome} da lista renderam ${P(x.media_aa, 1, false)} ao ano, contra ${P(x.cdi_aa, 1, false)} do CDI.` : '';
+    return `<div class="note ${x.veredito === 'ajudou' ? 'good' : 'warn'}">${x.veredito === 'ajudou' ? ICON.check : ICON.warn}<div>${esc(txt + cdi)}</div></div>`;
+  };
+  const meses = Math.max(...cls.map(c => E[c].meses));
+  return `<h3>Teste da escolha de ações e FIIs</h3>
+    <p class="mut sm" style="margin:-4px 0 0">No fim de cada mês do passado, a regra do app escolheu ${N(E[cls[0]].escolhidos)} papéis de cada classe (um por setor, pela relação entre retorno e risco dos 3 anos anteriores). Comparamos os 12 meses seguintes com comprar todos os papéis da lista em partes iguais.</p>
+    <div class="scroll-x"><table class="tbl ac-tbl" style="margin-top:6px"><thead><tr><th>Classe</th><th>Escolhidos<small>por ano</small></th><th>Lista toda<small>por ano</small></th><th>Ganhou da lista<small>dos meses</small></th></tr></thead><tbody>
+      ${cls.map(c => `<tr><td>${NM[c][0]}<small>${esc(E[c].desde)} a ${esc(E[c].ate)}</small></td><td><b>${P(E[c].escolha_aa, 1, false)}</b></td><td>${P(E[c].media_aa, 1, false)}<small>${N(E[c].ativos_medio)} papéis</small></td><td><b>${P(E[c].bate_media, 0, false)}</b><small>${sg(E[c].vantagem_media)} p.p.</small></td></tr>`).join('')}
+    </tbody></table></div>
+    ${cls.map(nota).join('')}
+    <p class="mut xs">Viés de sobrevivência: a lista tem só empresas e fundos que existem hoje e estão entre os maiores; os que quebraram ou encolheram ficaram de fora. Isso faz todos os números parecerem melhores do que foram de verdade, por isso a comparação justa é entre os escolhidos e a lista toda, que têm o mesmo viés. As janelas de 12 meses se sobrepõem: ${N(meses)} meses equivalem a cerca de ${N(Math.round(meses / 12))} anos de teste independentes.</p>`;
 }
 
 /* ---------- abas ---------- */

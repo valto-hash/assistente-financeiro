@@ -198,3 +198,105 @@ def avaliar(cdi_atual=10.0, hoje=None):
     return {"fontes": {f: {h: _resumo(g) for h, g in v.items()} for f, v in grupos.items()},
             "total": len(regs), "pendentes": sum(1 for x in recentes if "3m" in x["pendente"]),
             "desde": regs[0]["data"] if regs else None, "ultimos": recentes[-15:][::-1]}
+
+
+# ---------------------------------------------------------------- teste da ESCOLHA de ações e FIIs (a regra que monta os complementos)
+
+def _fator_div(adj, dv):
+    """Razão entre o preço ajustado por proventos e o preço de tela em cada data. O preço ajustado de anos atrás fica
+    menor que o real (desconta os dividendos pagos depois), o que inflaria o dividend yield do passado."""
+    F, f = np.ones(len(adj)), 1.0
+    for e in sorted(dv.index, reverse=True):
+        k = adj.index.searchsorted(e) - 1  # último pregão antes da data ex
+        if k < 0:
+            continue
+        a = float(adj.iloc[k])
+        f = a / (a / f + float(dv.loc[e]))
+        F[:k + 1] = f
+    return pd.Series(F, index=adj.index)
+
+
+def _carteiras_do_mes(c, dv):
+    """Métricas no último pregão de cada mês (só com dados até ali) e o rendimento dos 12 meses seguintes."""
+    tela = c / _fator_div(c, dv)
+    div12 = (dv.reindex(c.index.union(dv.index), fill_value=0.0).rolling("365D").sum().reindex(c.index)
+             if len(dv) else pd.Series(0.0, index=c.index))
+    vol = c.pct_change().rolling(252).std() * 252 ** 0.5 * 100
+    v = c.to_numpy()
+    fins = c.groupby([c.index.year, c.index.month]).tail(1).index
+    pos = {d: i for i, d in enumerate(c.index)}
+    out = {}
+    for d in fins:
+        i = pos[d]
+        if i < 252 or i + 252 >= len(c) or (d - c.index[0]).days < 3 * 365.25:
+            continue
+        i3 = c.index.searchsorted(d - pd.DateOffset(years=3))
+        janela = v[i - 251:i + 1]
+        out[d] = {"ret_3a_aa": ((v[i] / v[i3]) ** (1 / 3) - 1) * 100, "vol_aa": float(vol.iloc[i]),
+                  "queda_max_12m": float((janela / np.maximum.accumulate(janela) - 1).min() * 100),
+                  "ret_12m": (v[i] / v[i - 252] - 1) * 100, "dy_12m": float(div12.iloc[i] / tela.iloc[i] * 100),
+                  "anos_hist": (d - c.index[0]).days / 365.25,
+                  "fwd": min(max(v[i + 252] / v[i] - 1, -0.9), 3.0)}  # limita erros grosseiros de dado que tenham sobrado
+    return out
+
+
+def teste_escolha(universo, setores, etfs, cdi_atual=10.0, k=3, minimo=8):
+    """A regra que escolhe os complementos (regras.pontuacao, um por setor) aplicada no fim de cada mês do passado,
+    comparada com comprar TODOS os papéis da lista em partes iguais. Mede se escolher ajuda ou se dá na mesma.
+    Viés de sobrevivência: a lista tem só empresas e fundos que existem hoje; isso melhora todos os resultados,
+    por isso a comparação justa é com a média dessa mesma lista, não com o Ibovespa."""
+    idx = cdi_mensal()
+    cods = [a for a, (c, _, _) in universo.items() if c in ("acao", "fii") and a not in etfs]
+    sim.baixar(cods)
+    feats = {}
+    for a in cods:
+        _, c, dv, _ = sim._hist.get(a, (0, pd.Series(dtype=float), pd.Series(dtype=float), None))
+        if len(c) > 4 * 252:
+            feats[a] = _carteiras_do_mes(c, dv)
+    out = {}
+    for cl in ("acao", "fii"):
+        meus = [a for a in feats if universo[a][0] == cl]
+        datas = sorted({d for a in meus for d in feats[a]})
+        linhas = []
+        for d in datas:
+            fs = {a: feats[a][d] for a in meus if d in feats[a]}
+            if len(fs) < minimo:
+                continue
+            cdi = cdi_periodo(d - pd.Timedelta(days=365), d, idx, cdi_atual) * 100
+            nota = {a: regras.pontuacao(m, cl, cdi) for a, m in fs.items()}
+            usados, top = set(), []
+            for a in sorted(nota, key=lambda a: -nota[a]):
+                if nota[a] <= -0.3 or setores.get(a) in usados:
+                    continue
+                top.append(a); usados.add(setores.get(a))
+                if len(top) == k:
+                    break
+            if not top:
+                continue
+            media = float(np.mean([m["fwd"] for m in fs.values()]))
+            esc = float(np.mean([fs[a]["fwd"] for a in top]))
+            fim = d + pd.DateOffset(years=1)
+            linhas.append((d, esc, media, cdi_periodo(d, fim, idx, cdi_atual), len(fs)))
+        if len(linhas) < 24:
+            continue
+        L = pd.DataFrame(linhas, columns=["data", "escolha", "media", "cdi", "n"]).set_index("data")
+        exc = (L["escolha"] - L["media"]) * 100
+        meio = L.index[len(L) // 2]
+        a1, a2 = exc[L.index < meio], exc[L.index >= meio]
+        bate, med, media_exc = float((exc > 0).mean() * 100), float(exc.median()), float(exc.mean())
+        if bate >= 55 and med > 0 and a1.mean() > 0 and a2.mean() > 0:
+            veredito = "ajudou"
+        elif bate >= 52 and media_exc > 0:
+            veredito = "pouco"
+        else:
+            veredito = "nao"
+        out[cl] = {"meses": len(L), "desde": L.index[0].strftime("%m/%Y"), "ate": L.index[-1].strftime("%m/%Y"),
+                   "ativos_medio": round(float(L["n"].mean())), "escolhidos": k,
+                   "bate_media": round(bate, 1), "vantagem_media": round(media_exc, 1), "vantagem_mediana": round(med, 1),
+                   "metade1": {"ate": a1.index[-1].strftime("%m/%Y"), "vantagem": round(float(a1.mean()), 1)},
+                   "metade2": {"desde": a2.index[0].strftime("%m/%Y"), "vantagem": round(float(a2.mean()), 1)},
+                   "escolha_aa": round(float(L["escolha"].mean() * 100), 1), "media_aa": round(float(L["media"].mean() * 100), 1),
+                   "cdi_aa": round(float(L["cdi"].mean() * 100), 1),
+                   "bate_cdi": round(float((L["escolha"] > L["cdi"]).mean() * 100), 1),
+                   "veredito": veredito}
+    return {"classes": out, "cdi_real": idx is not None}

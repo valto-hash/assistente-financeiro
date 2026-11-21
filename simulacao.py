@@ -39,7 +39,7 @@ CRISES = [  # (nome, início, fim, CDI médio aproximado no período, % a.a.)
     ("Estresse fiscal, dólar a R$ 6", "2024-08-28", "2024-12-18", 10.8),
 ]
 
-_hist: dict = {}   # código -> (timestamp, fechamentos ajustados na moeda original, dividendos)
+_hist: dict = {}   # código -> (timestamp, fechamentos ajustados na moeda original, dividendos, giro diário em R$ milhões)
 _lock = threading.Lock()
 
 
@@ -51,6 +51,48 @@ def _sem_tz(s):
     if getattr(s.index, "tz", None) is not None:
         s.index = s.index.tz_localize(None)
     return s
+
+
+def limpar(c, salto=0.4, janela=10):
+    """Corrige erros de cotação do Yahoo antes de qualquer conta (um único dado errado distorce retornos e o teste):
+    1) um salto de mais de 40% num dia que se desfaz em até 10 pregões (o preço volta para perto de onde estava) é
+       cotação errada, não movimento real, e sai da série;
+    2) um salto de mais de 90% para baixo ou de 400% para cima num único dia é desdobramento ou grupamento não
+       ajustado (ex.: XPML11 em jan/2026): a parte anterior da série é reescalada. Quedas reais e grandes, como a de
+       77% da Americanas em 2023, ficam como estão."""
+    if len(c) < 3:
+        return c
+    v = c.to_numpy(dtype=float).copy()
+    n, ok = len(v), np.ones(len(v), bool)
+    r = v[1:] / v[:-1]
+    for k in np.where((r > 1 + salto) | (r < 1 / (1 + salto)))[0] + 1:
+        if not ok[k]:
+            continue
+        j0 = k - 1
+        while j0 > 0 and not ok[j0]:
+            j0 -= 1
+        ref = v[j0]
+        if 1 / (1 + salto) <= v[k] / ref <= 1 + salto:
+            continue
+        fim = next((j for j in range(k + 1, min(k + janela + 1, n)) if 0.8 <= v[j] / ref <= 1.25), None)
+        if fim is not None:
+            ok[k:fim] = False
+    c = c[ok]
+    v = c.to_numpy(dtype=float).copy()
+    r = v[1:] / v[:-1]
+    for k in np.where((r < 0.1) | (r > 5))[0][::-1] + 1:
+        v[:k] *= v[k] / v[k - 1]
+    return pd.Series(v, index=c.index)
+
+
+def giro_diario(close, volume, dias=63):
+    """Mediana do volume financeiro diário (R$ milhões) nos últimos ~3 meses; None sem dado de volume."""
+    try:
+        g = (close * volume).dropna()
+        g = g[g > 0].iloc[-dias:]
+        return round(float(g.median()) / 1e6, 2) if len(g) >= 20 else None
+    except Exception:
+        return None
 
 
 def baixar(codigos):
@@ -69,10 +111,12 @@ def baixar(codigos):
                 except Exception:
                     df = pd.DataFrame()
                 for s, c in syms.items():
-                    close, dv = pd.Series(dtype=float), pd.Series(dtype=float)
+                    close, dv, giro = pd.Series(dtype=float), pd.Series(dtype=float), None
                     try:
-                        close = _sem_tz(df["Close"][s].dropna().astype(float))
-                        close = close[close > 0]
+                        bruto = _sem_tz(df["Close"][s].dropna().astype(float))
+                        close = limpar(bruto[bruto > 0])
+                        if c not in SIMB:  # índice e câmbio não têm volume que faça sentido
+                            giro = giro_diario(bruto, _sem_tz(df["Volume"][s].astype(float)))
                     except Exception:
                         pass
                     try:
@@ -80,7 +124,7 @@ def baixar(codigos):
                         dv = dv[dv > 0]
                     except Exception:
                         pass
-                    _hist[c] = (agora, close, dv)
+                    _hist[c] = (agora, close, dv, giro)
     return {c: _hist[c][1] for c in codigos if c in _hist}
 
 
@@ -106,7 +150,7 @@ def fechamentos_brl(codigos):
 def metricas_hist(codigo):
     """Métricas rápidas a partir do histórico em cache (moeda original do ativo)."""
     baixar([codigo])
-    _, c, dv = _hist.get(codigo, (0, pd.Series(dtype=float), pd.Series(dtype=float)))
+    _, c, dv, giro = _hist.get(codigo, (0, pd.Series(dtype=float), pd.Series(dtype=float), None))
     if len(c) < 60:
         return None
     um_ano = c[c.index > c.index.max() - pd.Timedelta(days=365)]
@@ -123,6 +167,8 @@ def metricas_hist(codigo):
         "vol_aa": round(float(um_ano.pct_change().std() * 252 ** 0.5 * 100), 1),
         "queda_max_12m": round(float((um_ano / um_ano.cummax() - 1).min() * 100), 1),
         "dy_12m": round(div12 / p * 100, 1),
+        "giro_dia": giro,
+        "anos_hist": round((c.index[-1] - c.index[0]).days / 365.25, 1),
         "tendencia": None if sma200 is None else ("alta" if p > sma200 * 1.02 else "baixa" if p < sma200 * 0.98 else "lateral"),
         "serie": [round(float(x), 2) for x in um_ano.iloc[::5].tolist() + [p]],
     }

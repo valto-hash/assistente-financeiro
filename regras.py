@@ -13,6 +13,11 @@ import re
 from datetime import date
 
 CLASSES = ["renda_fixa", "acao", "fii", "exterior", "cambio"]
+# regras de gestão de risco usadas por gestores profissionais (não tentam adivinhar o mercado; evitam erros caros)
+GIRO_MIN = {"acao": 10.0, "fii": 2.0}   # R$ milhões negociados por dia (mediana de 3 meses) para um ativo NOVO entrar
+VOL_REF = {"acao": 30.0, "fii": 15.0}   # oscilação "normal" da classe; acima dela, o peso do ativo novo diminui
+ANOS_MIN = 3                            # ativo novo precisa de 3 anos de histórico (evita modismo e IPO recente)
+CDI_REF = [12.0]                        # CDI atual (% a.a.); o servidor atualiza ao ler as taxas do Banco Central
 NOME = {"renda_fixa": "Renda fixa", "acao": "Ações Brasil", "fii": "Fundos imobiliários", "exterior": "Exterior", "cambio": "Dólar e ouro"}
 NOME_MIN = {"renda_fixa": "renda fixa", "acao": "ações brasileiras", "fii": "fundos imobiliários", "exterior": "exterior", "cambio": "dólar e ouro"}
 
@@ -59,7 +64,7 @@ def decidir(pontos, rsi):
     return "MANTER"
 
 
-def analise_ativo(m):
+def analise_ativo(m, classe=None):
     """Decisão COMPRAR/VENDER/MANTER a partir de indicadores, com alvo, stop, resumo e riscos."""
     p, s50, s200, rsi = m["preco"], m.get("sma50"), m.get("sma200"), m.get("rsi14")
     vol = m.get("volatilidade_anual") or 25.0
@@ -86,6 +91,8 @@ def analise_ativo(m):
     if vol > 35: riscos.append(f"Oscilação alta: {pct(vol, 0)} ao ano")
     if (m.get("queda_max_12m") or 0) < -20: riscos.append(f"Chegou a cair {pct(abs(m['queda_max_12m']), 0)} nos últimos 12 meses")
     if rsi is not None and rsi > 70: riscos.append("Subiu rápido: pode devolver parte da alta")
+    if (pl := pouca_liquidez(m, classe)): riscos.insert(0, pl)
+    if (ad := alerta_dividendos(m, classe)): riscos.insert(0, ad)
     riscos.append("Análise por indicadores de preço: as notícias não foram avaliadas")
     return {"decisao": dec, "confianca": conf, "alvo": round(p * (1 + 0.5 * vol / 100), 2), "stop": round(p * (1 - 0.3 * vol / 100), 2),
             "resumo": resumo, "riscos": riscos[:4]}
@@ -243,6 +250,74 @@ def alvo_classes(modelo, pan_classes, obj):
     return alvo, " ".join(motivos)
 
 
+def giro(m):
+    return (m or {}).get("giro_dia")
+
+
+def giro_txt(g):
+    return brl(g * 1e6, 0) if g < 1 else f"R$ {br(g, 0 if g >= 10 else 1)} milhões"
+
+
+def pouca_liquidez(m, c):
+    """Ativo que negocia pouco: na hora de vender (sobretudo numa crise) pode ser preciso aceitar um preço pior."""
+    g = giro(m)
+    if c not in GIRO_MIN or g is None or g >= GIRO_MIN[c]:
+        return None
+    return (f"Negocia pouco: cerca de {giro_txt(g)} por dia. Em dias ruins, vender pode exigir aceitar um preço "
+            "bem abaixo do último negócio")
+
+
+def alerta_dividendos(m, c, cdi=None):
+    """Dividend yield alto demais para durar: costuma ser pagamento extraordinário ou preço despencando (o yield sobe
+    porque o preço cai). Os gestores chamam de "armadilha de dividendos". Só alerta; não muda a escolha, porque no
+    teste com 20 anos de histórico penalizar esses casos não melhorou o resultado."""
+    m = m or {}
+    dy, r12 = m.get("dy_12m", m.get("dividend_yield_12m")) or 0, m.get("ret_12m")
+    queda = r12 is not None and r12 < (-20 if c == "acao" else -15)
+    if c == "acao" and (dy > max(15, (cdi or CDI_REF[0]) + 2) or (dy > 10 and queda)):
+        pass
+    elif c == "fii" and (dy > (cdi or CDI_REF[0]) + 5 or (dy > (cdi or CDI_REF[0]) and queda)):
+        pass
+    else:
+        return None
+    return (f"Dividendos de {pct(dy)} em 12 meses podem não se repetir"
+            + (f": o preço caiu {pct(abs(r12), 0)} no período, o que infla o percentual" if queda else
+               ": valor alto demais para durar, pode ter sido um pagamento extraordinário"))
+
+
+def elegivel(m, c):
+    """Um ativo NOVO só entra como complemento se tiver histórico de 3 anos e negociar o bastante (os que você já
+    tem não saem por isso; só recebem o alerta)."""
+    if not m: return False
+    if (m.get("anos_hist") or 0) < ANOS_MIN or m.get("ret_3a_aa") is None: return False
+    g = giro(m)
+    return g is None or g >= GIRO_MIN.get(c, 0)
+
+
+def escala_risco(m, c):
+    """Peso inversamente proporcional à oscilação (como fazem os gestores): um papel que oscila o dobro do normal da
+    classe entra com metade do peso, para que nenhum complemento sozinho domine o risco da carteira."""
+    vol = (m or {}).get("vol_aa") or VOL_REF.get(c, 25)
+    return round(min(1.0, max(0.5, VOL_REF.get(c, 25) / max(vol, 5))), 2)
+
+
+def concentracao_setor(itens, setores, etfs, limite=25):
+    """Alerta quando ações e FIIs individuais de um mesmo setor somam mais de 25% da carteira: se o setor for mal,
+    tudo cai junto, mesmo com vários papéis."""
+    por = {}
+    for i in itens:
+        st = setores.get(i["ticker"])
+        if st and i["classe"] in ("acao", "fii") and i["ticker"] not in etfs:
+            por.setdefault(st, []).append(i)
+    out = []
+    for st, xs in por.items():
+        tot = sum(x["pct"] for x in xs)
+        if len(xs) > 1 and tot > limite:
+            out.append(f"{pct(tot, 0)} da carteira está em um só setor ({st.lower()}: "
+                       f"{', '.join(x['ticker'] for x in sorted(xs, key=lambda x: -x['pct']))}). Se o setor for mal, tudo cai junto.")
+    return out
+
+
 def pontuacao(m, c, cdi=10.0):
     """Qualidade de longo prazo (quanto maior, melhor), sem tentar adivinhar o momento: retorno anual de 3 anos acima
     do CDI por unidade de risco, queda máxima e um pouco de peso para dividendos. O teste com 20 anos de histórico
@@ -296,7 +371,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
             n_sat = 0 if alvo_c < 8 else 1 if alvo_c < 18 else 2 if alvo_c < 28 else 3
             if individuais:
                 pont = {a: pontuacao(x.get("m"), c, cdi) for a, x in cand.items()
-                        if x.get("classe") == c and a not in nucleo and a not in meus and a not in etfs}
+                        if x.get("classe") == c and a not in nucleo and a not in meus and a not in etfs and elegivel(x.get("m"), c)}
                 usados = {setores.get(a) for a in meus_ok[:n_sat or 2]}
                 novos = []
                 for a, sc in sorted(pont.items(), key=lambda kv: -kv[1]):
@@ -311,7 +386,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
                 if a in meus:  # mantém o tamanho atual, só cortando o excesso
                     w = min(limite, 0.35 if individuais else 0.5, max(meus[a] / total_atual * 100 / alvo_c, 2 / alvo_c))
                 else:
-                    w = min(0.2, limite)
+                    w = min(0.2, limite) * escala_risco(cand[a].get("m"), c)
                 g[a] = w; parte += w
                 m = cand[a].get("m") or {}
                 dados = ", ".join(x for x in [f"{pct(m.get('ret_3a_aa'), sinal=True)} ao ano em 3 anos" if m.get("ret_3a_aa") is not None else
@@ -321,7 +396,8 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
                 motivos[a] = (f"Você já tem: fica como complemento de {NOME_MIN[c]}, limitado para não concentrar "
                               f"(vender agora geraria custo e talvez IR){' — ' + dados if dados else ''}." if a in meus else
                               f"Complemento de {NOME_MIN[c]} com a melhor relação entre retorno e risco nos últimos anos"
-                              f"{' no setor ' + setores[a].lower() if setores.get(a) else ''}{': ' + dados if dados else ''}; peso limitado para não concentrar.")
+                              f"{' no setor ' + setores[a].lower() if setores.get(a) else ''}{': ' + dados if dados else ''}; "
+                              + ("peso menor porque oscila mais que o normal da classe." if escala_risco(m, c) < 1 else "peso limitado para não concentrar."))
             for a, w in nucleo.items():
                 g[a] = g.get(a, 0) + w * (1 - parte)
                 desc = cand.get(a, {}).get("descricao", "")
@@ -394,7 +470,12 @@ def fatos_metricas(m, c):
     q = m.get("queda_max_12m")
     if q is not None and q < -5: fs.append(fato("Maior queda em 12 meses", pct(q, 0)))
     dy = m.get("dy_12m", m.get("dividend_yield_12m"))
-    if dy and c in ("acao", "fii"): fs.append(fato("Dividendos em 12 meses", pct(dy)))
+    if dy and c in ("acao", "fii"):
+        fs.append(fato("Dividendos em 12 meses", pct(dy), "pode não se repetir" if alerta_dividendos(m, c) else ""))
+    g = giro(m)
+    if g is not None and c in GIRO_MIN:
+        fs.append(fato("Negociado por dia", giro_txt(g),
+                       f"pouco: abaixo de R$ {br(GIRO_MIN[c], 0)} milhões" if g < GIRO_MIN[c] else "liquidez boa"))
     rsi = m.get("rsi14")
     if rsi is not None: fs.append(fato("RSI (14 dias)", br(rsi, 0), "acima de 70: subiu rápido; abaixo de 30: caiu rápido"))
     return fs

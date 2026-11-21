@@ -57,6 +57,23 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   perder a conta, basta criar a conta de novo com o mesmo e-mail (ou entrar com o Google): ela volta com o mesmo
   identificador e o aparelho reenvia os dados.
 
+## Regras de gestão de risco
+
+Valem com ou sem IA (e a IA recebe as mesmas regras e só os ativos que passam nelas):
+
+- **Dados limpos:** cotações erradas do Yahoo são corrigidas antes de qualquer conta. Um salto de mais de 40% num dia que
+  se desfaz em até 10 pregões sai da série; um salto de mais de 90% para baixo ou de 400% para cima num único dia é
+  tratado como desdobramento ou grupamento não ajustado. Quedas reais, mesmo grandes, ficam.
+- **Liquidez:** ativo novo só entra se negociar ao menos R$ 10 milhões por dia (ações) ou R$ 2 milhões (FIIs), pela
+  mediana de 3 meses. Os que a pessoa já tem não são vendidos por isso, mas recebem alerta.
+- **Histórico mínimo:** ativo novo precisa de 3 anos na bolsa.
+- **Peso pelo risco:** nenhum papel individual passa de 10% da carteira; no máximo um novo por setor; quem oscila mais
+  que o normal da classe (30% ao ano em ações, 15% em FIIs) entra com peso proporcionalmente menor (até a metade).
+  Alerta quando ações e FIIs de um mesmo setor somam mais de 25% da carteira.
+- **Armadilha de dividendos:** dividend yield muito acima do normal, ou alto porque o preço despencou, recebe aviso de
+  que pode não se repetir. É só aviso: no teste com o passado, penalizar esses casos na escolha não melhorou o resultado.
+- **Sem migalhas:** ativo novo que ficaria com menos de 1,5% da carteira vai para a renda fixa.
+
 ## Primeira conta
 
 A primeira conta criada herda a carteira salva na época em que o app tinha uma senha única. Ativos que estavam só no
@@ -70,6 +87,12 @@ Nenhuma ferramenta acerta o mercado sempre. O app mede os próprios acertos e mo
   dados de cada data, e o resultado é medido 3, 6 e 12 meses depois contra o CDI (série 4391 do Banco Central). Um sinal
   de compra acerta quando o ativo rende mais que o CDI; um de venda, quando rende menos. A "taxa base" mostra com que
   frequência o ativo bate o CDI sem sinal nenhum. A IA não entra nesse teste, porque ela já sabe o que aconteceu depois.
+- **Teste da escolha de ações e FIIs:** a regra que escolhe os complementos da carteira (retorno de 3 anos acima do CDI
+  por unidade de risco, um papel por setor) é aplicada no fim de cada mês do passado e comparada com comprar todos os
+  papéis da lista em partes iguais. Com os dados de novembro de 2026: nas ações, as escolhidas ganharam da lista em 55%
+  dos meses, +2,3 p.p. ao ano em média (vantagem maior até 2014 do que depois); nos FIIs, escolher não ajudou. Por isso
+  ações e FIIs individuais são só complemento (até 10% cada) e o núcleo fica em ETFs e fundos amplos. A lista só tem
+  quem existe hoje (viés de sobrevivência), então a comparação justa é escolhidos x lista toda, não x Ibovespa.
 - **Histórico real:** cada sinal de compra ou venda (da IA e das regras) é guardado com data e preço e conferido depois
   de 3, 6 e 12 meses, separado por quem deu o sinal: IA, regras ou as duas juntas.
 - **Segunda opinião:** toda análise da IA é comparada com a das regras. Quando discordam, o app mostra "opiniões
