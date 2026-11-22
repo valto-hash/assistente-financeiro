@@ -58,7 +58,13 @@ NOME_CLASSE = {"renda_fixa": "Renda fixa", "acao": "Ações Brasil", "fii": "Fun
 
 PADRAO = {"renda_fixa": {"TESOURO_SELIC": 0.5, "TESOURO_IPCA": 0.5}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4},
           "fii": {"HGLG11": 0.35, "KNRI11": 0.35, "KNCR11": 0.3}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}
-PERFIS = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},
+# Conservador revisto em nov/2026 com o simulador do passado e validação fora da amostra (escolhido com 2013-2019,
+# confirmado em 2020-2026): menos FIIs (sofrem com os mesmos juros da renda fixa) e mais exterior, dólar e ouro, que
+# protegem nas crises locais. O anterior caía 15% na crise de 2008, quase o dobro do que o perfil aceita.
+PERFIS_ANTERIOR = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3}}
+REVISAO_MODELO = {"conservador": ("2026-11-22", "o modelo do perfil conservador foi revisto em nov/2026 com testes no passado: "
+                                                "menos fundos imobiliários e mais exterior, dólar e ouro, que protegem melhor nas crises")}
+PERFIS = {"conservador": {"renda_fixa": 70, "acao": 7, "fii": 3, "exterior": 10, "cambio": 10},
           "moderado": {"renda_fixa": 45, "acao": 20, "fii": 15, "exterior": 15, "cambio": 5},
           "arrojado": {"renda_fixa": 25, "acao": 32, "fii": 15, "exterior": 22, "cambio": 6}}
 TEMAS = {"juros": ("Copom Selic juros", "renda_fixa"), "inflacao": ("inflação IPCA", "renda_fixa"),
@@ -1112,6 +1118,14 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
             "ativos_permitidos": lista}
         mem_ctx, mem_cons = memoria.contexto(uid, ent)
+        rev = REVISAO_MODELO.get(perfil_ef)
+        if mem_cons and rev and date.today() - timedelta(days=mem_cons["dias"]) < date.fromisoformat(rev[0]):
+            # a recomendação anterior foi feita com o modelo antigo: a parte da mudança que vem da revisão tem motivo e não
+            # é incoerência; o resto continua sendo conferido (compara com a anterior deslocada pela revisão)
+            novo, velho = PERFIS[perfil_ef], PERFIS_ANTERIOR[perfil_ef]
+            mem_cons["anterior_comparavel"] = {c: v + novo.get(c, 0) - velho.get(c, 0) for c, v in mem_cons["anterior"].items()}
+            mem_cons["mudancas"] = mem_cons["mudancas"] + [rev[1]]
+            mem_ctx["o_que_mudou_desde_entao"] = [m for m in mem_ctx["o_que_mudou_desde_entao"] if not m.startswith("nada no")] + [rev[1]]
         try:
             ref = cached("ref:planos", 12 * 3600, referencias.planos_ref, ok=lambda v: bool(v["planos"]), ttl_falha=600)
         except Exception as e:
@@ -1234,7 +1248,8 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
         except Exception as e:
             print("teste com o passado da carteira falhou:", repr(e)[:200], flush=True)
         comp, dominam = referencias.comparar(teste_cart, ref_p, perfil_ef) if ref_p else ([], [])
-        chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior"), (mem_cons or {}).get("mudou_entrada"),
+        chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior_comparavel") or (mem_cons or {}).get("anterior"),
+                                                (mem_cons or {}).get("mudou_entrada"),
                                                 (mem_cons or {}).get("dias"))
         txt_mud = str(ia.get("mudancas", ""))[:400] if fonte == "ia" else ""
         txt_comp = str(ia.get("comparacao_planos", ""))[:500] if fonte == "ia" else ""
@@ -1847,7 +1862,7 @@ def _simulador():
         d = armazem.ler("cache", "simulador")
         if d and d["dados"].get("versao") == simulador.VERSAO and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
             return d["dados"]
-        r = simulador.tudo(PERFIS, PIOR_CRISE)
+        r = simulador.tudo(PERFIS, PIOR_CRISE, anteriores=PERFIS_ANTERIOR)
         if r["perfis"]:
             armazem.gravar("cache", "simulador", r)
         return r

@@ -31,7 +31,7 @@ import simulacao as sim
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNIVERSO
 
 INICIO = "2013-01"
-VERSAO = 2               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
+VERSAO = 3               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
 CUSTO = 0.001            # 0,1% por compra ou venda (emolumentos da B3 + diferença entre compra e venda)
 INICIAL, MENSAL = 10000.0, 1000.0
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF
@@ -238,11 +238,11 @@ def _resumo(nome, x, extra=None):
             "serie": [round(v / a * 100, 1) for v, a in zip(x["valores"], np.cumsum(x["aportes"]))]}
 
 
-def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL):
-    """Roda o app e as estratégias de comparação para um perfil."""
+def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL, anterior=None):
+    """Roda o app e as estratégias de comparação para um perfil. anterior: o modelo do perfil antes de uma revisão."""
     R = d["R"]
 
-    app, app_antigo = decisor(d, modelo), decisor(d, modelo, momento=True, classe_pequena=6)
+    app, app_antigo = decisor(d, modelo), decisor(d, anterior or modelo, momento=True, classe_pequena=6)
 
     fixo = {a: modelo[c] * w for c, ws in NUCLEO.items() for a, w in ws.items() if modelo.get(c)}
     linhas = [_resumo("Seguindo o app", _rodar(d, app, inicial, mensal), {"id": "app"}),
@@ -261,12 +261,17 @@ def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL):
             linhas.append(_resumo(p["nome"], _rodar(d, lambda t, h, pp=pesos_p: pp, inicial, mensal), {"id": p["id"], "plano": True}))
     except Exception as e:
         print("planos no simulador falharam:", repr(e)[:200], flush=True)
+    if anterior and anterior != modelo:
+        fixo_ant = {a: anterior[c] * w for c, ws in NUCLEO.items() for a, w in ws.items() if anterior.get(c)}
+        linhas.append(_resumo("Modelo fixo anterior do perfil (até nov/2026)", _rodar(d, lambda t, h: fixo_ant, inicial, mensal),
+                              {"id": "fixo_antigo"}))
     app_, fixo_, cdi_ = linhas[0], linhas[2], linhas[3]
-    melhores = sorted((l for l in linhas if l["id"] != "app_antigo"), key=lambda l: -l["final"])
+    melhores = sorted((l for l in linhas if l["id"] not in ("app_antigo", "fixo_antigo")), key=lambda l: -l["final"])
     return {"perfil": perfil, "linhas": linhas, "datas": [x.strftime("%Y-%m-%d") for x in _rodar_datas(d)],
             "desde": d["meses"][0].strftime("%m/%Y"), "ate": d["meses"][-1].strftime("%m/%Y"), "inicial": inicial, "mensal": mensal,
             "posicao": [l["id"] for l in melhores].index("app") + 1, "total": len(melhores),
-            "vs_fixo": round(app_["final"] - fixo_["final"], 0), "vs_cdi": round(app_["final"] - cdi_["final"], 0)}
+            "vs_fixo": round(app_["final"] - fixo_["final"], 0), "vs_cdi": round(app_["final"] - cdi_["final"], 0),
+            "modelo": modelo, "modelo_anterior": anterior if anterior and anterior != modelo else None}
 
 
 def decisor(d, modelo, momento=None, classe_pequena=None):
@@ -325,10 +330,10 @@ def resultado_vivo(d, reg, perfis):
             "perfis": {p: {k: round((v - 1) * 100, 2) for k, v in x.items()} for p, x in out.items()}}
 
 
-def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL):
+def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL, anteriores=None):
     t0 = time.time()
     d = preparar()
-    out = {p: simular(d, p, perfis[p], limites[p], inicial, mensal) for p in perfis}
+    out = {p: simular(d, p, perfis[p], limites[p], inicial, mensal, (anteriores or {}).get(p)) for p in perfis}
     vivo = None
     try:
         vivo = resultado_vivo(d, registrar_vivo(d, perfis), perfis)

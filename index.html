@@ -1118,6 +1118,8 @@ function simulHtml() {
   const dif = (a, b) => `${a - b >= 0 ? 'mais' : 'menos'} (${reais(Math.abs(a - b))})`;
   const bomFixo = x.vs_fixo >= 0;
   const linhas = [...x.linhas].sort((p, q) => (q.id === 'app') - (p.id === 'app') || q.final - p.final);
+  const nomeCl = {renda_fixa: 'renda fixa', acao: 'ações', fii: 'FIIs', exterior: 'exterior', cambio: 'dólar e ouro'};
+  const modeloTxt = m => Object.entries(m).filter(([, v]) => v).map(([c, v]) => `${N(v)}% ${nomeCl[c] || c}`).join(', ');
   const serie = {datas: x.datas, app: app.serie, fixo: fixo.serie, cdi: cdi.serie};
   const v = d.vivo, vp = v && v.perfis ? v.perfis[perf] : null;
   return `<div class="card">
@@ -1134,10 +1136,10 @@ function simulHtml() {
     ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1], ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
     <p class="mut xs" style="margin:2px 0 0">Quanto o patrimônio estava acima do total aplicado até cada mês (dinheiro novo não conta como ganho).</p>
     <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR das vendas no caminho</small></th></tr></thead><tbody>
-      ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${l.id === 'app_antigo' ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
+      ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${['app_antigo', 'fixo_antigo'].includes(l.id) ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
         <td><b>${reais(l.final)}</b><small>${P(l.ganho_pct, 0)}</small></td><td>${P(l.tir_aa, 1, false)}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
         <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${reais(l.custos)}<small>${reais(l.ir_estimado)}</small></td></tr>`).join('')}</tbody></table></div>
-    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes deste teste” mostra como era (${reais(antigo.final)} neste perfil). Como essas mudanças saíram deste mesmo teste, a prova que vale de verdade é a de baixo.</div></div>
+    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes deste teste” mostra como era (${reais(antigo.final)} neste perfil).${x.modelo_anterior ? ` O modelo deste perfil também foi revisto: era ${esc(modeloTxt(x.modelo_anterior))}, que caía 15% na crise de 2008 (quase o dobro do que o perfil aceita); passou a ser ${esc(modeloTxt(x.modelo))}. Ele foi escolhido entre cinco candidatos definidos antes do teste, usando só 2013 a 2019, e confirmado em 2020 a 2026, período que não entrou na escolha.` : ''} Como essas mudanças saíram de testes com o passado, a prova que vale de verdade é a de baixo.</div></div>
     <h3>Prova ao vivo</h3>
     ${vp && v.meses.length ? `<p class="sm" style="margin:-4px 0 0">Desde ${esc(v.meses[0])} (${N(v.meses.length)} ${v.meses.length === 1 ? 'mês' : 'meses'}), a carteira que o app recomendava para este perfil rendeu <b>${P(vp.app, 2)}</b>, o modelo fixo ${P(vp.fixo, 2)} e o CDI ${P(vp.cdi, 2)}. Cada carteira foi guardada antes de o mês acontecer.</p>`
       : `<p class="mut sm" style="margin:-4px 0 0">Todo mês, o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer. O resultado real aparece aqui a partir do mês que vem, sem nenhuma chance de ajustar regra olhando o resultado.</p>`}

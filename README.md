@@ -68,7 +68,17 @@ queda, custos e o IR estimado das vendas.
 
 O que o simulador mudou: ajustar a alocação pela tendência e pelo juro do momento deixava o resultado menor nos três
 perfis, então foi desligado (`regras.AJUSTE_MOMENTO`); com 4% ou mais em dólar e ouro, a carteira passa a ter os dois.
-A tela mostra também a versão antiga. Como essas mudanças saíram do próprio teste, existe a **prova ao vivo**: todo mês
+A tela mostra também a versão antiga.
+
+O modelo do perfil conservador também foi revisto (nov/2026). O antigo (70% renda fixa, 8% ações, 10% FIIs, 9% exterior,
+3% dólar e ouro) caía 15% na crise de 2008, quase o dobro dos 8% que o perfil aceita. Cinco candidatos foram definidos
+antes de olhar os resultados, a escolha usou só 2013 a 2019 (maior retorno entre os que não arriscam mais que o atual) e a
+confirmação usou 2020 a 2026, que não entrou na escolha. Venceu 70% renda fixa, 7% ações, 3% FIIs, 10% exterior e 10%
+dólar e ouro: de 2013 a 2026, R$ 411.755 contra R$ 382.331 do app antigo (11,1% contra 10,2% ao ano), com maior queda de
+4,8% em vez de 8%, e pior crise de -9,4% (Covid) em vez de -15%. Moderado e arrojado não mudaram. Quem tinha uma
+recomendação feita com o modelo antigo vê o motivo da mudança (`server.REVISAO_MODELO`), e a IA também fica sabendo.
+
+Como essas mudanças saíram de testes com o passado, existe a **prova ao vivo**: todo mês
 o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer, e o resultado real aparece depois.
 Limites: a IA não entra (ela sabe o que aconteceu depois), lista de ativos de hoje (viés de sobrevivência), valores antes
 do IR. O resultado fica guardado no banco por 7 dias (`simulador.py`).

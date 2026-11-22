@@ -45,6 +45,10 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 5. Mudança em regra de alocação ou escolha de ativos: rode o simulador (`simulador.tudo`) antes e depois e compare com o
    modelo fixo do perfil. Regra que piora o resultado nos três perfis não entra (foi assim que `AJUSTE_MOMENTO` foi
    desligado). Cuidado para não ajustar regra até "ganhar no passado": a prova que vale é a ao vivo.
+6. Mudança no modelo de um perfil (`server.PERFIS`): candidatos definidos antes de ver os resultados, escolha só com a
+   primeira metade (2013-2019) e confirmação na segunda (2020-2026), sem arriscar mais que o modelo atual nem passar da
+   pior crise do perfil. Guarde o modelo antigo em `PERFIS_ANTERIOR` (aparece no simulador) e o motivo em
+   `REVISAO_MODELO` (explica a mudança a quem tinha recomendação antiga). Foi assim com o conservador em nov/2026.
 
 ## Armadilhas de dados já encontradas (o Yahoo erra)
 

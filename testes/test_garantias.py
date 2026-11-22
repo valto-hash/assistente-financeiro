@@ -129,6 +129,26 @@ p3 = c.post("/api/portfolio", headers=H, json={"pos": pos2, "perfil": "conservad
 co = next((x for x in p3["auditoria"]["checagens"] if x["id"] == "consistencia"), None)
 print("   coerência:", co)
 ok(co and not co["ok"], "mudança brusca desde a última recomendação aparece como aviso")
+# revisão do modelo do perfil: a recomendação anterior feita com o modelo antigo não vira aviso de incoerência
+# (modelo antigo fictício, bem diferente, para a revisão sozinha passar do limite de 10 p.p. do aviso)
+velho = {"renda_fixa": 85, "acao": 4, "fii": 3, "exterior": 5, "cambio": 3}
+novo = server.PERFIS["conservador"]
+d = armazem.ler("memoria", uid)["dados"]
+d["recomendacoes"][-1].update(data=(date.today() - timedelta(days=3)).isoformat(),
+                              alvo={c: v + velho[c] - novo[c] for c, v in p3["alvo"].items()})
+armazem.gravar("memoria", uid, d)
+orig = server.REVISAO_MODELO["conservador"], server.PERFIS_ANTERIOR["conservador"]
+server.REVISAO_MODELO["conservador"] = ((date.today() - timedelta(days=1)).isoformat(), orig[0][1])
+server.PERFIS_ANTERIOR["conservador"] = velho
+mocks.CALLS.clear(); server.cache.clear()
+p4 = c.post("/api/portfolio", headers=H, json={"pos": pos2, "perfil": "conservador", "objetivo": ""}).json()
+server.REVISAO_MODELO["conservador"], server.PERFIS_ANTERIOR["conservador"] = orig
+kw = next(k for k in mocks.CALLS if "planejador" in k["system"])
+hist = json.loads(kw["messages"][0]["content"]).get("historico_do_investidor") or {}
+co = next((x for x in p4["auditoria"]["checagens"] if x["id"] == "consistencia"), None)
+print("   revisão do modelo:", co)
+ok(p4["alvo"] == p3["alvo"] and any("revisto" in x for x in hist.get("o_que_mudou_desde_entao", [])) and co and co["ok"],
+   "a IA fica sabendo que o modelo do perfil foi revisto, e a mudança que vem da revisão não vira aviso")
 ok(memoria.ler(uid) and c.request("DELETE", "/api/conta", headers=H, json={"email": "g@ex.com", "senha": "senhateste1"}).status_code == 200
    and armazem.ler("memoria", uid) is None, "excluir a conta apaga a memória")
 print("TUDO OK" if not falhas else f"{len(falhas)} FALHA(S)")

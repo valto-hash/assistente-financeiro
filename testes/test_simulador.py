@@ -71,7 +71,7 @@ c2 = (float((1 + rr).prod()) ** (12 / len(rr)) - 1) * 100
 ok(abs(c1 - c2) < 1.0, f"Três fundos: simulador {c1:.2f}% x outro motor {c2:.2f}% ao ano (só muda o rebalanceamento)")
 
 # ---- 5) simulação completa nos três perfis
-r = S.tudo(server.PERFIS, server.PIOR_CRISE)
+r = S.tudo(server.PERFIS, server.PIOR_CRISE, anteriores=server.PERFIS_ANTERIOR)
 for p, x in r["perfis"].items():
     ids = [l["id"] for l in x["linhas"]]
     app = next(l for l in x["linhas"] if l["id"] == "app")
@@ -80,6 +80,9 @@ for p, x in r["perfis"].items():
        f"{p}: app, versão antiga, modelo fixo e CDI com o mesmo dinheiro nas mesmas datas")
 xm = r["perfis"]["moderado"]
 ok(xm["total"] == len(xm["linhas"]) - 1 and 1 <= xm["posicao"] <= xm["total"], "a versão antiga do app não entra na contagem de posição")
+xc = r["perfis"]["conservador"]
+ok(any(l["id"] == "fixo_antigo" for l in xc["linhas"]) and xc["total"] == len(xc["linhas"]) - 2 and xc["modelo_anterior"]
+   and not xm.get("modelo_anterior"), "o modelo antigo do conservador aparece para comparação, fora da contagem de posição")
 cdi = next(l for l in r["perfis"]["moderado"]["linhas"] if l["id"] == "cdi")
 ok(cdi["maior_queda"] == 0 and cdi["ir_estimado"] == 0, "CDI sem queda e sem IR de vendas (sanidade)")
 
