@@ -1863,7 +1863,7 @@ def _simulador():
         if d and d["dados"].get("versao") == simulador.VERSAO and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
             return d["dados"]
         r = simulador.tudo(PERFIS, PIOR_CRISE, anteriores=PERFIS_ANTERIOR)
-        if r["perfis"]:
+        if r["perfis"] and not r.get("aproximado"):  # sem o Banco Central, mostra mas não guarda (refaz na próxima)
             armazem.gravar("cache", "simulador", r)
         return r
 

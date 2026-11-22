@@ -24,9 +24,28 @@ ok(t in todas and all(abs((todas[t][k] or 0) - (cortada[t][k] or 0)) < 1e-6 for 
 orig_bcb = S._bcb
 S._bcb = lambda serie, desde=2005: pd.Series({pd.Timestamp("2018-05-15"): 2.0 if serie == 13522 else 6.5,
                                               pd.Timestamp("2018-06-15"): 4.0 if serie == 13522 else 6.5})
-sel, ip = S._taxas(pd.DatetimeIndex([pd.Timestamp("2018-06-30")]), None)
+sel, ip, aprox = S._taxas(pd.DatetimeIndex([pd.Timestamp("2018-06-30")]), None)
+ok(float(ip.iloc[0]) == 2.0 and float(sel.iloc[0]) == 6.5 and not aprox, "no fim de junho vale o IPCA de maio (o de junho só é divulgado em julho)")
+def _falha(serie, desde=2005): raise IOError("Banco Central fora do ar")
+S._bcb = _falha
+R0 = pd.DataFrame({"CDI": [0.01] * 14}, index=pd.date_range("2017-05-31", periods=14, freq="ME"))
+sel, ip, aprox = S._taxas(R0.index, R0)
 S._bcb = orig_bcb
-ok(float(ip.iloc[0]) == 2.0 and float(sel.iloc[0]) == 6.5, "no fim de junho vale o IPCA de maio (o de junho só é divulgado em julho)")
+ok(aprox == ["Selic", "IPCA"] and float(ip.iloc[-1]) == 4.5, "sem o Banco Central, a Selic e o IPCA são aproximados e isso fica marcado")
+import requests as _rq
+chamadas, orig_get = [], _rq.get
+class _Resp:
+    def __init__(self, ok): self.ok = ok
+    def raise_for_status(self):
+        if not self.ok: raise IOError("503")
+    def json(self): return [{"data": "15/06/2018", "valor": "6,5"}]
+def _get(url, **kw):
+    chamadas.append(url); return _Resp(len(chamadas) > 1)  # a primeira tentativa falha
+_rq.get = _get; S._bcb_cache.clear(); orig_sleep = S.time.sleep; S.time.sleep = lambda s: None
+s1 = S._bcb(432, desde=2016); n = len(chamadas); s2 = S._bcb(432, desde=2016)
+_rq.get = orig_get; S.time.sleep = orig_sleep; S._bcb_cache.clear()
+ok(float(s1.iloc[0]) == 6.5 and n == 3 and len(chamadas) == n and s2.equals(s1),
+   "a API do Banco Central é tentada de novo quando falha, e a série fica guardada (duas rodadas seguidas dão o mesmo resultado)")
 idx = pd.Series(np.linspace(100, 200, 40), index=pd.date_range("2015-01-31", periods=40, freq="ME"))
 ok(S._indicador(idx, idx.index[20])["ret_12m"] == S._indicador(idx[:21], idx.index[20])["ret_12m"], "o panorama da época também só usa o passado")
 
@@ -102,6 +121,7 @@ ok(len(v["meses"]) == 1 and v["perfis"]["moderado"]["cdi"] > 0, f"o resultado ao
 c = TestClient(server.app)
 T = c.post("/api/conta/cadastrar", json={"nome": "Teste", "email": "s@ex.com", "senha": "senhateste1"}).json()["token"]
 j = c.get("/api/simulador", headers={"Authorization": "Bearer " + T}).json()
-ok(set(j["perfis"]) == {"conservador", "moderado", "arrojado"} and armazem.ler("cache", "simulador"), "API do simulador, com o resultado guardado no banco")
+ok(set(j["perfis"]) == {"conservador", "moderado", "arrojado"} and armazem.ler("cache", "simulador") and not j["aproximado"],
+   "API do simulador, com o resultado guardado no banco")
 ok(c.get("/api/simulador").status_code == 401, "precisa estar logado")
 print("TUDO OK" if not falhas else f"{len(falhas)} FALHA(S)")

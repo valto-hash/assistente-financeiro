@@ -45,28 +45,51 @@ COMP_ATIVO = {"ACOES_BR": {"BOVA11": 1}, "EXTERIOR": {"IVVB11": 1}, "IPCA_LONGO"
 
 # ---------------------------------------------------------------- dados de cada mês (só o que existia na data)
 
+_bcb_cache = {}
+
+
 def _bcb(serie, desde=2005):
+    """Série do Banco Central, em trechos de 10 anos (limite da API). A API do BC às vezes falha: até 3 tentativas por
+    trecho e cache de 12h, para duas rodadas seguidas não darem resultados diferentes."""
+    c = _bcb_cache.get((serie, desde))
+    if c and time.time() - c[0] < 12 * 3600:
+        return c[1]
     pts, hoje = [], date.today()
     for ini in range(desde, hoje.year + 1, 10):
-        r = requests.get(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados", timeout=20,
-                         params={"formato": "json", "dataInicial": f"01/01/{ini}", "dataFinal": f"31/12/{min(ini + 9, hoje.year)}"})
+        for tentativa in range(3):
+            try:
+                r = requests.get(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados", timeout=20,
+                                 params={"formato": "json", "dataInicial": f"01/01/{ini}", "dataFinal": f"31/12/{min(ini + 9, hoje.year)}"})
+                r.raise_for_status()
+                dados = r.json()
+                break
+            except Exception:
+                if tentativa == 2:
+                    raise
+                time.sleep(2 * (tentativa + 1))
         pts += [(pd.Timestamp(x["data"][6:10] + "-" + x["data"][3:5] + "-" + x["data"][:2]), float(x["valor"].replace(",", ".")))
-                for x in r.json()]
-    return pd.Series(dict(pts), dtype=float).sort_index()
+                for x in dados]
+    s = pd.Series(dict(pts), dtype=float).sort_index()
+    _bcb_cache[(serie, desde)] = (time.time(), s)
+    return s
 
 
 def _taxas(meses, R):
-    """Selic e IPCA de 12 meses no fim de cada mês (Banco Central). Sem o BC, aproxima pelo CDI e por 4,5%."""
+    """Selic e IPCA de 12 meses no fim de cada mês (Banco Central). Sem o BC, aproxima pelo CDI e por 4,5% e avisa
+    (o terceiro valor diz o que foi aproximado; resultado aproximado não fica guardado)."""
+    aprox = []
     try:
         selic = _bcb(432).resample("ME").last().reindex(meses, method="ffill")
     except Exception:
         selic = ((1 + R["CDI"]).rolling(12).apply(np.prod, raw=True) - 1).reindex(meses) * 100 + 0.1
+        aprox.append("Selic")
     try:
         # o IPCA de um mês só sai uns 10 dias depois: no fim do mês t, o último conhecido é o de t-1
         ipca = _bcb(13522).resample("ME").last().shift(1).reindex(meses, method="ffill")
     except Exception:
         ipca = pd.Series(4.5, index=meses)
-    return selic.ffill().fillna(10.0), ipca.ffill().fillna(4.5)
+        aprox.append("IPCA")
+    return selic.ffill().fillna(10.0), ipca.ffill().fillna(4.5), aprox
 
 
 def _metricas_mes(c, dv, meses):
@@ -124,10 +147,10 @@ def preparar(inicio=INICIO):
             ret[a] = referencias.serie_ativo(a, {"tipo": "mercado", "classe": cl}, R, proprias)[0]
     indices = {nome: (1 + R[k]).cumprod() for nome, k in (("IBOV", "ACOES_BR"), ("IFIX (FIIs grandes)", "FII"),
                                                          ("S&P 500 em reais", "EXTERIOR"), ("Dólar", "DOLAR")) if k in R}
-    selic, ipca = _taxas(R.index, R)
+    selic, ipca, aprox = _taxas(R.index, R)
     cdi12 = ((1 + R["CDI"]).rolling(12).apply(np.prod, raw=True) - 1) * 100
     return {"R": R, "meses": meses, "F": F, "ret": pd.DataFrame(ret).fillna(0.0), "indices": indices,
-            "selic": selic, "ipca": ipca, "cdi12": cdi12}
+            "selic": selic, "ipca": ipca, "cdi12": cdi12, "aproximado": aprox}
 
 
 # ---------------------------------------------------------------- operar como o app manda
@@ -340,4 +363,5 @@ def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL, anteriores=None):
     except Exception as e:
         print("prova ao vivo falhou:", repr(e)[:200], flush=True)
     print(f"simulador do passado pronto em {time.time() - t0:.0f}s", flush=True)
-    return {"perfis": out, "custo_operacao": CUSTO * 100, "vivo": vivo, "calculado": time.time(), "versao": VERSAO}
+    return {"perfis": out, "custo_operacao": CUSTO * 100, "vivo": vivo, "calculado": time.time(), "versao": VERSAO,
+            "aproximado": d["aproximado"]}
