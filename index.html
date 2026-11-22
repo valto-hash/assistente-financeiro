@@ -1133,7 +1133,7 @@ function simulHtml() {
       Contra o CDI: ${dif(app.final, cdi.final)}. Entre as ${N(x.total)} estratégias comparadas, o app ficou em ${N(x.posicao)}º lugar.</div></div>
     ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1], ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
     <p class="mut xs" style="margin:2px 0 0">Quanto o patrimônio estava acima do total aplicado até cada mês (dinheiro novo não conta como ganho).</p>
-    <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR estimado nas vendas</small></th></tr></thead><tbody>
+    <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR das vendas no caminho</small></th></tr></thead><tbody>
       ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${l.id === 'app_antigo' ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
         <td><b>${reais(l.final)}</b><small>${P(l.ganho_pct, 0)}</small></td><td>${P(l.tir_aa, 1, false)}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
         <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${reais(l.custos)}<small>${reais(l.ir_estimado)}</small></td></tr>`).join('')}</tbody></table></div>
@@ -1144,7 +1144,8 @@ function simulHtml() {
     <details style="margin-top:8px"><summary>Limites deste teste</summary><ul class="ink2 sm" style="padding-left:18px">
       <li>A IA não entra: ela já “sabe” o que aconteceu depois, e testá-la no passado daria um resultado falso. O teste usa o motor de regras.</li>
       <li>A lista de ativos é a de hoje: empresas que quebraram ficaram de fora (viés de sobrevivência).</li>
-      <li>Valores antes do imposto de renda. O IR que as vendas teriam pago aparece à parte.</li>
+      <li>Valores antes do imposto de renda. A coluna de IR mostra só o imposto das vendas feitas no caminho; o IR do resgate no fim (renda fixa e ganhos ainda não vendidos) não está nela, por isso o CDI aparece com zero.</li>
+      <li>O filtro de liquidez (volume negociado por dia) não roda no passado, porque a fonte não guarda o volume antigo.</li>
       <li>A expectativa de inflação da época foi aproximada pelo IPCA dos 12 meses anteriores, e a simulação de 2.000 cenários e a reserva de emergência ficaram de fora.</li>
       <li>O passado não garante o futuro.</li></ul></details>
   </div>`;

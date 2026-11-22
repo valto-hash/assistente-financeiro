@@ -1845,7 +1845,7 @@ def _simulador():
     """Pesado (refaz 14 anos mês a mês): o resultado fica guardado no banco por 7 dias e sobrevive a reinícios."""
     with _lock_simul:
         d = armazem.ler("cache", "simulador")
-        if d and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
+        if d and d["dados"].get("versao") == simulador.VERSAO and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
             return d["dados"]
         r = simulador.tudo(PERFIS, PIOR_CRISE)
         if r["perfis"]:

@@ -17,8 +17,16 @@ meses = pd.date_range("2016-01-31", "2020-12-31", freq="ME")
 todas = S._metricas_mes(c, dv, meses)
 t = pd.Timestamp("2018-06-30")
 cortada = S._metricas_mes(c[c.index <= t], dv[dv.index <= t], [t])
-ok(t in todas and all(abs((todas[t][k] or 0) - (cortada[t][k] or 0)) < 1e-6 for k in ("ret_12m", "ret_3a_aa", "vol_aa", "queda_max_12m", "dy_12m")),
+# (o dividend yield fica fora desta conta: o Yahoo ajusta os preços antigos pelos dividendos pagos depois, então cortar a
+#  série não desfaz o ajuste; o simulador reconstrói o preço de tela da época, conferido com o preço sem ajuste do Yahoo)
+ok(t in todas and all(abs((todas[t][k] or 0) - (cortada[t][k] or 0)) < 1e-6 for k in ("ret_12m", "ret_3a_aa", "vol_aa", "queda_max_12m", "anos_hist")),
    "as métricas de jun/2018 não mudam quando os preços de depois são apagados (o app não vê o futuro)")
+orig_bcb = S._bcb
+S._bcb = lambda serie, desde=2005: pd.Series({pd.Timestamp("2018-05-15"): 2.0 if serie == 13522 else 6.5,
+                                              pd.Timestamp("2018-06-15"): 4.0 if serie == 13522 else 6.5})
+sel, ip = S._taxas(pd.DatetimeIndex([pd.Timestamp("2018-06-30")]), None)
+S._bcb = orig_bcb
+ok(float(ip.iloc[0]) == 2.0 and float(sel.iloc[0]) == 6.5, "no fim de junho vale o IPCA de maio (o de junho só é divulgado em julho)")
 idx = pd.Series(np.linspace(100, 200, 40), index=pd.date_range("2015-01-31", periods=40, freq="ME"))
 ok(S._indicador(idx, idx.index[20])["ret_12m"] == S._indicador(idx[:21], idx.index[20])["ret_12m"], "o panorama da época também só usa o passado")
 
@@ -40,7 +48,29 @@ pan = {"renda_fixa": {"visao": "POSITIVA"}, "acao": {"visao": "NEGATIVA"}}
 ok(regras.alvo_classes(mod, pan, None)[0] == {k: float(v) for k, v in mod.items()}, "sem objetivo, a alocação é a do perfil (sem adivinhar o momento)")
 ok(regras.alvo_classes(mod, pan, None, momento=True)[0]["renda_fixa"] > mod["renda_fixa"], "a versão antiga (com ajuste) continua disponível para comparação")
 
-# ---- 4) simulação completa nos três perfis
+# ---- 4) conferências independentes: conta à mão e o outro motor de testes do app
+d = S.preparar()
+meses = list(d["meses"])
+for ativo in ("TESOURO_SELIC", "BOVA11"):
+    v = 0.0
+    for i in range(len(meses) - 1):
+        v = (v + (S.INICIAL if i == 0 else S.MENSAL) * (1 - S.CUSTO)) * (1 + float(d["ret"].at[meses[i + 1], ativo]))
+    x = S._rodar(d, lambda t, h, a=ativo: {a: 100}, S.INICIAL, S.MENSAL)
+    ok(abs(x["valores"][-1] - v) < 0.01, f"100% {ativo}: o simulador bate com a conta feita à mão (R$ {v:,.2f})")
+import referencias
+# plano sem ouro: nos dados simulados dos testes, o GOLD11 é uma série aleatória que não acompanha o ouro
+perm = next(p for p in referencias.PLANOS if p["id"] == "tres_fundos")
+pp = {}
+for k, w in perm["pesos"].items():
+    for a, f in S.COMP_ATIVO[k].items():
+        pp[a] = pp.get(a, 0) + w * f
+x = S._rodar(d, lambda t, h: pp, S.INICIAL, 0.0)
+c1 = (np.prod(1 + np.array(x["rets"])) ** (12 / len(x["rets"])) - 1) * 100
+rr = referencias.rodar(perm["pesos"], d["R"][d["R"].index > meses[0]])
+c2 = (float((1 + rr).prod()) ** (12 / len(rr)) - 1) * 100
+ok(abs(c1 - c2) < 1.0, f"Três fundos: simulador {c1:.2f}% x outro motor {c2:.2f}% ao ano (só muda o rebalanceamento)")
+
+# ---- 5) simulação completa nos três perfis
 r = S.tudo(server.PERFIS, server.PIOR_CRISE)
 for p, x in r["perfis"].items():
     ids = [l["id"] for l in x["linhas"]]
@@ -48,10 +78,12 @@ for p, x in r["perfis"].items():
     print(f"   {p}: app {app['final']:,.0f} (TIR {app['tir_aa']}%), vs fixo {x['vs_fixo']:+,.0f}, vs CDI {x['vs_cdi']:+,.0f}, {x['posicao']}º de {x['total']}")
     ok({"app", "app_antigo", "fixo", "cdi"} <= set(ids) and len(app["serie"]) == len(x["datas"]) and app["investido"] > 0 and app["final"] > 0,
        f"{p}: app, versão antiga, modelo fixo e CDI com o mesmo dinheiro nas mesmas datas")
+xm = r["perfis"]["moderado"]
+ok(xm["total"] == len(xm["linhas"]) - 1 and 1 <= xm["posicao"] <= xm["total"], "a versão antiga do app não entra na contagem de posição")
 cdi = next(l for l in r["perfis"]["moderado"]["linhas"] if l["id"] == "cdi")
 ok(cdi["maior_queda"] == 0 and cdi["ir_estimado"] == 0, "CDI sem queda e sem IR de vendas (sanidade)")
 
-# ---- 5) prova ao vivo: guarda uma carteira por mês, antes de o mês acontecer
+# ---- 6) prova ao vivo: guarda uma carteira por mês, antes de o mês acontecer
 reg = armazem.ler("simulador_vivo", "todos")["dados"]
 k = list(reg["meses"])[0]
 ok(len(reg["meses"]) == 1 and set(reg["meses"][k]["app"]) == set(server.PERFIS), "carteira do mês guardada para os três perfis")
@@ -63,7 +95,7 @@ reg["meses"][ant] = reg["meses"][k]
 v = S.resultado_vivo(d, reg, server.PERFIS)
 ok(len(v["meses"]) == 1 and v["perfis"]["moderado"]["cdi"] > 0, f"o resultado ao vivo usa só os meses que já aconteceram ({v['meses']})")
 
-# ---- 6) API
+# ---- 7) API
 c = TestClient(server.app)
 T = c.post("/api/conta/cadastrar", json={"nome": "Teste", "email": "s@ex.com", "senha": "senhateste1"}).json()["token"]
 j = c.get("/api/simulador", headers={"Authorization": "Bearer " + T}).json()

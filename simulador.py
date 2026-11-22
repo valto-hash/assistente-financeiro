@@ -31,6 +31,7 @@ import simulacao as sim
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNIVERSO
 
 INICIO = "2013-01"
+VERSAO = 2               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
 CUSTO = 0.001            # 0,1% por compra ou venda (emolumentos da B3 + diferença entre compra e venda)
 INICIAL, MENSAL = 10000.0, 1000.0
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF
@@ -61,7 +62,8 @@ def _taxas(meses, R):
     except Exception:
         selic = ((1 + R["CDI"]).rolling(12).apply(np.prod, raw=True) - 1).reindex(meses) * 100 + 0.1
     try:
-        ipca = _bcb(13522).resample("ME").last().reindex(meses, method="ffill")
+        # o IPCA de um mês só sai uns 10 dias depois: no fim do mês t, o último conhecido é o de t-1
+        ipca = _bcb(13522).resample("ME").last().shift(1).reindex(meses, method="ffill")
     except Exception:
         ipca = pd.Series(4.5, index=meses)
     return selic.ffill().fillna(10.0), ipca.ffill().fillna(4.5)
@@ -69,7 +71,7 @@ def _taxas(meses, R):
 
 def _metricas_mes(c, dv, meses):
     """As métricas que o app usa (as mesmas de simulacao.metricas_hist), calculadas no fim de cada mês."""
-    if c is None or len(c) < 260:
+    if c is None or len(c) < 253:  # precisa de 1 ano de pregões até a data (conferido abaixo, mês a mês, só com o passado)
         return {}
     tela = c / acertos._fator_div(c, dv) if len(dv) else c
     div12 = (dv.reindex(c.index.union(dv.index), fill_value=0.0).rolling("365D").sum().reindex(c.index)
@@ -260,10 +262,10 @@ def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL):
     except Exception as e:
         print("planos no simulador falharam:", repr(e)[:200], flush=True)
     app_, fixo_, cdi_ = linhas[0], linhas[2], linhas[3]
-    melhores = sorted(linhas, key=lambda l: -l["final"])
+    melhores = sorted((l for l in linhas if l["id"] != "app_antigo"), key=lambda l: -l["final"])
     return {"perfil": perfil, "linhas": linhas, "datas": [x.strftime("%Y-%m-%d") for x in _rodar_datas(d)],
             "desde": d["meses"][0].strftime("%m/%Y"), "ate": d["meses"][-1].strftime("%m/%Y"), "inicial": inicial, "mensal": mensal,
-            "posicao": [l["id"] for l in melhores].index("app") + 1, "total": len(linhas),
+            "posicao": [l["id"] for l in melhores].index("app") + 1, "total": len(melhores),
             "vs_fixo": round(app_["final"] - fixo_["final"], 0), "vs_cdi": round(app_["final"] - cdi_["final"], 0)}
 
 
@@ -333,4 +335,4 @@ def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL):
     except Exception as e:
         print("prova ao vivo falhou:", repr(e)[:200], flush=True)
     print(f"simulador do passado pronto em {time.time() - t0:.0f}s", flush=True)
-    return {"perfis": out, "custo_operacao": CUSTO * 100, "vivo": vivo, "calculado": time.time()}
+    return {"perfis": out, "custo_operacao": CUSTO * 100, "vivo": vivo, "calculado": time.time(), "versao": VERSAO}

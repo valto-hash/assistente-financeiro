@@ -56,6 +56,11 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
   quando duas contas independentes batem (`fundamentos.indicadores`).
 - Proventos de FIIs com anos faltando no Yahoo: ano zerado entre anos com pagamento é "sem dado".
 - O IPCA do Banco Central (série 433) e o CDI (série 4391) têm limite de 10 anos por consulta.
+- Preço ajustado do Yahoo embute os dividendos pagos depois: para dividend yield de uma data antiga, use o preço de
+  tela reconstruído (`acertos._fator_div`), conferido com o preço sem ajuste. Retornos podem usar o preço ajustado.
+- O IPCA de um mês só é divulgado uns 10 dias depois: em testes com o passado, no fim do mês t vale o IPCA de t-1.
+- Em testes com o passado, nada pode depender de dados posteriores à data (nem o tamanho total da série).
+  `testes/test_simulador.py` confere isso.
 
 ## Fluxo de trabalho
 
