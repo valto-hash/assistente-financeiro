@@ -57,6 +57,22 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   perder a conta, basta criar a conta de novo com o mesmo e-mail (ou entrar com o Google): ela volta com o mesmo
   identificador e o aparelho reenvia os dados.
 
+## Simulador do passado (eficácia do app)
+
+Na aba Mercado: e se alguém tivesse seguido o app desde jan/2013, com R$ 10 mil no início e R$ 1.000 por mês? No fim
+de cada mês o app recebe só os dados daquela data (preços, proventos, Selic e IPCA da época), monta a carteira com as
+regras de hoje e a pessoa simulada segue as regras de operação do app (aportes no que está abaixo do recomendado,
+vendas só quando o app mandaria, 0,1% de custo por operação). O mesmo dinheiro vai para o modelo fixo do perfil só com
+ETFs, para o CDI e para os planos consagrados que cabem no perfil. Mostra patrimônio final, retorno ao ano, maior
+queda, custos e o IR estimado das vendas.
+
+O que o simulador mudou: ajustar a alocação pela tendência e pelo juro do momento deixava o resultado menor nos três
+perfis, então foi desligado (`regras.AJUSTE_MOMENTO`); com 4% ou mais em dólar e ouro, a carteira passa a ter os dois.
+A tela mostra também a versão antiga. Como essas mudanças saíram do próprio teste, existe a **prova ao vivo**: todo mês
+o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer, e o resultado real aparece depois.
+Limites: a IA não entra (ela sabe o que aconteceu depois), lista de ativos de hoje (viés de sobrevivência), valores antes
+do IR. O resultado fica guardado no banco por 7 dias (`simulador.py`).
+
 ## Auditoria das recomendações, planos consagrados e memória
 
 - **Auditoria:** toda carteira recomendada (da IA ou das regras) passa por checagens objetivas antes de aparecer: soma

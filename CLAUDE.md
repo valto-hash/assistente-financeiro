@@ -23,6 +23,7 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `memoria.py` | Memória por usuário: recomendações anteriores e compras/vendas, para a IA ser coerente |
 | `simulacao.py` | Histórico de preços (com limpeza), Monte Carlo, testes de estresse, série IPCA+ longo |
 | `acertos.py` | Quanto o app acerta: teste dos sinais e da escolha de ações com o passado, histórico real |
+| `simulador.py` | Simulador do passado (seguir o app mês a mês desde 2013) e a prova ao vivo mensal |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
 | `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
@@ -41,6 +42,9 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
    precisa explicar mudanças grandes. Mudança brusca sem motivo vira aviso na auditoria; as regras mantêm o nível
    de risco anterior quando a opção nova não é claramente melhor.
 4. Sinais de compra/venda só viram aviso quando IA e regras concordam.
+5. Mudança em regra de alocação ou escolha de ativos: rode o simulador (`simulador.tudo`) antes e depois e compare com o
+   modelo fixo do perfil. Regra que piora o resultado nos três perfis não entra (foi assim que `AJUSTE_MOMENTO` foi
+   desligado). Cuidado para não ajustar regra até "ganhar no passado": a prova que vale é a ao vivo.
 
 ## Armadilhas de dados já encontradas (o Yahoo erra)
 

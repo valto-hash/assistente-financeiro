@@ -23,6 +23,7 @@ import gastos as gmod
 import investimentos as inv
 import memoria
 import referencias
+import simulador
 import paginas
 import perfil as teste_perfil
 import planos
@@ -527,7 +528,9 @@ partir de notícias recentes); as taxas; e a LISTA DE ATIVOS PERMITIDOS com mét
 (retorno 12 meses, retorno anualizado em 3 anos, volatilidade, queda máxima em 12 meses, dividend yield, tendência).
 Se o perfil for "não informado", use moderado e diga isso no resumo.
 1) alvo: alocação-alvo por classe (renda_fixa, acao, fii, exterior, cambio; soma 100), partindo do modelo do perfil e
-   desviando no máximo 10 p.p. por classe conforme o panorama. alvo_motivo: 1 a 2 frases.
+   desviando no máximo 10 p.p. por classe conforme o panorama. alvo_motivo: 1 a 2 frases. No simulador do passado
+   (seguindo o app mês a mês de 2013 a 2026), ajustar a alocação pela tendência e pelo juro do momento deixou o resultado
+   menor nos três perfis: só desvie do modelo do perfil por um motivo forte e duradouro, e explique qual.
 2) carteira: a carteira recomendada completa, com 6 a 12 ativos da lista permitida, peso em % do total (soma 100),
    coerente com o alvo de cada classe. Inclua liquidez para emergências (TESOURO_SELIC ou CDB_CDI).
    Use ETFs e fundos amplos como núcleo; ações e FIIs individuais como complemento, no máximo 10% cada.
@@ -1831,6 +1834,33 @@ def b3_apagar(req: Request, authorization: str = Header("")):
     uid = auth(req, authorization)
     armazem.apagar("b3", uid)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- simulador do passado (e se alguém tivesse seguido o app?)
+
+_lock_simul = threading.Lock()
+
+
+def _simulador():
+    """Pesado (refaz 14 anos mês a mês): o resultado fica guardado no banco por 7 dias e sobrevive a reinícios."""
+    with _lock_simul:
+        d = armazem.ler("cache", "simulador")
+        if d and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
+            return d["dados"]
+        r = simulador.tudo(PERFIS, PIOR_CRISE)
+        if r["perfis"]:
+            armazem.gravar("cache", "simulador", r)
+        return r
+
+
+@app.get("/api/simulador")
+def simulador_ep(req: Request, authorization: str = Header("")):
+    auth(req, authorization)
+    try:
+        return cached("simulador", 6 * 3600, _simulador, ok=lambda v: bool(v.get("perfis")), ttl_falha=600)
+    except Exception as e:
+        print("simulador falhou:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui rodar o simulador agora. Tente de novo em alguns minutos.")
 
 
 # ---------------------------------------------------------------- fundamentos e ranking

@@ -1098,6 +1098,58 @@ function dispersaoSvg(linhas, limite, dom) {
   </svg></div>`;
 }
 
+/* ---------- simulador do passado: e se alguém tivesse seguido o app desde 2013? ---------- */
+st.simul = {perfil: null, dados: null, err: null, busy: false};
+async function loadSimul() {
+  st.simul.busy = true; st.simul.err = null; renderSimul();
+  try { st.simul.dados = await api('/api/simulador'); } catch (e) { st.simul.err = e.message; }
+  st.simul.busy = false; renderSimul();
+}
+function renderSimul() { const el = $('#simulCard'); if (el) { el.innerHTML = simulHtml(); ligarSimul(); } }
+function ligarSimul() { $$('#simulCard [data-sp]').forEach(b => b.onclick = () => { st.simul.perfil = b.dataset.sp; renderSimul(); }); }
+function simulHtml() {
+  const S = st.simul, d = S.dados;
+  if (!d) return `<div class="card"><h2>E se você tivesse seguido o app?</h2>${S.err ? `<p class="err-box">${esc(S.err)}</p><div class="btns"><button class="btn" type="button" onclick="loadSimul()">Tentar de novo</button></div>`
+    : busy('Seguindo o app mês a mês desde 2013… na primeira vez pode levar alguns minutos') + sk(4)}</div>`;
+  const perf = S.perfil || (d.perfis[perfil] ? perfil : 'moderado'), x = d.perfis[perf];
+  if (!x) return '';
+  const L = id => x.linhas.find(l => l.id === id), app = L('app'), fixo = L('fixo'), cdi = L('cdi'), antigo = L('app_antigo');
+  const reais = v => M(v).replace(/,00$/, '');
+  const dif = (a, b) => `${a - b >= 0 ? 'mais' : 'menos'} (${reais(Math.abs(a - b))})`;
+  const bomFixo = x.vs_fixo >= 0;
+  const linhas = [...x.linhas].sort((p, q) => (q.id === 'app') - (p.id === 'app') || q.final - p.final);
+  const serie = {datas: x.datas, app: app.serie, fixo: fixo.serie, cdi: cdi.serie};
+  const v = d.vivo, vp = v && v.perfis ? v.perfis[perf] : null;
+  return `<div class="card">
+    <h2>E se você tivesse seguido o app?</h2>
+    <div class="chips" role="group" aria-label="Perfil simulado" style="margin-top:8px">${Object.keys(d.perfis).map(p => `<button type="button" data-sp="${p}" aria-pressed="${p === perf}">${esc(PERFIS[p]?.[0] || p)}</button>`).join('')}</div>
+    <p class="lead sm" style="margin-top:8px">Começando com ${reais(x.inicial)} em ${esc(x.desde)} e aplicando ${reais(x.mensal)} todo mês até ${esc(x.ate)}. No fim de cada mês, o app recebeu só os dados que existiam naquela data, montou a carteira com as regras de hoje e a pessoa simulada seguiu: dinheiro novo no que estava abaixo do recomendado, vendas só quando o app mandaria, ${N(d.custo_operacao, 1)}% de custo em cada compra e venda.</p>
+    <div class="tiles"><div class="tile main"><div class="l">Seguindo o app</div><div class="v tn">${reais(app.final)}</div><div class="d">${P(app.tir_aa, 1, false)} ao ano sobre ${reais(app.investido)} aplicados</div></div>
+      <div class="tile"><div class="l">Modelo fixo do perfil</div><div class="v tn">${reais(fixo.final)}</div><div class="d">${P(fixo.tir_aa, 1, false)} ao ano, só ETFs e títulos</div></div>
+      <div class="tile"><div class="l">100% CDI</div><div class="v tn">${reais(cdi.final)}</div><div class="d">${P(cdi.tir_aa, 1, false)} ao ano</div></div></div>
+    <div class="note ${bomFixo ? 'good' : 'warn'}">${bomFixo ? ICON.check : ICON.warn}<div>${bomFixo
+      ? `<b>As decisões do app ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs, com queda máxima parecida (${P(app.maior_queda, 0)} contra ${P(fixo.maior_queda, 0)}).`
+      : `<b>As decisões do app não ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs. Para este perfil, o mais simples teria sido melhor.`}
+      Contra o CDI: ${dif(app.final, cdi.final)}. Entre as ${N(x.total)} estratégias comparadas, o app ficou em ${N(x.posicao)}º lugar.</div></div>
+    ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1], ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
+    <p class="mut xs" style="margin:2px 0 0">Quanto o patrimônio estava acima do total aplicado até cada mês (dinheiro novo não conta como ganho).</p>
+    <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR estimado nas vendas</small></th></tr></thead><tbody>
+      ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${l.id === 'app_antigo' ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
+        <td><b>${reais(l.final)}</b><small>${P(l.ganho_pct, 0)}</small></td><td>${P(l.tir_aa, 1, false)}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
+        <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${reais(l.custos)}<small>${reais(l.ir_estimado)}</small></td></tr>`).join('')}</tbody></table></div>
+    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes deste teste” mostra como era (${reais(antigo.final)} neste perfil). Como essas mudanças saíram deste mesmo teste, a prova que vale de verdade é a de baixo.</div></div>
+    <h3>Prova ao vivo</h3>
+    ${vp && v.meses.length ? `<p class="sm" style="margin:-4px 0 0">Desde ${esc(v.meses[0])} (${N(v.meses.length)} ${v.meses.length === 1 ? 'mês' : 'meses'}), a carteira que o app recomendava para este perfil rendeu <b>${P(vp.app, 2)}</b>, o modelo fixo ${P(vp.fixo, 2)} e o CDI ${P(vp.cdi, 2)}. Cada carteira foi guardada antes de o mês acontecer.</p>`
+      : `<p class="mut sm" style="margin:-4px 0 0">Todo mês, o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer. O resultado real aparece aqui a partir do mês que vem, sem nenhuma chance de ajustar regra olhando o resultado.</p>`}
+    <details style="margin-top:8px"><summary>Limites deste teste</summary><ul class="ink2 sm" style="padding-left:18px">
+      <li>A IA não entra: ela já “sabe” o que aconteceu depois, e testá-la no passado daria um resultado falso. O teste usa o motor de regras.</li>
+      <li>A lista de ativos é a de hoje: empresas que quebraram ficaram de fora (viés de sobrevivência).</li>
+      <li>Valores antes do imposto de renda. O IR que as vendas teriam pago aparece à parte.</li>
+      <li>A expectativa de inflação da época foi aproximada pelo IPCA dos 12 meses anteriores, e a simulação de 2.000 cenários e a reserva de emergência ficaram de fora.</li>
+      <li>O passado não garante o futuro.</li></ul></details>
+  </div>`;
+}
+
 /* ---------- gastos do dia a dia (lançamentos, categorias e limites) ---------- */
 st.gastos = {};  // resumo por mês 'AAAA-MM'
 const ymG = ({ano, mes}) => `${ano}-${String(mes + 1).padStart(2, '0')}`;  // mês dos gastos, 'AAAA-MM'
@@ -2025,8 +2077,11 @@ function renderMercado() {
   <div class="sect-t">Ranking de ações e FIIs</div>
   <div id="rankCard">${rankHtml()}</div>
   <div class="sect-t">Confiabilidade</div>
-  <div id="acertos">${acertosHtml()}</div>`;
+  <div id="acertos">${acertosHtml()}</div>
+  <div class="sect-t">Simulador do passado</div>
+  <div id="simulCard">${simulHtml()}</div>`;
   ligarRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo);
+  ligarSimul(); if (!st.simul.dados && !st.simul.busy) loadSimul();
 }
 
 /* ---------- Meus ativos ---------- */

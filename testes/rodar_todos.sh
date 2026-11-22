@@ -5,7 +5,7 @@
 # "python3 testes/test_lancamento.py banco".
 cd "$(dirname "$0")/.." || exit 1
 falhou=0
-for t in test_garantias test_diferenciais test_trader test_mestre test_confiab test_lancamento; do
+for t in test_simulador test_garantias test_diferenciais test_trader test_mestre test_confiab test_lancamento; do
   printf '%-22s ' "$t"
   saida=$(python3 "testes/$t.py" arquivo 2>&1)
   if echo "$saida" | grep -q "TUDO OK"; then echo "ok"; else echo "FALHOU"; echo "$saida" | grep -E "FALHA|Traceback|Error" | head -5; falhou=1; fi
