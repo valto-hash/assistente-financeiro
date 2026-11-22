@@ -453,6 +453,15 @@ body.travado{overflow:hidden}
 .rk-tbl th[aria-sort] button{color:var(--acc)}
 .rk-ctl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .rk-ctl select{font:inherit;font-size:14px;padding:6px 8px;border-radius:10px;border:1px solid var(--line);background:var(--sf);color:var(--ink);max-width:100%}
+.aud{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px}
+.aud li{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.aud li svg{flex:0 0 18px;width:18px;height:18px;margin-top:2px}
+.aud li.ok svg{color:var(--up)}.aud li.warn svg{color:var(--warn)}.aud li.bad svg{color:var(--dn)}
+.aud li b{display:block}.aud li span{color:var(--ink2);font-size:13px}
+.ref-tbl td small,.ref-tbl th small{display:block;font-size:11px;color:var(--mut);font-weight:400}
+.ref-tbl tr.sua td{background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.ref-tbl tr.melhor td{background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.ref-tbl th,.ref-tbl td{white-space:normal}
 </style>
 </head>
 <body>
@@ -1017,6 +1026,32 @@ function escolhaHtml(e) {
     </tbody></table></div>
     ${cls.map(nota).join('')}
     <p class="mut xs">Viés de sobrevivência: a lista tem só empresas e fundos que existem hoje e estão entre os maiores; os que quebraram ou encolheram ficaram de fora. Isso faz todos os números parecerem melhores do que foram de verdade, por isso a comparação justa é entre os escolhidos e a lista toda, que têm o mesmo viés. As janelas de 12 meses se sobrepõem: ${N(meses)} meses equivalem a cerca de ${N(Math.round(meses / 12))} anos de teste independentes.</p>`;
+}
+
+/* ---------- auditoria da recomendação e planos consagrados ---------- */
+function auditoriaHtml(p) {
+  const a = p.auditoria;
+  if (!a) return '';
+  const ref = a.referencia, cart = a.carteira, chk = a.checagens || [];
+  const linhas = ref ? [...(cart ? [{nome: 'Carteira recomendada', autor: 'a sua, testada do mesmo jeito', ...cart, sua: true}] : []), ...ref.planos] : [];
+  const reais = v => M(v).replace(/,00$/, '');
+  const tab = linhas.length ? `<div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:6px"><thead><tr><th>Plano</th><th>Por ano<small>acima da inflação</small></th><th>Maior queda</th><th>Pior 12 meses</th><th>Bateu o CDI<small>nas janelas de 12 meses</small></th><th>R$ 10 mil viraram</th></tr></thead><tbody>
+    ${linhas.map(l => `<tr class="${l.sua ? 'sua' : ''}${l.id && l.id === a.parecido_melhor ? ' melhor' : ''}"><td><b>${esc(l.nome)}</b><small>${esc(l.autor || '')}</small></td>
+      <td><b>${P(l.ret_aa, 1, false)}</b>${l.real_aa != null ? `<small>${P(l.real_aa, 1)} real</small>` : ''}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
+      <td class="${cl(l.pior_12m)}">${P(l.pior_12m, 0)}</td><td>${l.id === 'cdi' ? '—' : P(l.acima_cdi_12m, 0, false)}</td><td>${reais(l.final_10k)}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const pend = chk.filter(c => !c.ok).length;
+  return `<div class="card" id="auditoria">
+    <h2>Auditoria da recomendação ${a.aprovada && !pend ? pill('good', '', 'Aprovada') : a.aprovada ? pill('warn', '', `${pend} ${pend === 1 ? 'aviso' : 'avisos'}`) : pill('bad', 'warn', 'Reprovada')}</h2>
+    <p class="lead sm">Antes de aparecer aqui, toda recomendação ${p.fonte === 'ia' ? 'da IA' : 'das regras'} passa por checagens objetivas. Se a da IA não passar numa checagem que bloqueia, o app a descarta e usa a das regras.</p>
+    <ul class="aud">${chk.map(c => `<li class="${c.ok ? 'ok' : c.bloqueia ? 'bad' : 'warn'}">${c.ok ? ICON.check : ICON.warn}<div><b>${esc(c.titulo)}</b><span>${esc(c.detalhe)}</span></div></li>`).join('')}</ul>
+    ${a.checagem_numeros ? `<p class="mut xs" style="margin:8px 0 0">Números dos textos da IA conferidos: ${N(a.checagem_numeros.textos)} ${a.checagem_numeros.textos === 1 ? 'texto' : 'textos'}, ${N(a.checagem_numeros.trocados)} ${a.checagem_numeros.trocados === 1 ? 'trocado' : 'trocados'} pela explicação das regras.</p>` : ''}
+    ${ref ? `<h3>Comparação com planos consagrados</h3>
+      <p class="mut sm" style="margin:-4px 0 0">Como cada plano se saiu de ${esc(ref.desde)} a ${esc(ref.ate)} no Brasil, com rebalanceamento uma vez por ano, sem custos nem impostos${cart ? `. A carteira recomendada foi testada do mesmo jeito (${N(cart.cobertura)}% com o histórico dos próprios ativos; o resto, pela média da classe)` : ''}.</p>
+      ${tab}
+      ${a.comparacao_texto ? `<div class="note">${ICON.spark}<div>${esc(a.comparacao_texto)}</div></div>` : ''}
+      <details style="margin-top:8px"><summary>Quem são esses planos</summary><ul class="ink2 sm" style="padding-left:18px">${ref.planos.map(pl => `<li style="margin:6px 0"><b>${esc(pl.nome)}</b> (${esc(pl.autor)}): ${esc(pl.ideia)} Composição: ${Object.entries(pl.pesos).map(([k, w]) => `${w}% ${esc(ref.componentes[k] || k)}`).join(', ')}.</li>`).join('')}</ul></details>
+      <p class="mut xs" style="margin:8px 0 0">O passado não garante o futuro: os números mostram como cada plano atravessou crises reais (recessão de 2015-16, pandemia, alta de juros de 2021-22, queda de out/2026), não quanto vai render.</p>` : ''}
+  </div>`;
 }
 
 /* ---------- gastos do dia a dia (lançamentos, categorias e limites) ---------- */
@@ -1586,6 +1621,8 @@ function renderInvestir() {
     <div class="card">
       <h2>Carteira recomendada ${p.fonte === 'ia' ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Regras + dados')}</h2>
       <p class="lead sm">${esc(p.resumo || '')}</p>
+      ${p.auditoria?.ia_reprovada ? `<div class="note warn">${ICON.warn}<div><b>A IA sugeriu uma carteira que não passou na auditoria</b>, por isso esta é a carteira das regras. Motivo: ${esc(p.auditoria.ia_reprovada.motivos.join(' '))}</div></div>` : ''}
+      ${p.mudancas ? `<div class="note">${ICON.info}<div><b>Desde a última recomendação:</b> ${esc(p.mudancas)}</div></div>` : ''}
       ${otimizacaoHtml(p.otimizacao)}
       ${p.modelo ? `<p class="mut xs" style="margin:6px 0 0">Montada pelo ${esc(modeloNome(p.modelo))}, que pensa com mais calma nas decisões de compra e venda.</p>` : ''}
       ${checagemHtml(p.checagem)}
@@ -1604,7 +1641,8 @@ function renderInvestir() {
         </div>`).join('')}`).join('')}
       <p class="mut xs">A IA escolhe só entre ativos amplos e líquidos de uma lista fixa (ou os que você já tem), com métricas calculadas a partir do histórico real. Pesquise cada um antes de investir.</p>
     </div>
-  </div>`;
+  </div>
+  ${auditoriaHtml(p)}`;
   $$('.segctl [data-m]', el).forEach(b => b.onclick = () => { modo = b.dataset.m; renderInvestir(); });
   const inp = $('#aporte', el);
   if (inp) inp.oninput = () => { const v = num(inp.value); aporte = isNaN(v) ? 0 : Math.max(v, 0); sv(); $('#plano').innerHTML = planoHtml(); simDirty(); };

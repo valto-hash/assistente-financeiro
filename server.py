@@ -21,6 +21,8 @@ import contas as cmod
 import fundamentos
 import gastos as gmod
 import investimentos as inv
+import memoria
+import referencias
 import paginas
 import perfil as teste_perfil
 import planos
@@ -569,6 +571,23 @@ por mês e a reserva de emergência (alvo = meses x contas mensais; atual = o qu
 - A parte de liquidez da carteira (TESOURO_SELIC ou CDB_CDI, ou o que ele já usa para isso) deve cobrir a reserva.
 - Se a reserva ainda não está completa, diga no resumo que o dinheiro novo deve completá-la antes dos ativos de risco.
 - Use a sobra mensal para falar de quanto ele consegue investir por mês. Se as contas passam da renda, alerte."""
+PROMPT_REFERENCIAS = """
+Você também recebe PLANOS DE REFERÊNCIA (campo "planos_de_referencia"): carteiras consagradas e como cada uma se saiu
+de verdade no Brasil no período informado (retorno ao ano, retorno acima da inflação, maior queda, pior resultado em
+12 meses e em quantas janelas de 12 meses bateu o CDI), calculados pelo app com dados reais. Use-os como verificação:
+- Compare a sua carteira com o plano de risco parecido. Se ela for mais arriscada que um plano que rendeu tanto ou
+  mais no período, aproxime-a dele ou explique por que não.
+- comparacao_planos: 2 a 3 frases dizendo com qual plano a sua carteira mais se parece e por que ela serve ao perfil
+  e ao objetivo, citando só os números recebidos. O passado não garante o futuro: não prometa repetir esses números.
+Depois da sua resposta, o app audita a carteira (faixas do perfil, prazo, concentração, liquidez, pior crise real) e
+a descarta se ela não passar."""
+PROMPT_MEMORIA = """
+Você também recebe o HISTÓRICO DO INVESTIDOR (campo "historico_do_investidor"): a sua última recomendação para ele,
+o que mudou desde então e as compras e vendas que ele registrou.
+- Seja coerente: se nada relevante mudou (perfil, objetivo, ativos, orçamento, ou um panorama de mercado bem
+  diferente), não mude a alocação de nenhuma classe em mais de 5 p.p. em relação à última recomendação.
+- Se ele seguiu a recomendação anterior (comprou o que foi sugerido), não recomende desfazer isso sem motivo forte.
+- mudancas: 1 a 2 frases dizendo o que mudou em relação à última recomendação e por quê (ou que ficou igual)."""
 SCH_OBJETIVO = obj(resumo=STR, metas=arr(obj(descricao=STR, prazo_anos=NUM, valor_alvo=NUM)), aporte_mensal=NUM,
                    liquidez=enum("ALTA", "MEDIA", "BAIXA"), influencia=STR, atencao=arr(STR))
 
@@ -595,17 +614,19 @@ def montar_carteira(ia, perfil_ef, atual, sinais, com_objetivo=False):
     objetivo exigir (mais renda fixa, menos risco), mas nunca mais de 10 p.p. mais arrojado que o perfil."""
     modelo = PERFIS[perfil_ef]
     ia_alvo = ia.get("alvo") if isinstance(ia.get("alvo"), dict) else {}
-    alvo = {}
+    alvo, faixa = {}, {}
     for c in CORE:
         v = num(ia_alvo.get(c))
-        v = modelo[c] if v is None else v
+        alvo[c] = modelo[c] if v is None else v
         if com_objetivo:
-            lo, hi = (modelo[c] - 10, 100) if c == "renda_fixa" else (0, modelo[c] + 10)
+            faixa[c] = (modelo[c] - 10, 100) if c == "renda_fixa" else (0, modelo[c] + 10)
         else:
-            lo, hi = modelo[c] - 10, modelo[c] + 10
-        alvo[c] = min(max(v, lo, 0), hi)
-    s = sum(alvo.values()) or 1
-    alvo = {c: round(v / s * 100, 1) for c, v in alvo.items()}
+            faixa[c] = (modelo[c] - 10, modelo[c] + 10)
+    for _ in range(8):  # limita e normaliza algumas vezes: normalizar uma vez só pode empurrar uma classe para fora da faixa
+        alvo = {c: min(max(v, faixa[c][0], 0), faixa[c][1]) for c, v in alvo.items()}
+        s = sum(alvo.values()) or 1
+        alvo = {c: v / s * 100 for c, v in alvo.items()}
+    alvo = {c: round(v, 1) for c, v in alvo.items()}
 
     permitidos = set(UNIVERSO) | set(atual)
     pesos, motivos = {}, {}
@@ -661,7 +682,7 @@ CONTRA_PADRAO = {
 PIOR_CRISE = {"conservador": -8.0, "moderado": -18.0, "arrojado": -30.0}  # perda tolerada na pior crise real (2008, 2015, 2020...)
 
 
-def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos):
+def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos, risco_anterior=None):
     """Testa a carteira com mais e menos risco (renda fixa x resto) em 2.000 cenários e nas crises reais e escolhe,
     entre as que caem menos do que o perfil aceita na pior crise:
     - com meta alcançável: a que mais vezes chega à meta (empate de até 2 p.p.: a menos arriscada);
@@ -677,6 +698,10 @@ def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos
         nr = min(max(tr + d, 0), teto if d > 0 else 100)
         if d and abs(nr - tr) < 1: continue
         cands[f"{nr:.0f}"] = {**{a: w * nr / tr for a, w in risco.items()}, **{a: w * (100 - nr) / tf for a, w in rf_.items()}}
+    if risco_anterior is not None:  # o nível de risco da recomendação anterior também entra no teste (coerência)
+        nr = min(max(risco_anterior, 0), teto)
+        if all(abs(nr - float(k)) >= 1 for k in cands):
+            cands[f"{nr:.0f}"] = {**{a: w * nr / tr for a, w in risco.items()}, **{a: w * (100 - nr) / tf for a, w in rf_.items()}}
     anos_sim = int(min(max(round(anos or 10), 1), 30))
     try:
         taxas = rates()
@@ -701,6 +726,13 @@ def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos
         escolhido = min((k for k in ok if (st_[k]["prob_meta"] or 0) >= (st_[melhor]["prob_meta"] or 0) - 2), key=float)
     else:
         escolhido = perfil_ok
+    manteve = False
+    if risco_anterior is not None:  # coerência: se a opção nova não é claramente melhor, fica o nível de risco anterior
+        k_ant = min(st_, key=lambda k: abs(float(k) - risco_anterior))
+        if abs(float(k_ant) - risco_anterior) < 1 and k_ant in ok and k_ant != escolhido:
+            ganho = ((st_[escolhido]["prob_meta"] or 0) - (st_[k_ant]["prob_meta"] or 0)) if alcancavel else 0
+            if ganho < 5:
+                escolhido, manteve = k_ant, True
     s_ = st_[escolhido]
     nr = float(escolhido)
     novos = {a: round(w, 2) for a, w in cands[escolhido].items() if w >= 0.01}
@@ -727,13 +759,51 @@ def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos
                  f"(veja em Simular). Mantive o risco do seu perfil: {risco_txt}.")
     else:
         texto = f"Conferi a carteira nas crises reais: {risco_txt}."
+    if manteve:
+        texto += (" Mantive o nível de risco da recomendação anterior: a outra opção não era claramente melhor, e mudar de ideia "
+                  "sem motivo forte só gera custo.")
     if migalhas:
         texto += (f" {', '.join(migalhas)} {'ficaria' if len(migalhas) == 1 else 'ficariam'} com menos de 1,5% da carteira: "
                   f"o valor foi para {nome(rf_principal)}, porque posições tão pequenas não mudam o resultado e só geram custo.")
     return {"pesos": novos, "alvo": alvo2, "texto": texto, "escolhido": nr, "limite_pior_crise": limite, "anos": anos_sim,
-            "meta": meta or None, "alcancavel": alcancavel,
+            "meta": meta or None, "alcancavel": alcancavel, "manteve_anterior": manteve,
             "candidatos": [{"risco": float(k), "prob_meta": v["prob_meta"], "pior_crise": pior[k], "mediana": v["p50"],
                             "dentro_do_perfil": k in ok} for k, v in sorted(st_.items(), key=lambda kv: float(kv[0]))]}
+
+
+def _specs(pesos, pos):
+    posn = {norm(k): v for k, v in pos.items()}
+    return {a: spec(a, posn.get(a)) for a in pesos}
+
+
+def _pior_crise(pesos, specs):
+    """A pior das crises reais testadas para esta carteira: (nome, variação em %)."""
+    try:
+        crises = sim.estresse({"c": pesos}, specs)
+        vals = [(l["nome"], l["carteiras"]["c"]["ret"]) for l in crises if "c" in l["carteiras"]]
+        return min(vals, key=lambda x: x[1]) if vals else None
+    except Exception as e:
+        print("teste de crise na auditoria falhou:", repr(e)[:200], flush=True)
+        return None
+
+
+def _individual(a):
+    return classe(a) in ("acao", "fii") and a not in ETF_ACAO | ETF_EXT | ETF_RF
+
+
+def _elegivel_novo(a, univ):
+    """Um ativo que a pessoa ainda não tem pode entrar na carteira? (liquidez, histórico e cotação atualizada)"""
+    if a in RF:
+        return True
+    m = univ.get(a)
+    if _individual(a):
+        return regras.elegivel(m, classe(a))
+    return bool(m) and not m.get("dados_parados")
+
+
+def checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs):
+    return referencias.checar(pesos, alvo, PERFIS[perfil_ef], perfil_ef, (obj_an or {}).get("liquidez"), set(held), _individual,
+                              lambda a: _elegivel_novo(a, univ), PIOR_CRISE[perfil_ef], _pior_crise(pesos, specs), bool(obj_an))
 
 
 def resumo_regras(perfil_ef, alvo, obj_an):
@@ -974,6 +1044,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
     perfil_ef = r.perfil if r.perfil in PERFIS else "moderado"
     objetivo = " ".join(r.objetivo.split())[:600]
     orc = orcamento(uid)
+    ent = memoria.entrada(perfil_ef if r.perfil in PERFIS else "não informado", objetivo, list(held), orc)
     key = (f"p:{int(usar_ia)}:" + json.dumps({t: p.model_dump() for t, p in sorted(held.items())}) + r.perfil[:30] + "|" + objetivo +
            f"|{orc['contas_mensais']}|{orc['reserva_meses']}|{orc['renda_mensal']}")
 
@@ -1013,6 +1084,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             if c != "renda_fixa" and not m: continue
             # ativo novo sem 3 anos de histórico ou que negocia pouco não entra na lista (os que a pessoa já tem, sim)
             if c in ("acao", "fii") and a not in held and a not in ETF_ACAO and not regras.elegivel(m, c): continue
+            if a not in held and m.get("dados_parados"): continue  # preço parado na fonte (ex.: ETFs de renda fixa no Yahoo)
             if (ad := regras.alerta_dividendos(m, c, taxas.get("cdi"))): extra["alerta"] = ad
             lista.append({"ativo": a, "nome": nm, "classe": c, "descricao": desc, **extra})
         permitidos = sorted({x["ativo"] for x in lista} | set(held))
@@ -1033,19 +1105,40 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                          "cenarios": [{k: s[k] for k in ("nome", "prob", "descricao")} for s in pan["cenarios"]]},
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
             "ativos_permitidos": lista}
-        ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else "") + (PROMPT_ORCAMENTO if tem_orc else ""), dados, schema,
+        mem_ctx, mem_cons = memoria.contexto(uid, ent)
+        try:
+            ref = cached("ref:planos", 12 * 3600, referencias.planos_ref, ok=lambda v: bool(v["planos"]), ttl_falha=600)
+        except Exception as e:
+            print("planos de referência indisponíveis:", repr(e)[:200], flush=True)
+            ref = None
+        if mem_ctx:
+            dados["historico_do_investidor"] = mem_ctx
+            schema["properties"]["mudancas"] = STR; schema["required"].append("mudancas")
+        if ref:
+            dados["planos_de_referencia"] = {"periodo": f"{ref['desde']} a {ref['ate']}", "planos": [
+                {k: p[k] for k in ("nome", "autor", "classes", "ret_aa", "real_aa", "vol_aa", "maior_queda", "pior_12m", "acima_cdi_12m")}
+                for p in ref["planos"]]}
+            schema["properties"]["comparacao_planos"] = STR; schema["required"].append("comparacao_planos")
+        ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else "") + (PROMPT_ORCAMENTO if tem_orc else "")
+                      + (PROMPT_REFERENCIAS if ref else "") + (PROMPT_MEMORIA if mem_ctx else ""), dados, schema,
                       effort=EFFORT_DECISOES, model=MODELO_DECISOES, max_tokens=32000) if usar_ia else {}
         atual = {i["ticker"]: i["valor"] for i in itens}
         sinais = {i["ticker"]: i["sinal"] for i in itens}
         fonte = "ia" if ia.get("carteira") else "regras"
-        otimizacao = None
+        otimizacao, ia_reprovada = None, None
         if fonte == "ia":
             alvo, pesos, motivos, origem = montar_carteira(ia, perfil_ef, atual, sinais, bool(objetivo))
             obj_an, alvo_motivo, resumo = (ler_objetivo(ia.get("objetivo_analise")) if objetivo else None), str(ia.get("alvo_motivo", ""))[:400], str(ia.get("resumo", ""))[:600]
             textos = {norm(str(x.get("ativo", ""))): x for x in ia.get("carteira", []) if isinstance(x, dict)}
             obj_da_ia = bool(obj_an)
             if objetivo and not obj_an: obj_an = regras.objetivo(objetivo)  # a IA não analisou o objetivo: usa as regras
-        else:  # sem IA (ou se ela falhar): motor de regras
+            # auditoria antes de mostrar: se a carteira da IA não passar numa checagem que bloqueia, vale a das regras
+            bloq = [c for c in checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, _specs(pesos, r.pos)) if c["bloqueia"]]
+            if bloq:
+                ia_reprovada = {"motivos": [f"{c['titulo']}: {c['detalhe']}" for c in bloq]}
+                print("auditoria reprovou a carteira da IA:", ia_reprovada["motivos"], flush=True)
+                fonte = "regras"
+        if fonte != "ia":  # sem IA, se ela falhar ou se a auditoria reprovar a carteira dela: motor de regras
             obj_an = regras.objetivo(objetivo) if objetivo else None
             alvo, alvo_motivo = regras.alvo_classes(PERFIS[perfil_ef], pan["classes"], obj_an)
             cand = {a: {"classe": c, "nome": nm, "descricao": desc, "m": univ.get(a)} for a, (c, nm, desc) in UNIVERSO.items()}
@@ -1061,8 +1154,11 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             # alocação pela meta: testa versões mais e menos arriscadas em 2.000 cenários e fica com a melhor dentro do risco aceito
             meta_p = ((obj_an or {}).get("metas") or [{}])[0]
             aporte_p = (obj_an or {}).get("aporte_mensal") or max(orc.get("sobra") or 0, 0)
+            risco_ant = None
+            if mem_cons and mem_cons["dias"] <= 30 and not any(m.startswith(("perfil", "o objetivo")) for m in mem_cons["mudancas"]):
+                risco_ant = 100 - mem_cons["anterior"].get("renda_fixa", 0)
             otimizacao = otimizar_risco(pesos, alvo, perfil_ef, meta_p.get("valor_alvo") or 0, meta_p.get("prazo_anos") or 0,
-                                        total, aporte_p, pan, r.pos)
+                                        total, aporte_p, pan, r.pos, risco_ant)
             if otimizacao:
                 pesos, alvo = otimizacao.pop("pesos"), otimizacao.pop("alvo")
                 alvo_motivo += " " + otimizacao["texto"]
@@ -1117,7 +1213,34 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             s_r["fatos"].insert(0, regras.fato("Reserva de emergência", f"{regras.brl(reserva_atual, 0)} de {regras.brl(orc['reserva_alvo'], 0)}",
                                                f"{orc['reserva_meses']} meses de contas de {regras.brl(orc['contas_mensais'], 0)}"))
         aporte_m = ((obj_an or {}).get("aporte_mensal") or max(orc.get("sobra") or 0, 0))
-        acoes = explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, ia.get("acoes", []), fonte, conf, aporte_m)
+        acoes = explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, ia.get("acoes", []) if fonte == "ia" else [],
+                                  fonte, conf, aporte_m)
+        # auditoria final (da IA ou das regras): checagens objetivas, comparação com planos consagrados e coerência
+        specs_f = _specs(pesos, r.pos)
+        chks = checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs_f)
+        teste_cart = None
+        try:
+            teste_cart = referencias.testar_carteira(pesos, specs_f) if ref else None
+        except Exception as e:
+            print("teste com o passado da carteira falhou:", repr(e)[:200], flush=True)
+        comp, melhor = referencias.comparar(teste_cart, ref, PIOR_CRISE[perfil_ef] - 5) if ref else ([], None)
+        chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior"), (mem_cons or {}).get("mudou_entrada"),
+                                                (mem_cons or {}).get("dias"))
+        txt_mud = str(ia.get("mudancas", ""))[:400] if fonte == "ia" else ""
+        txt_comp = str(ia.get("comparacao_planos", ""))[:500] if fonte == "ia" else ""
+        if conf:
+            if txt_mud and not conf.ok(txt_mud, "mudancas"): txt_mud = ""
+            if txt_comp and not conf.ok(txt_comp, "comparacao_planos"): txt_comp = ""
+        if not txt_mud and mem_cons:
+            ant = mem_cons["anterior"]
+            difs = [f"{regras.NOME[c].lower()} {v - ant.get(c, 0):+.0f} p.p." for c, v in alvo.items() if abs(v - ant.get(c, 0)) >= 2]
+            txt_mud = ((f"Em relação à recomendação {referencias.quando(mem_cons['dias'], True)}: " + ", ".join(difs) + ".") if difs else
+                       f"A alocação por classe ficou igual à da recomendação {referencias.quando(mem_cons['dias'], True)}.")
+            if difs and mem_cons["mudancas"]:
+                txt_mud += " O que mudou desde então: " + "; ".join(mem_cons["mudancas"]) + "."
+        auditoria = {"aprovada": not any(c["bloqueia"] for c in chks), "checagens": chks, "ia_reprovada": ia_reprovada,
+                     "carteira": teste_cart, "referencia": ref, "parecido_melhor": melhor["id"] if melhor else None,
+                     "comparacao_texto": txt_comp, "checagem_numeros": conf.resumo() if conf else None}
         falta_reserva = max(orc["reserva_alvo"] - reserva_atual, 0)
         alertas = []
         if orc["renda_mensal"] and orc["contas_mensais"] > orc["renda_mensal"]:
@@ -1145,7 +1268,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                 "alertas": (alertas + ia_alertas)[:5],
                 "ia": fonte == "ia", "fonte": fonte, "ia_configurada": usar_ia, "classes_padrao": list(origem), "usd": usd,
                 "modelo": MODELO_DECISOES if fonte == "ia" else None, "checagem": conf.resumo() if conf else None,
-                "otimizacao": otimizacao,
+                "otimizacao": otimizacao, "auditoria": auditoria, "mudancas": txt_mud,
                 "objetivo": objetivo, "objetivo_analise": obj_an,
                 "orcamento": {**orc, "reserva_atual": reserva_atual, "reserva_falta": round(falta_reserva, 2),
                               "meses_cobertos": round(reserva_atual / orc["contas_mensais"], 1) if orc["contas_mensais"] else None,
@@ -1154,6 +1277,10 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
         res = cached(key, 1800, calc, ok=lambda v: v["fonte"] == "ia" or not usar_ia)
     except Exception as e:
         raise HTTPException(502, str(e))
+    try:  # memória: a próxima recomendação sabe o que foi recomendado agora
+        memoria.registrar(uid, res, ent)
+    except Exception as e:
+        print("falha ao guardar a memória:", repr(e)[:200], flush=True)
     # guarda a carteira recomendada da pessoa: usada nos avisos de rebalanceamento e de bons momentos de compra
     pesos_alvo = {s["ticker"]: s["peso"] for s in res["sugerida"]}
     avisos.atualizar("niveis", uid, {"ativos": {}}, lambda d: d.update(alvo=res["alvo"], pesos=pesos_alvo,
@@ -1272,8 +1399,10 @@ def carteira_get(req: Request, authorization: str = Header("")):
 @app.put("/api/carteira")
 def carteira_put(req: Request, r: SalvarReq, authorization: str = Header("")):
     uid = auth(req, authorization)
+    ant = ((armazem.ler("carteira", uid) or {}).get("dados") or {}).get("pos") or {}
     try:
-        novo = armazem.gravar("carteira", uid, limpar_carteira(r.dados), max(r.base, 0))
+        limpo = limpar_carteira(r.dados)
+        novo = armazem.gravar("carteira", uid, limpo, max(r.base, 0))
         if novo is None:
             atual = armazem.ler("carteira", uid)
             raise HTTPException(409, {"msg": "a carteira foi alterada em outro aparelho", "versao": atual["versao"] if atual else 0})
@@ -1282,6 +1411,11 @@ def carteira_put(req: Request, r: SalvarReq, authorization: str = Header("")):
     except Exception as e:
         print("erro ao salvar a carteira:", repr(e), flush=True)
         raise HTTPException(503, "não consegui salvar a carteira no servidor")
+    try:
+        for txt in memoria.diferenca_posicoes(ant, limpo["pos"]):
+            memoria.evento(uid, "carteira", txt)
+    except Exception as e:
+        print("falha ao guardar a memória:", repr(e)[:200], flush=True)
     return {"versao": novo["versao"], "atualizado": novo["atualizado"], **_info()}
 
 
@@ -2312,6 +2446,8 @@ def perfil_teste(req: Request, r: TesteReq, authorization: str = Header("")):
     uid = auth(req, authorization)
     res = teste_perfil.avaliar(r.respostas)
     armazem.gravar("perfil_teste", uid, {**res, "quando": time.time()})
+    try: memoria.evento(uid, "perfil", f"fez o teste de perfil: {res.get('perfil')}")
+    except Exception: pass
     if res["renda"]:  # a renda informada no teste vai para o orçamento
         avisos.atualizar("financas", uid, dict(FIN_PADRAO), lambda d: d.update(renda_mensal=res["renda"], renda_origem="teste"))
     return res

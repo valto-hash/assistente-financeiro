@@ -288,7 +288,7 @@ def alerta_dividendos(m, c, cdi=None):
 def elegivel(m, c):
     """Um ativo NOVO só entra como complemento se tiver histórico de 3 anos e negociar o bastante (os que você já
     tem não saem por isso; só recebem o alerta)."""
-    if not m: return False
+    if not m or m.get("dados_parados"): return False  # fonte parou de atualizar o preço: não dá para confiar
     if (m.get("anos_hist") or 0) < ANOS_MIN or m.get("ret_3a_aa") is None: return False
     g = giro(m)
     return g is None or g >= GIRO_MIN.get(c, 0)
