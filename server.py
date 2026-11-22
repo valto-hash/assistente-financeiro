@@ -572,13 +572,16 @@ por mês e a reserva de emergência (alvo = meses x contas mensais; atual = o qu
 - Se a reserva ainda não está completa, diga no resumo que o dinheiro novo deve completá-la antes dos ativos de risco.
 - Use a sobra mensal para falar de quanto ele consegue investir por mês. Se as contas passam da renda, alerte."""
 PROMPT_REFERENCIAS = """
-Você também recebe PLANOS DE REFERÊNCIA (campo "planos_de_referencia"): carteiras consagradas e como cada uma se saiu
-de verdade no Brasil no período informado (retorno ao ano, retorno acima da inflação, maior queda, pior resultado em
-12 meses e em quantas janelas de 12 meses bateu o CDI), calculados pelo app com dados reais. Use-os como verificação:
-- Compare a sua carteira com o plano de risco parecido. Se ela for mais arriscada que um plano que rendeu tanto ou
-  mais no período, aproxime-a dele ou explique por que não.
-- comparacao_planos: 2 a 3 frases dizendo com qual plano a sua carteira mais se parece e por que ela serve ao perfil
-  e ao objetivo, citando só os números recebidos. O passado não garante o futuro: não prometa repetir esses números.
+Você também recebe PLANOS DE REFERÊNCIA (campo "planos_de_referencia"): 11 carteiras consagradas e como cada uma se
+saiu de verdade no Brasil no período informado (retorno ao ano, retorno acima da inflação, maior queda, pior resultado
+em 12 meses, em quantas janelas de 12 meses bateu o CDI e o retorno em cada metade do período), calculados pelo app com
+dados reais. cabe_no_perfil diz se a maior queda do plano cabe no que o perfil aceita. Use-os como verificação:
+- Compare a sua carteira com TODOS os planos que cabem no perfil, não com um só. Se algum deles rendeu mais E caiu
+  menos, aproxime a sua carteira dele ou explique por que não.
+- Prefira o que funcionou nas duas metades do período: um plano que só foi bem numa fase pode ter tido sorte.
+- comparacao_planos: 2 a 4 frases comparando a sua carteira com pelo menos três planos que cabem no perfil (com
+  quais ela se parece, em que é melhor e em que é pior), citando só os números recebidos. O passado não garante o
+  futuro: não prometa repetir esses números.
 Depois da sua resposta, o app audita a carteira (faixas do perfil, prazo, concentração, liquidez, pior crise real) e
 a descarta se ela não passar."""
 PROMPT_MEMORIA = """
@@ -1114,10 +1117,14 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
         if mem_ctx:
             dados["historico_do_investidor"] = mem_ctx
             schema["properties"]["mudancas"] = STR; schema["required"].append("mudancas")
+        ref_p = referencias.para_perfil(ref, PIOR_CRISE[perfil_ef]) if ref else None
         if ref:
-            dados["planos_de_referencia"] = {"periodo": f"{ref['desde']} a {ref['ate']}", "planos": [
-                {k: p[k] for k in ("nome", "autor", "classes", "ret_aa", "real_aa", "vol_aa", "maior_queda", "pior_12m", "acima_cdi_12m")}
-                for p in ref["planos"]]}
+            dados["planos_de_referencia"] = {"periodo": f"{ref['desde']} a {ref['ate']}", "limite_de_queda_do_perfil": PIOR_CRISE[perfil_ef],
+                                             "planos": [{**{k: p[k] for k in ("nome", "autor", "classes", "ret_aa", "real_aa", "vol_aa",
+                                                                              "maior_queda", "pior_12m", "acima_cdi_12m")},
+                                                         "retorno_ao_ano_1a_metade": p["metade1"]["ret_aa"],
+                                                         "retorno_ao_ano_2a_metade": p["metade2"]["ret_aa"],
+                                                         "cabe_no_perfil": p["cabe"]} for p in ref_p["planos"]]}
             schema["properties"]["comparacao_planos"] = STR; schema["required"].append("comparacao_planos")
         ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else "") + (PROMPT_ORCAMENTO if tem_orc else "")
                       + (PROMPT_REFERENCIAS if ref else "") + (PROMPT_MEMORIA if mem_ctx else ""), dados, schema,
@@ -1223,7 +1230,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             teste_cart = referencias.testar_carteira(pesos, specs_f) if ref else None
         except Exception as e:
             print("teste com o passado da carteira falhou:", repr(e)[:200], flush=True)
-        comp, melhor = referencias.comparar(teste_cart, ref, PIOR_CRISE[perfil_ef] - 5) if ref else ([], None)
+        comp, dominam = referencias.comparar(teste_cart, ref_p, perfil_ef) if ref_p else ([], [])
         chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior"), (mem_cons or {}).get("mudou_entrada"),
                                                 (mem_cons or {}).get("dias"))
         txt_mud = str(ia.get("mudancas", ""))[:400] if fonte == "ia" else ""
@@ -1239,7 +1246,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             if difs and mem_cons["mudancas"]:
                 txt_mud += " O que mudou desde então: " + "; ".join(mem_cons["mudancas"]) + "."
         auditoria = {"aprovada": not any(c["bloqueia"] for c in chks), "checagens": chks, "ia_reprovada": ia_reprovada,
-                     "carteira": teste_cart, "referencia": ref, "parecido_melhor": melhor["id"] if melhor else None,
+                     "carteira": teste_cart, "referencia": ref_p, "dominam": dominam,
                      "comparacao_texto": txt_comp, "checagem_numeros": conf.resumo() if conf else None}
         falta_reserva = max(orc["reserva_alvo"] - reserva_atual, 0)
         alertas = []

@@ -63,10 +63,14 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   100%, risco dentro do perfil, dinheiro de curto prazo em renda fixa, nenhum papel novo acima de 10%, ativos novos com
   liquidez, histórico e cotação atualizada, e a pior crise real dentro do limite do perfil. Se a carteira da IA não
   passar, o app usa a das regras e mostra o motivo. A tela "Investir" mostra cada checagem.
-- **Planos consagrados:** 100% CDI, Portfólio Permanente (Harry Browne), All Weather (Ray Dalio), 60/40 e Três fundos
-  (Bogleheads), adaptados com ativos brasileiros e testados com dados reais de 04/2011 até hoje (rebalanceamento anual,
-  sem custos nem impostos). A carteira recomendada é testada do mesmo jeito e comparada; se um plano consagrado foi,
-  ao mesmo tempo, melhor e menos arriscado, aparece um aviso. A IA recebe esses números e precisa se comparar com eles.
+- **Planos consagrados (11):** 100% CDI, Portfólio Permanente (Harry Browne), All Weather (Ray Dalio), 60/40, Três
+  fundos (Bogleheads), Renda e crescimento 35/65 (inspirada no Vanguard Wellesley), Golden Butterfly, Coffeehouse
+  (Bill Schultheis), Carteira de Swensen (Yale), Core Four (Rick Ferri) e 100% bolsa brasileira. Adaptados com ativos
+  brasileiros e testados com dados reais de 04/2011 até hoje (rebalanceamento anual, sem custos nem impostos), com o
+  resultado de cada metade do período. A carteira recomendada é testada do mesmo jeito e comparada com TODOS os planos
+  que cabem no perfil (maior queda dentro do limite): avisa se algum foi melhor e menos arriscado (lista todos), mostra
+  a posição dela entre eles e se ela bateu o CDI nas duas metades. A tela tem um gráfico de retorno x maior queda.
+  A IA recebe todos esses números e precisa comparar a carteira dela com pelo menos três planos.
 - **Memória:** o app guarda as últimas recomendações de cada pessoa e as compras e vendas registradas. A IA recebe esse
   resumo e precisa explicar mudanças grandes; mudança brusca sem motivo vira aviso, e as regras mantêm o nível de
   risco anterior quando a opção nova não é claramente melhor.

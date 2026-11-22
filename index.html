@@ -462,6 +462,9 @@ body.travado{overflow:hidden}
 .ref-tbl tr.sua td{background:color-mix(in srgb,var(--acc) 8%,transparent)}
 .ref-tbl tr.melhor td{background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .ref-tbl th,.ref-tbl td{white-space:normal}
+.ref-tbl tr.fora td{opacity:.6}
+.nref{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:99px;border:1px solid var(--line);font-size:11px;margin-right:6px;vertical-align:1px}
+.ref-tbl tr.sua .nref{background:var(--acc);border-color:var(--acc);color:#fff}
 </style>
 </head>
 <body>
@@ -1033,12 +1036,18 @@ function auditoriaHtml(p) {
   const a = p.auditoria;
   if (!a) return '';
   const ref = a.referencia, cart = a.carteira, chk = a.checagens || [];
-  const linhas = ref ? [...(cart ? [{nome: 'Carteira recomendada', autor: 'a sua, testada do mesmo jeito', ...cart, sua: true}] : []), ...ref.planos] : [];
+  // a recomendada primeiro; depois os planos, do menos ao mais arriscado (número = marcador no gráfico)
+  const planos = ref ? [...ref.planos].sort((x, y) => y.maior_queda - x.maior_queda) : [];
+  const linhas = [...(cart ? [{nome: 'Carteira recomendada', autor: 'a sua, testada do mesmo jeito', ...cart, sua: true, cabe: true}] : []), ...planos]
+    .map((l, i) => ({...l, n: l.sua ? '★' : String(cart ? i : i + 1)}));
   const reais = v => M(v).replace(/,00$/, '');
-  const tab = linhas.length ? `<div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:6px"><thead><tr><th>Plano</th><th>Por ano<small>acima da inflação</small></th><th>Maior queda</th><th>Pior 12 meses</th><th>Bateu o CDI<small>nas janelas de 12 meses</small></th><th>R$ 10 mil viraram</th></tr></thead><tbody>
-    ${linhas.map(l => `<tr class="${l.sua ? 'sua' : ''}${l.id && l.id === a.parecido_melhor ? ' melhor' : ''}"><td><b>${esc(l.nome)}</b><small>${esc(l.autor || '')}</small></td>
-      <td><b>${P(l.ret_aa, 1, false)}</b>${l.real_aa != null ? `<small>${P(l.real_aa, 1)} real</small>` : ''}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
-      <td class="${cl(l.pior_12m)}">${P(l.pior_12m, 0)}</td><td>${l.id === 'cdi' ? '—' : P(l.acima_cdi_12m, 0, false)}</td><td>${reais(l.final_10k)}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const dom = new Set(a.dominam || []);
+  const nCabe = planos.filter(x => x.cabe).length;
+  const tab = linhas.length ? `<div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:6px"><thead><tr><th>Plano</th><th>Por ano<small>acima da inflação</small></th><th>1ª metade<small>2ª metade</small></th><th>Maior queda</th><th>Pior 12 meses</th><th>Bateu o CDI<small>nas janelas de 12 meses</small></th><th>R$ 10 mil viraram</th></tr></thead><tbody>
+    ${linhas.map(l => `<tr class="${l.sua ? 'sua' : ''}${dom.has(l.id) ? ' melhor' : ''}${l.cabe ? '' : ' fora'}"><td><b><span class="nref">${l.n}</span>${esc(l.nome)}</b><small>${esc(l.autor || '')}${l.cabe ? '' : ' · não cabe no seu perfil'}${dom.has(l.id) ? ' · rendeu mais e caiu menos' : ''}</small></td>
+      <td><b>${P(l.ret_aa, 1, false)}</b>${l.real_aa != null ? `<small>${P(l.real_aa, 1)} real</small>` : ''}</td>
+      <td>${l.metade1 ? `${P(l.metade1.ret_aa, 1, false)}<small>${P(l.metade2.ret_aa, 1, false)}</small>` : '—'}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
+      <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${l.id === 'cdi' ? '—' : P(l.acima_cdi_12m, 0, false)}</td><td>${reais(l.final_10k)}</td></tr>`).join('')}</tbody></table></div>` : '';
   const pend = chk.filter(c => !c.ok).length;
   return `<div class="card" id="auditoria">
     <h2>Auditoria da recomendação ${a.aprovada && !pend ? pill('good', '', 'Aprovada') : a.aprovada ? pill('warn', '', `${pend} ${pend === 1 ? 'aviso' : 'avisos'}`) : pill('bad', 'warn', 'Reprovada')}</h2>
@@ -1047,11 +1056,46 @@ function auditoriaHtml(p) {
     ${a.checagem_numeros ? `<p class="mut xs" style="margin:8px 0 0">Números dos textos da IA conferidos: ${N(a.checagem_numeros.textos)} ${a.checagem_numeros.textos === 1 ? 'texto' : 'textos'}, ${N(a.checagem_numeros.trocados)} ${a.checagem_numeros.trocados === 1 ? 'trocado' : 'trocados'} pela explicação das regras.</p>` : ''}
     ${ref ? `<h3>Comparação com planos consagrados</h3>
       <p class="mut sm" style="margin:-4px 0 0">Como cada plano se saiu de ${esc(ref.desde)} a ${esc(ref.ate)} no Brasil, com rebalanceamento uma vez por ano, sem custos nem impostos${cart ? `. A carteira recomendada foi testada do mesmo jeito (${N(cart.cobertura)}% com o histórico dos próprios ativos; o resto, pela média da classe)` : ''}.</p>
+      ${dispersaoSvg(linhas, ref.limite, dom)}
+      <p class="mut xs" style="margin:2px 0 0">Quanto mais para cima, mais rendeu; quanto mais para a direita, mais chegou a cair. A faixa clara é o que o seu perfil aceita (queda de até ${N(Math.abs(ref.limite))}%): ${N(nCabe)} dos ${N(planos.length)} planos cabem nela, e a recomendada é comparada com todos eles.</p>
       ${tab}
       ${a.comparacao_texto ? `<div class="note">${ICON.spark}<div>${esc(a.comparacao_texto)}</div></div>` : ''}
       <details style="margin-top:8px"><summary>Quem são esses planos</summary><ul class="ink2 sm" style="padding-left:18px">${ref.planos.map(pl => `<li style="margin:6px 0"><b>${esc(pl.nome)}</b> (${esc(pl.autor)}): ${esc(pl.ideia)} Composição: ${Object.entries(pl.pesos).map(([k, w]) => `${w}% ${esc(ref.componentes[k] || k)}`).join(', ')}.</li>`).join('')}</ul></details>
       <p class="mut xs" style="margin:8px 0 0">O passado não garante o futuro: os números mostram como cada plano atravessou crises reais (recessão de 2015-16, pandemia, alta de juros de 2021-22, queda de out/2026), não quanto vai render.</p>` : ''}
   </div>`;
+}
+
+// retorno (eixo vertical) x maior queda (eixo horizontal) de cada plano, com a faixa que cabe no perfil
+function dispersaoSvg(linhas, limite, dom) {
+  if (linhas.length < 2) return '';
+  const W = 640, H = 260, pl = 44, pr = 14, pt = 12, pb = 34;
+  const xs = linhas.map(l => -l.maior_queda), ys = linhas.map(l => l.ret_aa);
+  const xmax = Math.max(...xs, -limite) * 1.08 || 1, ylo = Math.min(0, ...ys), yhi = Math.max(...ys) * 1.1;
+  const X = v => pl + v / xmax * (W - pl - pr), Y = v => pt + (yhi - v) / (yhi - ylo) * (H - pt - pb);
+  const passoY = yhi - ylo > 12 ? 5 : 2, gy = [];
+  for (let g = Math.ceil(ylo / passoY) * passoY; g <= yhi; g += passoY) gy.push(g);
+  const passoX = xmax > 30 ? 10 : 5, gx = [];
+  for (let g = 0; g <= xmax; g += passoX) gx.push(g);
+  const pos = new Map(), usados = [];  // afasta marcadores que cairiam um em cima do outro
+  [...linhas].sort((p, q) => p.sua ? -1 : q.sua ? 1 : 0).forEach(l => {
+    const x = X(-l.maior_queda), y0 = Y(l.ret_aa);
+    let y = y0;
+    for (const d of [0, -19, 19, -38, 38, -57, 57]) { y = y0 + d; if (!usados.some(([ux, uy]) => Math.hypot(ux - x, uy - y) < 19)) break; }
+    usados.push([x, y]); pos.set(l, [x, y]);
+  });
+  const ponto = l => {
+    const [x, y] = pos.get(l);
+    if (l.sua) return `<g><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="10" style="fill:var(--acc)"/><text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" style="fill:#fff;font-size:11px;font-weight:700">★</text></g>`;
+    const cor = dom.has(l.id) ? 'var(--warn)' : l.cabe ? 'var(--ink2)' : 'var(--mut)';
+    return `<g opacity="${l.cabe ? 1 : .55}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" style="fill:var(--sf);stroke:${cor};stroke-width:1.6"/><text x="${x.toFixed(1)}" y="${(y + 3.5).toFixed(1)}" text-anchor="middle" style="fill:${cor};font-size:10px;font-weight:700">${l.n}</text></g>`;
+  };
+  return `<div class="graf"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Retorno ao ano e maior queda de cada plano">
+    <rect x="${X(0)}" y="${pt}" width="${(X(-limite) - X(0)).toFixed(1)}" height="${H - pt - pb}" style="fill:color-mix(in srgb,var(--up) 9%,transparent)"/>
+    ${gy.map(g => `<line x1="${pl}" x2="${W - pr}" y1="${Y(g).toFixed(1)}" y2="${Y(g).toFixed(1)}" style="stroke:var(--line2)"/><text x="${pl - 6}" y="${(Y(g) + 4).toFixed(1)}" text-anchor="end">${N(g)}%</text>`).join('')}
+    ${gx.map(g => `<text x="${X(g).toFixed(1)}" y="${H - 16}" text-anchor="middle">${g ? '-' + N(g) : '0'}%</text>`).join('')}
+    <text x="${W - pr}" y="${H - 2}" text-anchor="end">maior queda no período →</text><text x="${pl - 40}" y="${pt + 2}" text-anchor="start">ao ano</text>
+    ${linhas.filter(l => !l.sua).map(ponto).join('')}${linhas.filter(l => l.sua).map(ponto).join('')}
+  </svg></div>`;
 }
 
 /* ---------- gastos do dia a dia (lançamentos, categorias e limites) ---------- */

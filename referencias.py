@@ -45,11 +45,33 @@ PLANOS = [
     {"id": "tres_fundos", "nome": "Três fundos", "autor": "Taylor Larimore e a comunidade Bogleheads",
      "pesos": {"ACOES_BR": 40, "EXTERIOR": 20, "IPCA_LONGO": 20, "CDI": 20},
      "ideia": "Três investimentos amplos e baratos (ações daqui, ações de fora e renda fixa), sem escolher empresa nenhuma."},
+    {"id": "wellesley", "nome": "Renda e crescimento 35/65", "autor": "inspirada no fundo Vanguard Wellesley Income, ativo desde 1970",
+     "pesos": {"DIVID": 20, "EXTERIOR": 15, "IPCA_LONGO": 35, "CDI": 30},
+     "ideia": "Conservadora: 65% em renda fixa e 35% em ações de empresas que pagam bons dividendos. Busca renda e quedas pequenas."},
+    {"id": "golden_butterfly", "nome": "Golden Butterfly (Borboleta Dourada)", "autor": "Tyler, do site Portfolio Charts",
+     "pesos": {"ACOES_BR": 20, "SMALL": 20, "IPCA_LONGO": 20, "CDI": 20, "OURO": 20},
+     "ideia": "Uma variação do Permanente com mais ações, incluindo empresas menores, que crescem mais no longo prazo. Busca "
+              "quedas pequenas sem abrir mão de crescimento."},
+    {"id": "coffeehouse", "nome": "Coffeehouse", "autor": "Bill Schultheis, livro The Coffeehouse Investor, 1998",
+     "pesos": {"IPCA_LONGO": 20, "CDI": 20, "ACOES_BR": 10, "DIVID": 10, "SMALL": 20, "EXTERIOR": 10, "FII": 10},
+     "ideia": "40% em renda fixa e 60% divididos entre vários tipos de ações e imóveis. Diversifica muito e não mexe: o autor "
+              "dizia para ir tomar um café em vez de acompanhar o mercado."},
+    {"id": "swensen", "nome": "Carteira de Swensen (Yale)", "autor": "David Swensen, gestor do fundo da Universidade Yale, livro Unconventional Success, 2005",
+     "pesos": {"ACOES_BR": 30, "EXTERIOR": 20, "FII": 20, "IPCA_LONGO": 15, "CDI": 15},
+     "ideia": "A versão para pessoa física da gestão do fundo de Yale: muito diversificada, com bastante imóveis (aqui, FIIs) e "
+              "títulos protegidos da inflação."},
+    {"id": "core_four", "nome": "Core Four", "autor": "Rick Ferri, comunidade Bogleheads",
+     "pesos": {"ACOES_BR": 48, "EXTERIOR": 24, "FII": 8, "IPCA_LONGO": 10, "CDI": 10},
+     "ideia": "Quatro investimentos amplos com foco em crescimento: 80% em ações e imóveis e 20% em renda fixa."},
+    {"id": "bolsa", "nome": "100% bolsa brasileira", "autor": "Ibovespa (BOVA11): a referência do outro extremo",
+     "pesos": {"ACOES_BR": 100},
+     "ideia": "Tudo em ações brasileiras, sem proteção nenhuma. Mostra quanto a bolsa rendeu e quanto chegou a cair no período."},
 ]
 COMPONENTES = {"ACOES_BR": "Ibovespa (BOVA11)", "EXTERIOR": "S&P 500 em reais (IVVB11)", "IPCA_LONGO": "Tesouro IPCA+ longo (IMA-B 5+)",
-               "CDI": "CDI", "OURO": "Ouro em reais", "DOLAR": "Dólar", "FII": "FIIs grandes (cesta de 5)"}
+               "CDI": "CDI", "OURO": "Ouro em reais", "DOLAR": "Dólar", "FII": "FIIs grandes (cesta de 5)",
+               "SMALL": "Empresas menores (SMAL11)", "DIVID": "Boas pagadoras de dividendos (DIVO11)"}
 CLASSE_COMP = {"ACOES_BR": "acao", "EXTERIOR": "exterior", "IPCA_LONGO": "renda_fixa", "CDI": "renda_fixa", "OURO": "cambio",
-               "DOLAR": "cambio", "FII": "fii"}
+               "DOLAR": "cambio", "FII": "fii", "SMALL": "acao", "DIVID": "acao"}
 NOME_CLASSE = {"acao": "ações", "fii": "FIIs", "exterior": "exterior", "cambio": "dólar e ouro", "renda_fixa": "renda fixa"}
 _cache = {"t": 0, "R": None}
 _lock = threading.Lock()
@@ -68,10 +90,12 @@ def componentes():
     if _cache["R"] is not None and time.time() - _cache["t"] < 12 * 3600:
         return _cache["R"]
     with _lock:
-        s = sim.fechamentos_brl(["BOVA11", "IBOV", "IVVB11", "SP500", "IPCA_LONGO", "OURO", "DOLAR", *sim.FII_CESTA])
+        s = sim.fechamentos_brl(["BOVA11", "IBOV", "IVVB11", "SP500", "IPCA_LONGO", "OURO", "DOLAR", "SMAL11", "DIVO11", *sim.FII_CESTA])
         R = {}
         if "BOVA11" in s:
             R["ACOES_BR"] = _mensal(s["BOVA11"]).combine_first(_mensal(s["IBOV"])) if "IBOV" in s else _mensal(s["BOVA11"])
+            for k, c in (("SMALL", "SMAL11"), ("DIVID", "DIVO11")):  # antes de existirem, valem pelo Ibovespa
+                R[k] = _mensal(s[c]).combine_first(R["ACOES_BR"]) if c in s and not sim.parado(s[c]) else R["ACOES_BR"]
         if "SP500" in s:
             R["EXTERIOR"] = _mensal(s["IVVB11"]).combine_first(_mensal(s["SP500"])) if "IVVB11" in s else _mensal(s["SP500"])
         for k, c in (("IPCA_LONGO", "IPCA_LONGO"), ("OURO", "OURO"), ("DOLAR", "DOLAR")):
@@ -141,7 +165,11 @@ def metricas(r, R):
     real = None
     if ip is not None:
         real = ((idx[-1] / float((1 + ip.fillna(0)).prod())) ** (1 / anos) - 1) * 100
-    return {"ret_aa": round((idx[-1] ** (1 / anos) - 1) * 100, 1), "real_aa": round(real, 1) if real is not None else None,
+    meio = len(r) // 2
+    cagr = lambda x: round((float((1 + x).prod()) ** (12 / len(x)) - 1) * 100, 1)
+    return {"metade1": {"ate": r.index[meio - 1].strftime("%m/%Y"), "ret_aa": cagr(r.iloc[:meio])},
+            "metade2": {"desde": r.index[meio].strftime("%m/%Y"), "ret_aa": cagr(r.iloc[meio:])},
+            "ret_aa": round((idx[-1] ** (1 / anos) - 1) * 100, 1), "real_aa": round(real, 1) if real is not None else None,
             "vol_aa": round(float(r.std() * 12 ** 0.5 * 100), 1), "maior_queda": round(float(dd.min() * 100), 1),
             "pior_12m": round(float(r12[ok].min() * 100), 1), "acima_cdi_12m": round(float((r12[ok] > c12[ok]).mean() * 100)),
             "meses_recuperar": int(maior), "final_10k": round(float(10000 * idx[-1]), 0)}
@@ -238,27 +266,48 @@ def checar(pesos, alvo, modelo, perfil, liquidez, held, individual, elegivel, li
     return out
 
 
-def comparar(carteira, ref, perfil_risco_max):
-    """Avisos da comparação com os planos de referência: algum plano consagrado foi melhor E menos arriscado?"""
-    out, melhor = [], None
-    if not carteira:
-        return out, None
-    for p in ref["planos"]:
-        if p["id"] == "cdi":
-            continue
-        if (p["ret_aa"] >= carteira["ret_aa"] + 0.5 and p["maior_queda"] >= carteira["maior_queda"] - 0.5
-                and p["vol_aa"] <= carteira["vol_aa"] + 0.5 and p["maior_queda"] >= perfil_risco_max):
-            if melhor is None or p["ret_aa"] > melhor["ret_aa"]:
-                melhor = p
-    if melhor:
-        _chk(out, "dominada", "Nenhum plano consagrado foi melhor e menos arriscado", False,
-             f"No mesmo período, o {melhor['nome']} rendeu {_br(melhor['ret_aa'])}% ao ano contra {_br(carteira['ret_aa'])}% da "
-             f"recomendada, com queda máxima de {melhor['maior_queda']:.0f}% contra {carteira['maior_queda']:.0f}%. "
-             "Vale considerar uma carteira mais parecida com ele.")
-    else:
-        _chk(out, "dominada", "Nenhum plano consagrado foi melhor e menos arriscado", True,
-             "Nenhum dos planos de referência teve, ao mesmo tempo, mais retorno e menos risco que a carteira recomendada no período.")
-    return out, melhor
+def para_perfil(ref, limite):
+    """Marca os planos que cabem no perfil: a maior queda do plano no período não passa do que o perfil aceita."""
+    planos = [{**p, "cabe": p["maior_queda"] >= limite - 0.5} for p in ref["planos"]]
+    return {**ref, "planos": planos, "limite": limite}
+
+
+def comparar(carteira, ref_p, perfil):
+    """Compara a recomendada com TODOS os planos que cabem no perfil (não com um só):
+    - algum deles foi, ao mesmo tempo, melhor e menos arriscado? (lista todos);
+    - em que posição ela ficou entre eles;
+    - o resultado se repetiu nas duas metades do período, ou dependeu de uma fase boa?"""
+    out = []
+    if not carteira or not ref_p:
+        return out, []
+    compat = [p for p in ref_p["planos"] if p["cabe"] and p["id"] != "cdi"]
+    if not compat:
+        return out, []
+    dominam = [p for p in compat if p["ret_aa"] >= carteira["ret_aa"] + 0.5 and p["maior_queda"] >= carteira["maior_queda"] - 0.5
+               and p["vol_aa"] <= carteira["vol_aa"] + 0.5]
+    dominam.sort(key=lambda p: -p["ret_aa"])
+    _chk(out, "dominada", "Nenhum plano consagrado foi melhor e menos arriscado", not dominam,
+         ("No mesmo período, " + "; ".join(f"o {p['nome']} rendeu {_br(p['ret_aa'])}% ao ano com queda máxima de {p['maior_queda']:.0f}%"
+                                           for p in dominam)
+          + f", contra {_br(carteira['ret_aa'])}% e {carteira['maior_queda']:.0f}% da recomendada. Vale considerar uma carteira "
+          + ("mais parecida com eles." if len(dominam) > 1 else "mais parecida com ele.")) if dominam else
+         f"Comparada com os {len(compat)} planos consagrados que cabem no perfil {perfil}, nenhum teve, ao mesmo tempo, mais "
+         "retorno e menos risco que a recomendada no período.")
+    acima = sum(1 for p in compat if carteira["ret_aa"] > p["ret_aa"])
+    rets = sorted(p["ret_aa"] for p in compat)
+    _chk(out, "ranking", "Retorno entre os planos que cabem no seu perfil", acima * 2 >= len(compat),
+         f"Rendeu mais que {acima} dos {len(compat)} planos que cabem no perfil {perfil} (eles renderam de {_br(rets[0])}% a "
+         f"{_br(rets[-1])}% ao ano; a recomendada, {_br(carteira['ret_aa'])}%)."
+         + ("" if acima * 2 >= len(compat) else " Ou seja, ficou na metade de baixo: a segurança extra custou retorno no período."))
+    cdi = next((p for p in ref_p["planos"] if p["id"] == "cdi"), None)
+    if cdi and carteira.get("metade1"):
+        m1, m2 = carteira["metade1"], carteira["metade2"]
+        ok1, ok2 = m1["ret_aa"] >= cdi["metade1"]["ret_aa"], m2["ret_aa"] >= cdi["metade2"]["ret_aa"]
+        _chk(out, "periodos", "Bateu o CDI nas duas metades do período", ok1 and ok2,
+             f"Até {m1['ate']}: {_br(m1['ret_aa'])}% ao ano (CDI {_br(cdi['metade1']['ret_aa'])}%); desde {m2['desde']}: "
+             f"{_br(m2['ret_aa'])}% (CDI {_br(cdi['metade2']['ret_aa'])}%)."
+             + ("" if ok1 and ok2 else " O resultado dependeu de uma fase boa: em parte do tempo, deixar no CDI teria sido melhor."))
+    return out, [p["id"] for p in dominam]
 
 
 def quando(dias, de=False):

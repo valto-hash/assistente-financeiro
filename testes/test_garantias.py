@@ -24,7 +24,26 @@ ok(sim.PROXY_ATIVO["TESOURO_IPCA"] == "IPCA_LONGO" and "IMAB11" not in sim.BASE,
 ref = referencias.planos_ref()
 ids = [p["id"] for p in ref["planos"]]
 print("   planos:", [(p["nome"], p["ret_aa"], p["maior_queda"]) for p in ref["planos"]], ref["desde"], ref["ate"])
-ok(ids == ["cdi", "permanente", "all_weather", "60_40", "tres_fundos"] and all(p["vol_aa"] >= 0 for p in ref["planos"]), "5 planos consagrados testados")
+ok(len(ids) == 11 and ids[:5] == ["cdi", "permanente", "all_weather", "60_40", "tres_fundos"]
+   and {"wellesley", "golden_butterfly", "coffeehouse", "swensen", "core_four", "bolsa"} <= set(ids), "11 planos consagrados testados")
+ok(all(p["metade1"]["ret_aa"] is not None and p["metade2"]["ret_aa"] is not None for p in ref["planos"]), "cada plano tem o resultado das duas metades do período")
+# comparação com TODOS os planos que cabem no perfil
+falso = {"planos": [
+    {"id": "cdi", "nome": "CDI", "ret_aa": 10, "maior_queda": 0, "vol_aa": 1, "metade1": {"ret_aa": 10}, "metade2": {"ret_aa": 10}},
+    {"id": "a", "nome": "Plano A", "ret_aa": 14, "maior_queda": -6, "vol_aa": 5, "metade1": {"ret_aa": 14}, "metade2": {"ret_aa": 14}},
+    {"id": "b", "nome": "Plano B", "ret_aa": 13, "maior_queda": -7, "vol_aa": 6, "metade1": {"ret_aa": 13}, "metade2": {"ret_aa": 13}},
+    {"id": "c", "nome": "Plano C", "ret_aa": 9, "maior_queda": -12, "vol_aa": 9, "metade1": {"ret_aa": 9}, "metade2": {"ret_aa": 9}},
+    {"id": "d", "nome": "Plano D", "ret_aa": 20, "maior_queda": -40, "vol_aa": 20, "metade1": {"ret_aa": 20}, "metade2": {"ret_aa": 20}}]}
+rp = referencias.para_perfil(falso, -18)
+cart = {"ret_aa": 11, "maior_queda": -9, "vol_aa": 7, "metade1": {"ate": "01/2019", "ret_aa": 8}, "metade2": {"desde": "02/2019", "ret_aa": 14}}
+chs, dom = referencias.comparar(cart, rp, "moderado")
+chs = {c["id"]: c for c in chs}
+print("   dominam:", dom, "|", chs["ranking"]["detalhe"])
+ok(dom == ["a", "b"] and "Plano A" in chs["dominada"]["detalhe"] and "Plano B" in chs["dominada"]["detalhe"],
+   "lista TODOS os planos que foram melhores e menos arriscados, não só um")
+ok("d" not in dom and not next(p for p in rp["planos"] if p["id"] == "d")["cabe"], "plano que cai mais do que o perfil aceita não entra na comparação")
+ok(not chs["ranking"]["ok"] and "1 dos 3" in chs["ranking"]["detalhe"], "posição entre os planos que cabem no perfil")
+ok(not chs["periodos"]["ok"], "resultado que dependeu de uma metade do período vira aviso")
 cdi = ref["planos"][0]
 ok(cdi["maior_queda"] == 0 and cdi["vol_aa"] < 2, "CDI não tem queda (sanidade do teste)")
 r = referencias.rodar({"A": 50, "B": 50}, pd.DataFrame({"A": [0.1, 0.0], "B": [-0.1, 0.0]}, index=pd.to_datetime(["2020-01-31", "2020-02-29"])))
@@ -74,7 +93,8 @@ ok(all(mod[c] - 10.1 <= v <= mod[c] + 10.1 for c, v in alvo_c.items()) and abs(s
 ok(a["aprovada"] and all(c_["ok"] for c_ in a["checagens"] if c_["bloqueia"] or c_["id"] in ("soma", "perfil")), "a carteira das regras passa na auditoria")
 kw = next(k for k in mocks.CALLS if "planejador" in k["system"])
 dados = json.loads(kw["messages"][0]["content"])
-ok("PLANOS DE REFERÊNCIA" in kw["system"] and len(dados["planos_de_referencia"]["planos"]) == 5
+ok("PLANOS DE REFERÊNCIA" in kw["system"] and "TODOS os planos" in kw["system"] and len(dados["planos_de_referencia"]["planos"]) == 11
+   and all("cabe_no_perfil" in p and "retorno_ao_ano_2a_metade" in p for p in dados["planos_de_referencia"]["planos"])
    and "comparacao_planos" in kw["output_config"]["format"]["schema"]["required"], "a IA recebe os planos consagrados e precisa se comparar com eles")
 ok(a["carteira"] and a["carteira"]["cobertura"] >= 0 and a["referencia"]["planos"], "teste com o passado da carteira recomendada")
 server.client.messages.create = orig
