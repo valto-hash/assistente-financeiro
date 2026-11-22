@@ -13,7 +13,7 @@ import armazem
 
 SESSAO_DIAS = 180
 COLECOES_DO_USUARIO = ["carteira", "contas", "financas", "avisos", "avisos_cfg", "avisos_estado", "niveis", "push",
-                       "perfil_teste", "plano", "gastos", "b3"]
+                       "perfil_teste", "plano", "gastos", "b3", "memoria"]
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
 UID = re.compile(r"^[0-9a-f]{32}$")
 CODIGO_VALIDADE = 30 * 60

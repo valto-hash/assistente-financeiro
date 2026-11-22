@@ -57,6 +57,32 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   perder a conta, basta criar a conta de novo com o mesmo e-mail (ou entrar com o Google): ela volta com o mesmo
   identificador e o aparelho reenvia os dados.
 
+## Auditoria das recomendações, planos consagrados e memória
+
+- **Auditoria:** toda carteira recomendada (da IA ou das regras) passa por checagens objetivas antes de aparecer: soma
+  100%, risco dentro do perfil, dinheiro de curto prazo em renda fixa, nenhum papel novo acima de 10%, ativos novos com
+  liquidez, histórico e cotação atualizada, e a pior crise real dentro do limite do perfil. Se a carteira da IA não
+  passar, o app usa a das regras e mostra o motivo. A tela "Investir" mostra cada checagem.
+- **Planos consagrados (11):** 100% CDI, Portfólio Permanente (Harry Browne), All Weather (Ray Dalio), 60/40, Três
+  fundos (Bogleheads), Renda e crescimento 35/65 (inspirada no Vanguard Wellesley), Golden Butterfly, Coffeehouse
+  (Bill Schultheis), Carteira de Swensen (Yale), Core Four (Rick Ferri) e 100% bolsa brasileira. Adaptados com ativos
+  brasileiros e testados com dados reais de 04/2011 até hoje (rebalanceamento anual, sem custos nem impostos), com o
+  resultado de cada metade do período. A carteira recomendada é testada do mesmo jeito e comparada com TODOS os planos
+  que cabem no perfil (maior queda dentro do limite): avisa se algum foi melhor e menos arriscado (lista todos), mostra
+  a posição dela entre eles e se ela bateu o CDI nas duas metades. A tela tem um gráfico de retorno x maior queda.
+  A IA recebe todos esses números e precisa comparar a carteira dela com pelo menos três planos.
+- **Memória:** o app guarda as últimas recomendações de cada pessoa e as compras e vendas registradas. A IA recebe esse
+  resumo e precisa explicar mudanças grandes; mudança brusca sem motivo vira aviso, e as regras mantêm o nível de
+  risco anterior quando a opção nova não é claramente melhor.
+- **Títulos IPCA+:** simulados pelo IMA-B 5+ do Banco Central (2005-2023) emendado com o ETF IB5M11. Os ETFs de renda
+  fixa do Yahoo (IMAB11, B5P211, IRFM11, FIXA11) ficaram com o preço parado de 2023 a 2025 e são marcados como não
+  confiáveis.
+
+## Testes
+
+`sh testes/rodar_todos.sh` roda tudo sem internet. Veja `testes/LEIAME.md`. O contexto para quem for mexer no código
+(pessoa ou IA) está em `CLAUDE.md`.
+
 ## Gastos, rentabilidade e fundamentos
 
 - **Gastos do dia a dia** (aba Contas): lançamentos à mão ou importados do extrato do banco e da fatura do cartão (OFX

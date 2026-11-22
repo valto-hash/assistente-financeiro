@@ -15,6 +15,7 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import requests
 import yfinance as yf
 
 ANOS_HIST = 20          # janela de histórico usada no sorteio
@@ -25,9 +26,15 @@ TTL_HIST = 12 * 3600
 SIMB = {"DOLAR": "USDBRL=X", "VOO": "VOO", "IBOV": "^BVSP", "SP500": "^GSPC", "OURO": "GC=F"}
 EM_USD = {"VOO", "SP500", "OURO"}
 FII_CESTA = ["HGLG11", "KNRI11", "XPML11", "MXRF11", "KNCR11"]
-PROXY_CLASSE = {"acao": "IBOV", "fii": "FII_IDX", "exterior": "SP500", "cambio": "DOLAR"}
-PROXY_ATIVO = {"GOLD11": "OURO", "TESOURO_IPCA": "IMAB11", "IVVB11": "SP500", "VOO": "SP500", "NASD11": "SP500"}
-BASE = sorted({"IBOV", "SP500", "DOLAR", "OURO", "IMAB11", *FII_CESTA})
+PROXY_CLASSE = {"acao": "IBOV", "fii": "FII_IDX", "exterior": "SP500", "cambio": "DOLAR", "renda_fixa": "IPCA_LONGO"}
+PROXY_ATIVO = {"GOLD11": "OURO", "TESOURO_IPCA": "IPCA_LONGO", "IVVB11": "SP500", "VOO": "SP500", "NASD11": "SP500",
+               "IMAB11": "IPCA_LONGO", "B5P211": "IPCA_LONGO"}
+# Séries montadas pelo app. IPCA_LONGO = IMA-B 5+ (títulos públicos IPCA+ com mais de 5 anos): índice da ANBIMA
+# publicado pelo Banco Central (série 12468, 2005 a mai/2023) emendado com o ETF IB5M11, que segue o mesmo índice.
+# Os ETFs de renda fixa no Yahoo (IMAB11, B5P211, IRFM11, FIXA11) ficaram com o preço parado de 2023 a 2025 e depois
+# "saltaram" ~50% num dia: não servem para medir risco nem retorno.
+SINTETICOS = {"IPCA_LONGO"}
+BASE = sorted({"IBOV", "SP500", "DOLAR", "OURO", "IPCA_LONGO", *FII_CESTA})
 
 CRISES = [  # (nome, início, fim, CDI médio aproximado no período, % a.a.)
     ("Crise financeira global", "2008-05-20", "2008-10-27", 13.0),
@@ -96,6 +103,43 @@ def giro_diario(close, volume, dias=63):
         return None
 
 
+def parado(c, dias=20, anos=3):
+    """A fonte parou de atualizar? Preço idêntico por 20 pregões seguidos ou mais nos últimos 3 anos (num ativo
+    negociado todo dia, isso não acontece de verdade)."""
+    if c is None or len(c) < dias:
+        return False
+    v = c[c.index > c.index[-1] - pd.DateOffset(years=anos)].to_numpy()
+    seq = maior = 0
+    for igual in v[1:] == v[:-1]:
+        seq = seq + 1 if igual else 0
+        maior = max(maior, seq)
+    return maior + 1 >= dias
+
+
+def _bcb_indice(serie):
+    pts = []
+    for ini in (2005, 2015):
+        r = requests.get(f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}/dados", timeout=20,
+                         params={"formato": "json", "dataInicial": f"01/01/{ini}", "dataFinal": f"31/12/{ini + 9}"})
+        pts += [(pd.Timestamp(x["data"][6:10] + "-" + x["data"][3:5] + "-" + x["data"][:2]), float(x["valor"])) for x in r.json()]
+    return pd.Series(dict(pts), dtype=float).sort_index()
+
+
+def _ipca_longo(etf):
+    """Emenda o IMA-B 5+ do Banco Central (até mai/2023) com o ETF IB5M11 (depois disso)."""
+    try:
+        bcb = _bcb_indice(12468)
+    except Exception:
+        bcb = pd.Series(dtype=float)
+    if bcb.empty or etf is None or etf.empty:
+        return bcb if not bcb.empty else (etf if etf is not None else pd.Series(dtype=float))
+    corte = bcb.index[-1]
+    depois, base = etf[etf.index > corte], etf.asof(corte)
+    if depois.empty or pd.isna(base):
+        return bcb
+    return pd.concat([bcb, depois / float(base) * float(bcb.iloc[-1])])
+
+
 def baixar(codigos):
     """Baixa (com cache de 12h) o histórico máximo de vários ativos em uma única chamada ao Yahoo."""
     codigos = [c for c in dict.fromkeys(codigos) if c and c != "FII_IDX"]
@@ -104,6 +148,8 @@ def baixar(codigos):
     if velhos():
         with _lock:
             falta = velhos()
+            sint = [c for c in falta if c in SINTETICOS]
+            falta = [c for c in falta if c not in SINTETICOS] + (["IB5M11"] if sint and "IB5M11" not in falta else [])
             if falta:
                 syms = {ysym(c): c for c in falta}
                 try:
@@ -131,6 +177,8 @@ def baixar(codigos):
                     except Exception:
                         _splits[c] = pd.Series(dtype=float)
                     _hist[c] = (agora, close, dv, giro)
+            if "IPCA_LONGO" in sint:
+                _hist["IPCA_LONGO"] = (agora, _ipca_longo(_hist.get("IB5M11", (0, pd.Series(dtype=float)))[1]), pd.Series(dtype=float), None)
     return {c: _hist[c][1] for c in codigos if c in _hist}
 
 
@@ -191,6 +239,7 @@ def metricas_hist(codigo):
         "queda_max_12m": round(float((um_ano / um_ano.cummax() - 1).min() * 100), 1),
         "dy_12m": round(div12 / p * 100, 1),
         "giro_dia": giro,
+        "dados_parados": parado(c),
         "anos_hist": round((c.index[-1] - c.index[0]).days / 365.25, 1),
         "tendencia": None if sma200 is None else ("alta" if p > sma200 * 1.02 else "baixa" if p < sma200 * 0.98 else "lateral"),
         "serie": [round(float(x), 2) for x in um_ano.iloc[::5].tolist() + [p]],
@@ -256,7 +305,7 @@ def matriz_historica(ativos):
             continue
         proxy = PROXY_ATIVO.get(a) or PROXY_CLASSE.get(s["classe"], "IBOV")
         px = r[proxy] if proxy in r else pd.Series(0.0, index=r.index)
-        proprio = r[a] if a in r else pd.Series(np.nan, index=r.index)
+        proprio = r[a] if a in r and not parado(series.get(a)) else pd.Series(np.nan, index=r.index)
         cobertura[a] = int(proprio.notna().sum())
         base = proprio if cobertura[a] >= 24 else px
         base = base.dropna()
@@ -415,7 +464,7 @@ def estresse(carteiras, ativos):
         rf = (1 + cdi / 100) ** (dias / 365) - 1
         fii_vals = [x for x in (ret(c, ini, fim) for c in FII_CESTA) if x is not None]
         proxy = {"IBOV": ret("IBOV", ini, fim), "SP500": ret("SP500", ini, fim), "DOLAR": ret("DOLAR", ini, fim),
-                 "OURO": ret("OURO", ini, fim), "IMAB11": ret("IMAB11", ini, fim),
+                 "OURO": ret("OURO", ini, fim), "IPCA_LONGO": ret("IPCA_LONGO", ini, fim),
                  "FII_IDX": float(np.mean(fii_vals)) if fii_vals else None}
         if proxy["IBOV"] is None:
             continue

@@ -38,7 +38,7 @@ def ipca_mensal():
         return _ipca["s"]
     pontos, hoje = [], date.today()
     try:
-        for ini in range(hoje.year - 9, hoje.year + 1, 10):
+        for ini in range(2005, hoje.year + 1, 10):  # o BC limita a consulta a 10 anos por vez
             r = requests.get("https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados", timeout=15,
                              params={"formato": "json", "dataInicial": f"01/01/{ini}", "dataFinal": f"31/12/{min(ini + 9, hoje.year)}"})
             pontos += [(datetime.strptime(x["data"], "%d/%m/%Y"), float(x["valor"].replace(",", "."))) for x in r.json()]
