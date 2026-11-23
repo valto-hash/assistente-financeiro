@@ -57,6 +57,91 @@ Notificações no celular exigem o app servido por HTTPS. No iPhone, só funcion
   perder a conta, basta criar a conta de novo com o mesmo e-mail (ou entrar com o Google): ela volta com o mesmo
   identificador e o aparelho reenvia os dados.
 
+## Simulador do passado (eficácia do app)
+
+Na aba Mercado: e se alguém tivesse seguido o app desde jan/2013, com R$ 10 mil no início e R$ 1.000 por mês? No fim
+de cada mês o app recebe só os dados daquela data (preços, proventos, Selic e IPCA da época), monta a carteira com as
+regras de hoje e a pessoa simulada segue as regras de operação do app (aportes no que está abaixo do recomendado,
+vendas só quando o app mandaria, 0,1% de custo por operação). O mesmo dinheiro vai para o modelo fixo do perfil só com
+ETFs, para o CDI e para os planos consagrados que cabem no perfil. Mostra patrimônio final, retorno ao ano, maior
+queda, custos e o IR estimado das vendas.
+
+O que o simulador mudou: ajustar a alocação pela tendência e pelo juro do momento deixava o resultado menor nos três
+perfis, então foi desligado (`regras.AJUSTE_MOMENTO`); com 4% ou mais em dólar e ouro, a carteira passa a ter os dois.
+A tela mostra também a versão antiga.
+
+### Modelos dos perfis (revistos em nov/2026)
+
+Cada perfil tem um modelo de divisão entre as classes (`server.PERFIS`). Os três foram revistos com validação fora da
+amostra (`ferramentas/revisar_modelos.py`): candidatos definidos antes de rodar (o modelo de antes, os planos consagrados
+levados para as classes do app e uma versão "global" do de antes), escolha só com 2013 a 2019 e confirmação com 2020 a
+2026, período que não entrou na escolha. Só é elegível o que aguenta a pior crise real testada dentro do limite do perfil
+(o mesmo critério da auditoria) e não cai mais do que o perfil aceita. Todos rodam com as regras do app.
+
+| Perfil | Antes | Agora | 2013-2026, app com o modelo (R$ 10 mil + R$ 1.000/mês) | Pior crise real |
+|---|---|---|---|---|
+| Conservador | 70% RF, 8% ações, 10% FIIs, 9% exterior, 3% dólar/ouro | 70% RF, 7% ações, 3% FIIs, 10% exterior, 10% dólar/ouro | R$ 385 mil → R$ 412 mil | -15% → -9% |
+| Moderado | 45% RF, 20% ações, 15% FIIs, 15% exterior, 5% dólar/ouro | 45% RF, 17% ações, 8% FIIs, 20% exterior, 10% dólar/ouro | R$ 431 mil → R$ 452 mil | -25% → -19% |
+| Arrojado | 25% RF, 32% ações, 15% FIIs, 22% exterior, 6% dólar/ouro | 40% RF, 30% ações, 30% exterior (a 60/40) | R$ 469 mil → R$ 520 mil | -32% → -26% |
+
+Os modelos antigos de moderado e arrojado teriam caído mais do que esses perfis aceitam na crise de 2008 (18% e 30%).
+O conservador foi revisto em 22/11 (mesmo método, cinco candidatos) e, na rodada de 23/11, continuou o melhor elegível:
+o All Weather rende mais, mas teria caído 11% em 2008. Os resultados dos planos no período inteiro já tinham aparecido no
+simulador antes da revisão; por isso a escolha usa só a primeira metade, e a prova que vale continua sendo a ao vivo.
+Quem tinha uma recomendação feita com o modelo antigo vê o motivo da mudança (`server.REVISAO_MODELO`), e a IA também.
+
+### Escolher a estratégia
+
+Na aba Investir, a pessoa escolhe qual estratégia seguir (`estrategias.py`, `GET /api/estrategias`): a recomendada pelo
+app (padrão), o modelo do perfil só com ETFs e títulos, ou um dos 11 planos consagrados. Cada uma mostra a divisão, a
+ideia, o teste com o passado (mesmo período e mesmo método para todas), a pior crise real e, quando já calculado, o
+resultado no simulador. Só podem ser escolhidas as que cabem no perfil pelos critérios da auditoria (maior queda e pior
+crise dentro do limite); com objetivo de curto prazo, também é preciso ter 85% ou mais em renda fixa. A carteira de uma
+estratégia de divisão fixa não usa IA: é montada com os mesmos ETFs e títulos do teste, passa pela auditoria completa e
+garante a reserva de emergência. Se ela não couber (mudou o perfil, objetivo de curto prazo), vale a recomendada e a tela
+diz o motivo. A escolha fica salva com a carteira no servidor, entra na memória (trocar de estratégia não vira aviso de
+incoerência), aparece destacada no simulador, e a prova ao vivo guarda todo mês também a carteira de cada plano.
+
+Como essas mudanças saíram de testes com o passado, existe a **prova ao vivo**: todo mês
+o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer, e o resultado real aparece depois.
+Limites: a IA não entra (ela sabe o que aconteceu depois), lista de ativos de hoje (viés de sobrevivência), valores antes
+do IR. O resultado fica guardado no banco por 7 dias (`simulador.py`).
+
+### Corretora simulada (como o testador de estratégias do MetaTrader)
+
+Na aba Mercado, o segundo teste com dados reais (`corretora.py`, `GET /api/corretora`): as mesmas decisões do app (e do
+modelo fixo e de cada plano), mas executadas como numa conta de corretora, dia a dia, desde 2013. As ordens saem no
+pregão seguinte à decisão, pelo preço de tela da época, em quantidades inteiras de cotas, com emolumentos da B3 (0,03%),
+diferença entre compra e venda (0,05%), custódia do Tesouro (0,20% ao ano, descontada do título), câmbio do dólar (0,5%),
+proventos caindo na conta e o imposto de renda pago como a Receita manda (ações com a isenção de R$ 20 mil por mês, ETFs
+15%, FIIs 20%, prejuízo compensado, tabela regressiva no Tesouro e no CDB, LCI isenta). O relatório segue o do
+MetaTrader: patrimônio, lucro líquido, retorno de cada metade, maior queda dia a dia, ordens, vendas com lucro, fator de
+lucro, custos, imposto pago e o que ainda seria pago no resgate, além das últimas ordens e da posição final.
+
+Resultado de 23/11/2026 (R$ 10 mil em fev/2013 e R$ 1.000 por mês, já descontados custos e imposto pago): conservador
+R$ 402 mil, moderado R$ 446 mil, arrojado R$ 512 mil, contra R$ 378 mil no CDI na mesma corretora. Dia a dia as quedas
+aparecem maiores que no teste mês a mês (o conservador chegou a -11,6% em março de 2020), porque as cotações oscilam
+dentro do mês.
+
+### Garantia de melhor decisão
+
+Regra fixada antes de rodar com dados reais (`estrategias.dominantes`, `ferramentas/melhor_estrategia.py`): se uma
+estratégia que a pessoa pode escolher no perfil render mais que a recomendada nas duas metades do período (2013-2019 e
+2020 em diante, por 0,2 ponto ou mais em cada), nos dois testes (simulador e corretora), sem cair mais de 1 ponto além
+dela e terminando com mais dinheiro, a recomendada do perfil passa a seguir essa estratégia, e a tela explica o motivo.
+A conferência roda sozinha toda vez que os testes são refeitos (uma vez por semana) e fica guardada no banco
+(`decisao/padrao`). Em 23/11/2026, nenhuma estratégia venceu a recomendada em nenhum perfil: no moderado, o All Weather
+terminou com mais dinheiro, mas na primeira metade ganhou por só 0,1 ponto. Ninguém garante o futuro: a garantia é que a
+recomendada nunca fica atrás de uma alternativa disponível que se mostrou melhor de forma consistente nos testes.
+
+### Quanto você ganha com cada FII e ação
+
+Na aba Ativos, o app pergunta quanto a pessoa recebe por mês de proventos de cada ação e FII (campo `renda` da posição;
+ETFs ficam de fora, porque não distribuem). Mostra ao lado o que o histórico de 12 meses indica e avisa quando os dois
+são muito diferentes; o cartão de cada ativo mostra o rendimento sobre o que foi pago. A carteira recomendada usa isso: a
+IA recebe o informado e o estimado, e toda sugestão de venda ou redução diz quanto de renda por mês a pessoa deixaria de
+receber.
+
 ## Auditoria das recomendações, planos consagrados e memória
 
 - **Auditoria:** toda carteira recomendada (da IA ou das regras) passa por checagens objetivas antes de aparecer: soma

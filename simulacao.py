@@ -448,7 +448,7 @@ def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0
 
 def estresse(carteiras, ativos):
     """Quanto cada carteira teria variado em crises reais (buy and hold durante a janela da crise)."""
-    mercado = [a for a, s in ativos.items() if s["tipo"] != "pos"]
+    mercado = [a for a, s in ativos.items() if s["tipo"] == "mercado"]  # títulos (pós e IPCA+) não têm cotação no Yahoo
     series = fechamentos_brl(sorted(set(BASE) | set(mercado)))
 
     def ret(cod, ini, fim):

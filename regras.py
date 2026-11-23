@@ -216,8 +216,16 @@ def objetivo(texto):
 
 # ---------------------------------------------------------------- alocação e escolha de ativos
 
-def alvo_classes(modelo, pan_classes, obj):
-    """Alocação por classe: começa no modelo do perfil e ajusta pelo prazo do objetivo e pelo momento do mercado."""
+# Ajustar a alocação pelo "momento do mercado" (juro real alto -> mais renda fixa; Ibovespa em baixa -> menos ações)
+# ficou DESLIGADO depois do simulador do passado (simulador.py): seguindo o app mês a mês de 2013 a 2026, esse
+# ajuste deixou o resultado menor nos três perfis. O panorama continua aparecendo na tela, como informação.
+AJUSTE_MOMENTO = False
+CLASSE_PEQUENA = 4  # abaixo de 4% da carteira, a classe fica num ativo só; acima, os dois do núcleo (cada um com 2%+)
+
+
+def alvo_classes(modelo, pan_classes, obj, momento=None):
+    """Alocação por classe: começa no modelo do perfil e ajusta pelo prazo do objetivo (e, se ligado, pelo momento)."""
+    momento = AJUSTE_MOMENTO if momento is None else momento
     alvo, motivos = dict(modelo), []
     liq = (obj or {}).get("liquidez")
     risco = [c for c in CLASSES if c != "renda_fixa"]
@@ -235,18 +243,19 @@ def alvo_classes(modelo, pan_classes, obj):
     elif liq == "MEDIA":
         levar_para_rf(max(modelo["renda_fixa"], 65))
         motivos.append("Com prazo entre 2 e 5 anos, a maior parte fica em renda fixa para a bolsa não atrapalhar a meta.")
-    rf = (pan_classes or {}).get("renda_fixa", {}).get("visao")
+    rf = (pan_classes or {}).get("renda_fixa", {}).get("visao") if momento else None
     if rf == "POSITIVA" and liq != "ALTA":
         levar_para_rf(min(alvo["renda_fixa"] + 5, modelo["renda_fixa"] + 10, 100))
         motivos.append("O juro real está alto: mais 5 pontos em renda fixa, que paga bem acima da inflação sem risco de bolsa.")
-    acao = (pan_classes or {}).get("acao", {}).get("visao")
+    acao = (pan_classes or {}).get("acao", {}).get("visao") if momento else None
     if acao == "NEGATIVA" and alvo["acao"] > 3:
         alvo["acao"] -= 3; alvo["renda_fixa"] += 3
         motivos.append("O Ibovespa está em tendência de baixa: 3 pontos a menos em ações.")
     s = sum(alvo.values())
     alvo = {c: round(max(v, 0) / s * 100, 1) for c, v in alvo.items()}
     if not motivos:
-        motivos.append("Alocação do seu perfil, sem ajustes: o momento do mercado não pediu mudanças.")
+        motivos.append("Alocação do seu perfil, sem tentar adivinhar o momento do mercado: no simulador do passado, ajustar pela "
+                       "tendência e pelo juro do momento deixou o resultado menor.")
     return alvo, " ".join(motivos)
 
 
@@ -332,7 +341,7 @@ def pontuacao(m, c, cdi=10.0):
     return round(s, 2)
 
 
-def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None):
+def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None, classe_pequena=None):
     """Escolhe os ativos de cada classe. cand: {código: {classe, nome, descricao, m(métricas)}}; atual: {código: R$}.
     Núcleo em ETFs/títulos amplos; complementos individuais (no máximo 10% cada, um por setor) escolhidos pela
     qualidade de longo prazo, preferindo o que você já tem (vender gera custo e IR)."""
@@ -361,7 +370,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
         else:
             nucleo = {"acao": {"BOVA11": .6, "DIVO11": .4}, "fii": {"KNCR11": .5, "HGLG11": .5},
                       "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": .5, "GOLD11": .5}}[c]
-            if alvo_c < 6:  # classe pequena: um único ativo amplo basta
+            if alvo_c < (CLASSE_PEQUENA if classe_pequena is None else classe_pequena):  # classe pequena: um ativo amplo basta
                 nucleo = {next(iter(nucleo)): 1.0}
             individuais = c in ("acao", "fii")
             total_atual = max(sum(atual.values()), 1)

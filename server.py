@@ -17,12 +17,15 @@ import acertos
 import armazem
 import avisos
 import checagem
+import corretora
+import estrategias
 import contas as cmod
 import fundamentos
 import gastos as gmod
 import investimentos as inv
 import memoria
 import referencias
+import simulador
 import paginas
 import perfil as teste_perfil
 import planos
@@ -57,9 +60,28 @@ NOME_CLASSE = {"renda_fixa": "Renda fixa", "acao": "Ações Brasil", "fii": "Fun
 
 PADRAO = {"renda_fixa": {"TESOURO_SELIC": 0.5, "TESOURO_IPCA": 0.5}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4},
           "fii": {"HGLG11": 0.35, "KNRI11": 0.35, "KNCR11": 0.3}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}
-PERFIS = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},
-          "moderado": {"renda_fixa": 45, "acao": 20, "fii": 15, "exterior": 15, "cambio": 5},
-          "arrojado": {"renda_fixa": 25, "acao": 32, "fii": 15, "exterior": 22, "cambio": 6}}
+# Modelos revistos em nov/2026 com o simulador do passado e validação fora da amostra: candidatos definidos antes de
+# rodar, escolha só com 2013-2019 e confirmação com 2020-2026 (scripts e números no README). Elegível só o que aguenta a
+# pior crise real dentro do limite do perfil (PIOR_CRISE): os modelos antigos de moderado e arrojado teriam caído 25% e
+# 32% na crise de 2008, além do que esses perfis aceitam; o conservador antigo, 15%.
+# - conservador (22/11): menos FIIs (sofrem com os mesmos juros da renda fixa), mais exterior, dólar e ouro.
+# - moderado (23/11): a mesma lição ("global"): menos FIIs e um pouco menos de bolsa daqui, mais exterior, dólar e ouro.
+# - arrojado (23/11): a 60/40 clássica (metade das ações no Brasil, metade nos EUA, 40% em renda fixa): rendeu mais nas
+#   duas metades e caiu menos que o antigo.
+PERFIS_ANTERIOR = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},
+                   "moderado": {"renda_fixa": 45, "acao": 20, "fii": 15, "exterior": 15, "cambio": 5},
+                   "arrojado": {"renda_fixa": 25, "acao": 32, "fii": 15, "exterior": 22, "cambio": 6}}
+REVISAO_MODELO = {
+    "conservador": ("2026-11-22", "o modelo do perfil conservador foi revisto em nov/2026 com testes no passado: "
+                                  "menos fundos imobiliários e mais exterior, dólar e ouro, que protegem melhor nas crises"),
+    "moderado": ("2026-11-23", "o modelo do perfil moderado foi revisto em nov/2026 com testes no passado: menos fundos "
+                               "imobiliários e um pouco menos de bolsa brasileira, mais exterior, dólar e ouro, que protegem melhor nas crises"),
+    "arrojado": ("2026-11-23", "o modelo do perfil arrojado foi revisto em nov/2026 com testes no passado: passou a seguir a "
+                               "carteira 60/40 (ações do Brasil e dos EUA e 40% em renda fixa, sem fundos imobiliários), que rendeu "
+                               "mais e caiu menos que o modelo antigo")}
+PERFIS = {"conservador": {"renda_fixa": 70, "acao": 7, "fii": 3, "exterior": 10, "cambio": 10},
+          "moderado": {"renda_fixa": 45, "acao": 17, "fii": 8, "exterior": 20, "cambio": 10},
+          "arrojado": {"renda_fixa": 40, "acao": 30, "fii": 0, "exterior": 30, "cambio": 0}}
 TEMAS = {"juros": ("Copom Selic juros", "renda_fixa"), "inflacao": ("inflação IPCA", "renda_fixa"),
          "bolsa": ("Ibovespa bolsa de valores", "acao"), "fii": ("fundos imobiliários IFIX", "fii"),
          "exterior": ("Wall Street S&P 500 Fed", "exterior"), "cambio": ("dólar real câmbio", "cambio")}
@@ -70,6 +92,7 @@ class Pos(BaseModel):
     pm: float = 0
     saldo: float = 0
     pct: float = 100
+    renda: float = 0  # quanto a pessoa diz que recebe por mês de proventos com o ativo (R$), em ações e FIIs
 
 
 class AnReq(BaseModel):
@@ -81,6 +104,7 @@ class PortReq(BaseModel):
     pos: dict[str, Pos] = {}
     perfil: str = "não informado"
     objetivo: str = ""
+    estrategia: str = "app"  # estratégia escolhida pela pessoa (estrategias.py); "app" = a recomendada
 
 
 class SimReq(BaseModel):
@@ -527,7 +551,9 @@ partir de notícias recentes); as taxas; e a LISTA DE ATIVOS PERMITIDOS com mét
 (retorno 12 meses, retorno anualizado em 3 anos, volatilidade, queda máxima em 12 meses, dividend yield, tendência).
 Se o perfil for "não informado", use moderado e diga isso no resumo.
 1) alvo: alocação-alvo por classe (renda_fixa, acao, fii, exterior, cambio; soma 100), partindo do modelo do perfil e
-   desviando no máximo 10 p.p. por classe conforme o panorama. alvo_motivo: 1 a 2 frases.
+   desviando no máximo 10 p.p. por classe conforme o panorama. alvo_motivo: 1 a 2 frases. No simulador do passado
+   (seguindo o app mês a mês de 2013 a 2026), ajustar a alocação pela tendência e pelo juro do momento deixou o resultado
+   menor nos três perfis: só desvie do modelo do perfil por um motivo forte e duradouro, e explique qual.
 2) carteira: a carteira recomendada completa, com 6 a 12 ativos da lista permitida, peso em % do total (soma 100),
    coerente com o alvo de cada classe. Inclua liquidez para emergências (TESOURO_SELIC ou CDB_CDI).
    Use ETFs e fundos amplos como núcleo; ações e FIIs individuais como complemento, no máximo 10% cada.
@@ -547,6 +573,10 @@ Se o perfil for "não informado", use moderado e diga isso no resumo.
    sem isenção; ETFs 15% sem isenção; renda fixa 22,5% a 15% sobre o rendimento conforme o prazo (LCI/LCA isentas).
 4) resumo: 2 a 3 frases. alertas: 0 a 3 (concentração, falta de reserva, risco relevante).
 Cite apenas números que estão nos dados recebidos (sem arredondar demais e sem inventar estimativas): o app confere cada número e descarta o texto que citar um número que não está nos dados.
+Em posicao_atual, "proventos_mes_informado" é quanto a pessoa diz receber por mês com aquela ação ou FII e
+"proventos_mes_estimado" é o que o histórico dos últimos 12 meses indica. Ao sugerir vender ou reduzir um ativo que paga
+proventos, diga quanto de renda por mês ela deixaria de receber; se o informado for muito diferente do estimado, peça para
+ela conferir.
 Não prometa retorno. Responda em português do Brasil."""
 
 PROMPT_OBJETIVO = """
@@ -804,9 +834,61 @@ def _elegivel_novo(a, univ):
     return bool(m) and not m.get("dados_parados")
 
 
-def checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs):
-    return referencias.checar(pesos, alvo, PERFIS[perfil_ef], perfil_ef, (obj_an or {}).get("liquidez"), set(held), _individual,
+def checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs, modelo=None):
+    """modelo: a divisão de referência da faixa de cada classe (a do perfil; numa estratégia escolhida, a dela, que já
+    passou pelos limites de queda e de crise do perfil)."""
+    return referencias.checar(pesos, alvo, modelo or PERFIS[perfil_ef], perfil_ef, (obj_an or {}).get("liquidez"), set(held), _individual,
                               lambda a: _elegivel_novo(a, univ), PIOR_CRISE[perfil_ef], _pior_crise(pesos, specs), bool(obj_an))
+
+
+# ---------------------------------------------------------------- estratégias que a pessoa pode escolher (estrategias.py)
+
+ESTRATEGIA_NOMES = {estrategias.PADRAO: estrategias.NOME_PADRAO, "modelo_fixo": "Modelo do perfil, só ETFs e títulos",
+                    **{p["id"]: p["nome"] for p in referencias.PLANOS}}
+
+
+def _crises(carteiras):
+    """A pior crise real de cada carteira, em uma só passada pelo teste de estresse: {id: (nome, variação %)}."""
+    specs = {}
+    for p in carteiras.values():
+        specs.update(_specs(p, {}))
+    linhas = sim.estresse(carteiras, specs)
+    out = {}
+    for cid in carteiras:
+        vals = [(l["nome"], l["carteiras"][cid]["ret"]) for l in linhas if cid in l["carteiras"]]
+        if vals:
+            out[cid] = min(vals, key=lambda x: x[1])
+    return out
+
+
+def estrategias_perfil(perfil):
+    ref = cached("ref:planos", 12 * 3600, referencias.planos_ref, ok=lambda v: bool(v["planos"]), ttl_falha=600)
+    return cached(f"estr:{perfil}", 12 * 3600, lambda: estrategias.lista(perfil, PERFIS[perfil], PIOR_CRISE[perfil], _crises, ref),
+                  ok=lambda v: all(e["pior_crise"] for e in v["estrategias"]), ttl_falha=600)
+
+
+@app.get("/api/estrategias")
+def estrategias_ep(req: Request, perfil: str = "moderado", authorization: str = Header("")):
+    """As estratégias que a pessoa pode seguir, com o teste com o passado de cada uma e se cabem no perfil."""
+    auth(req, authorization)
+    p = perfil if perfil in PERFIS else "moderado"
+    try:
+        d = estrategias_perfil(p)
+    except Exception as e:
+        print("estratégias indisponíveis:", repr(e)[:200], flush=True)
+        raise HTTPException(502, "não consegui calcular as estratégias agora; tente de novo em alguns minutos")
+    out = {**d, "estrategias": [{k: v for k, v in e.items() if k != "motivos"} for e in d["estrategias"]]}
+    try:  # o resultado de cada uma no simulador do passado (com aportes, custos e as regras do app), se já foi calculado
+        sc = (armazem.ler("cache", "simulador") or {}).get("dados") or {}
+        x = (sc.get("perfis") or {}).get(p) if sc.get("versao") == simulador.VERSAO else None
+        if x:
+            out["simulador"] = {"desde": x["desde"], "ate": x["ate"], "inicial": x["inicial"], "mensal": x["mensal"],
+                                "linhas": {("modelo_fixo" if l["id"] == "fixo" else l["id"]): {k: l[k] for k in ("final", "tir_aa", "maior_queda")}
+                                           for l in x["linhas"] if l["id"] not in ("app_antigo", "fixo_antigo")}}
+            out["vivo"] = sc.get("vivo")
+    except Exception as e:
+        print("simulador indisponível para as estratégias:", repr(e)[:200], flush=True)
+    return out
 
 
 def resumo_regras(perfil_ef, alvo, obj_an):
@@ -898,6 +980,15 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
             fs.append(regras.fato("Sinal dos indicadores", i["sinal"].capitalize() + (f" ({regras.br(an['confianca'], 0)}% de confiança)" if an.get("confianca") else "")))
         if c == "renda_fixa" and an.get("taxa"):
             fs.append(regras.fato("Rendimento estimado", regras.pct(an["taxa"], 2) + " ao ano"))
+        renda = i.get("proventos_mes_informado") or 0
+        if renda:
+            custo_t = i.get("custo_total")
+            fs.append(regras.fato("Proventos que você recebe", regras.brl(renda) + " por mês",
+                                  (f"{regras.pct(renda * 12 / custo_t * 100)} ao ano sobre o que você pagou" if custo_t else "informado por você")))
+            est = i.get("proventos_mes_estimado")
+            if est and abs(renda - est) > 0.3 * max(renda, est):
+                fs.append(regras.fato("Pelo histórico dos últimos 12 meses", regras.brl(est) + " por mês",
+                                      "diferente do que você informou: confira (compra recente ou provento extra mudam a conta)"))
         fs += regras.fatos_metricas(m, c)[:4]
         if x and conf:  # checagem: número citado pela IA que não está nos dados troca a decisão e o texto pelos das regras
             custo_ia = regras.ir_venda(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT) if venda else None
@@ -924,6 +1015,10 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
         custo = regras.ir_venda(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT) if venda else None
         dica = regras.dica_isencao(t, c, venda, an.get("pl_pct"), ETF_ACAO | ETF_EXT | ETF_RF)
         if dica: fs.append(dica)
+        renda_perdida = (renda * (venda / i["valor"]) if renda and venda and i["valor"] else 0)
+        if renda_perdida >= 1:
+            fs.insert(1, regras.fato("Renda que deixaria de entrar", regras.brl(renda_perdida) + " por mês",
+                                     "proventos que você informou, na parte vendida"))
         porque = str(x.get("porque", "")).strip()[:600]
         if not porque:
             tend = regras.tendencia_txt(m)
@@ -938,6 +1033,8 @@ def explicar_mantidos(itens, analises, pesos, alvo, classes, pan, total, acoes_i
                        "REALIZAR_LUCRO": "A venda pode gerar IR e você deixa de ganhar com essa parte se continuar subindo.",
                        "AUMENTAR": "Aumentar concentra mais dinheiro neste ativo e no risco dele.",
                        "MANTER": "Manter não muda o risco atual: se o cenário piorar, a posição sente."}[acao])
+        if renda_perdida >= 1 and acao in VENDAS:
+            contra += f" Você também deixa de receber cerca de {regras.brl(renda_perdida)} por mês de proventos."
         out.append({"ativo": t, "nome": i.get("nome", t), "classe": c, "acao": acao,
                     "motivo": (str(x.get("motivo", "")).strip() or motivo_r)[:320], "porque": porque, "contra": contra,
                     "fatos": fs[:11], "custo": custo, "valor": round(mov, 2), "cotas": cotas, "preco_cota": round(pu, 2) if pu else None,
@@ -1046,10 +1143,15 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
         held = dict(list(held.items())[:planos.GRATIS["ativos"]])
     perfil_ef = r.perfil if r.perfil in PERFIS else "moderado"
     objetivo = " ".join(r.objetivo.split())[:600]
+    est = r.estrategia if r.estrategia in ESTRATEGIA_NOMES else estrategias.PADRAO
+    pad = _padroes().get(perfil_ef, {}) if est == estrategias.PADRAO else {}
+    segue = pad.get("id") if pad.get("id") in ESTRATEGIA_NOMES and pad.get("id") != estrategias.PADRAO else None
     orc = orcamento(uid)
-    ent = memoria.entrada(perfil_ef if r.perfil in PERFIS else "não informado", objetivo, list(held), orc)
+    ent = memoria.entrada(perfil_ef if r.perfil in PERFIS else "não informado", objetivo, list(held), orc,
+                          ESTRATEGIA_NOMES[est] if est != estrategias.PADRAO else
+                          f"Recomendada pelo app, seguindo {ESTRATEGIA_NOMES[segue]}" if segue else None)
     key = (f"p:{int(usar_ia)}:" + json.dumps({t: p.model_dump() for t, p in sorted(held.items())}) + r.perfil[:30] + "|" + objetivo +
-           f"|{orc['contas_mensais']}|{orc['reserva_meses']}|{orc['renda_mensal']}")
+           f"|{orc['contas_mensais']}|{orc['reserva_meses']}|{orc['renda_mensal']}|e:{est}:{segue}")
 
     def calc():
         with ThreadPoolExecutor(8) as ex:
@@ -1066,7 +1168,13 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             k = usd if a["moeda"] == "USD" else 1
             v = a["valor"] * k
             m = a.get("metricas") or {}
+            paga = a["classe"] in ("acao", "fii") and t not in ETF_ACAO | ETF_EXT | ETF_RF  # ETF não distribui proventos
+            renda_inf = round(max(held[t].renda, 0), 2) if paga else 0
+            renda_est = round(m["dividend_yield_12m"] / 100 * v / 12, 2) if paga and m.get("dividend_yield_12m") else None
             itens.append({"ticker": t, "nome": a.get("nome", t), "classe": a["classe"], "valor": round(v, 2),
+                          **({"proventos_mes_informado": renda_inf} if renda_inf else {}),
+                          **({"proventos_mes_estimado": renda_est} if renda_est else {}),
+                          **({"custo_total": round(float(held[t].qtd * held[t].pm * k), 2)} if held[t].qtd and held[t].pm else {}),
                           "pl": round((a.get("pl_atual") or 0) * k, 2), "pl_pct": a.get("pl_pct"), "sinal": a.get("decisao"),
                           "sugestao": a.get("sugestao"), "taxa_aa": a.get("taxa"), "resumo": a.get("resumo", "")[:200],
                           "metricas": {"ret_12m": m.get("ret_12m"), "volatilidade": m.get("volatilidade_anual"),
@@ -1109,6 +1217,14 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
             "ativos_permitidos": lista}
         mem_ctx, mem_cons = memoria.contexto(uid, ent)
+        rev = REVISAO_MODELO.get(perfil_ef)
+        if mem_cons and rev and est == estrategias.PADRAO and date.today() - timedelta(days=mem_cons["dias"]) < date.fromisoformat(rev[0]):
+            # a recomendação anterior foi feita com o modelo antigo: a parte da mudança que vem da revisão tem motivo e não
+            # é incoerência; o resto continua sendo conferido (compara com a anterior deslocada pela revisão)
+            novo, velho = PERFIS[perfil_ef], PERFIS_ANTERIOR[perfil_ef]
+            mem_cons["anterior_comparavel"] = {c: v + novo.get(c, 0) - velho.get(c, 0) for c, v in mem_cons["anterior"].items()}
+            mem_cons["mudancas"] = mem_cons["mudancas"] + [rev[1]]
+            mem_ctx["o_que_mudou_desde_entao"] = [m for m in mem_ctx["o_que_mudou_desde_entao"] if not m.startswith("nada no")] + [rev[1]]
         try:
             ref = cached("ref:planos", 12 * 3600, referencias.planos_ref, ok=lambda v: bool(v["planos"]), ttl_falha=600)
         except Exception as e:
@@ -1126,13 +1242,54 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                                                          "retorno_ao_ano_2a_metade": p["metade2"]["ret_aa"],
                                                          "cabe_no_perfil": p["cabe"]} for p in ref_p["planos"]]}
             schema["properties"]["comparacao_planos"] = STR; schema["required"].append("comparacao_planos")
+        # estratégia escolhida pela pessoa: vale se couber no perfil e passar na auditoria; senão, a recomendada, com o motivo
+        plano_est, est_info = None, {"id": estrategias.PADRAO, "nome": estrategias.NOME_PADRAO, "seguida": True, "motivo": None}
+        alvo_est = segue or (est if est != estrategias.PADRAO else None)
+        if alvo_est:
+            est_info = {"id": alvo_est, "nome": ESTRATEGIA_NOMES[alvo_est], "seguida": False, "motivo": None}
+            e = None
+            try:
+                e = next(x for x in estrategias_perfil(perfil_ef)["estrategias"] if x["id"] == alvo_est)
+            except Exception as ex:
+                print("estratégias indisponíveis:", repr(ex)[:200], flush=True)
+            if e is None:
+                est_info["motivo"] = "Não consegui carregar os dados desta estratégia agora."
+            elif not e["cabe"]:
+                est_info["motivo"] = f"Ela não cabe no seu perfil: {e['motivo_nao_cabe']}"
+            else:
+                obj_e = regras.objetivo(objetivo) if objetivo else None
+                bloq = [c for c in checagens_duras(e["ativos"], e["classes"], perfil_ef, obj_e, held, univ, _specs(e["ativos"], r.pos),
+                                                   e["classes"]) if c["bloqueia"]]
+                if bloq:
+                    est_info["motivo"] = "Ela não passou na auditoria para você. " + " ".join(f"{c['titulo']}: {c['detalhe']}" for c in bloq)
+                else:
+                    plano_est, est_info["seguida"] = e, True
+            if not est_info["seguida"]:
+                est_info["motivo"] += " Por isso, a carteira abaixo é a recomendada pelo app para o seu perfil."
+            if segue:  # a pessoa escolheu a recomendada: ela segue a estratégia que venceu nos testes, se der
+                est_info = {"id": estrategias.PADRAO, "nome": estrategias.NOME_PADRAO, "seguida": True,
+                            "segue": {"id": segue, "nome": ESTRATEGIA_NOMES[segue], "desde": pad.get("desde"),
+                                      "texto": texto_padrao(perfil_ef, pad)} if plano_est else None,
+                            "motivo": None if plano_est else
+                            f"Pelos testes com dados reais, a recomendada seguiria {ESTRATEGIA_NOMES[segue]}, mas ela não serve "
+                            f"para você agora ({est_info['motivo']})"}
         ia = ask_json(PROMPT_CARTEIRA + (PROMPT_OBJETIVO if objetivo else "") + (PROMPT_ORCAMENTO if tem_orc else "")
                       + (PROMPT_REFERENCIAS if ref else "") + (PROMPT_MEMORIA if mem_ctx else ""), dados, schema,
-                      effort=EFFORT_DECISOES, model=MODELO_DECISOES, max_tokens=32000) if usar_ia else {}
+                      effort=EFFORT_DECISOES, model=MODELO_DECISOES, max_tokens=32000) if usar_ia and not plano_est else {}
         atual = {i["ticker"]: i["valor"] for i in itens}
         sinais = {i["ticker"]: i["sinal"] for i in itens}
-        fonte = "ia" if ia.get("carteira") else "regras"
+        fonte = "estrategia" if plano_est else "ia" if ia.get("carteira") else "regras"
         otimizacao, ia_reprovada = None, None
+        if fonte == "estrategia":  # divisão fixa da estratégia escolhida: sem IA e sem ajuste pelo mercado
+            obj_an = regras.objetivo(objetivo) if objetivo else None
+            alvo, pesos, motivos = dict(plano_est["classes"]), dict(plano_est["ativos"]), dict(plano_est["motivos"])
+            origem, textos = {}, {}
+            alvo_motivo = f"{plano_est['nome']} ({plano_est['autor']}): {plano_est['ideia']}"
+            resumo = (f"Carteira da estratégia que você escolheu, {plano_est['nome']}: {estrategias.resumo_texto(plano_est)}. "
+                      "A divisão é fixa: o app não tenta adivinhar o mercado; só confere os riscos e a sua reserva de emergência.")
+            if obj_an:
+                obj_an["influencia"] = ("A estratégia escolhida tem uma divisão fixa; o seu objetivo entra na conferência de prazo "
+                                        "da auditoria.")
         if fonte == "ia":
             alvo, pesos, motivos, origem = montar_carteira(ia, perfil_ef, atual, sinais, bool(objetivo))
             obj_an, alvo_motivo, resumo = (ler_objetivo(ia.get("objetivo_analise")) if objetivo else None), str(ia.get("alvo_motivo", ""))[:400], str(ia.get("resumo", ""))[:600]
@@ -1145,7 +1302,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                 ia_reprovada = {"motivos": [f"{c['titulo']}: {c['detalhe']}" for c in bloq]}
                 print("auditoria reprovou a carteira da IA:", ia_reprovada["motivos"], flush=True)
                 fonte = "regras"
-        if fonte != "ia":  # sem IA, se ela falhar ou se a auditoria reprovar a carteira dela: motor de regras
+        if fonte == "regras":  # sem IA, se ela falhar ou se a auditoria reprovar a carteira dela: motor de regras
             obj_an = regras.objetivo(objetivo) if objetivo else None
             alvo, alvo_motivo = regras.alvo_classes(PERFIS[perfil_ef], pan["classes"], obj_an)
             cand = {a: {"classe": c, "nome": nm, "descricao": desc, "m": univ.get(a)} for a, (c, nm, desc) in UNIVERSO.items()}
@@ -1162,7 +1319,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             meta_p = ((obj_an or {}).get("metas") or [{}])[0]
             aporte_p = (obj_an or {}).get("aporte_mensal") or max(orc.get("sobra") or 0, 0)
             risco_ant = None
-            if mem_cons and mem_cons["dias"] <= 30 and not any(m.startswith(("perfil", "o objetivo")) for m in mem_cons["mudancas"]):
+            if mem_cons and mem_cons["dias"] <= 30 and not any(m.startswith(("perfil", "o objetivo", "a estratégia")) for m in mem_cons["mudancas"]):
                 risco_ant = 100 - mem_cons["anterior"].get("renda_fixa", 0)
             otimizacao = otimizar_risco(pesos, alvo, perfil_ef, meta_p.get("valor_alvo") or 0, meta_p.get("prazo_anos") or 0,
                                         total, aporte_p, pan, r.pos, risco_ant)
@@ -1224,14 +1381,15 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                                   fonte, conf, aporte_m)
         # auditoria final (da IA ou das regras): checagens objetivas, comparação com planos consagrados e coerência
         specs_f = _specs(pesos, r.pos)
-        chks = checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs_f)
+        chks = checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs_f, plano_est["classes"] if plano_est else None)
         teste_cart = None
         try:
             teste_cart = referencias.testar_carteira(pesos, specs_f) if ref else None
         except Exception as e:
             print("teste com o passado da carteira falhou:", repr(e)[:200], flush=True)
         comp, dominam = referencias.comparar(teste_cart, ref_p, perfil_ef) if ref_p else ([], [])
-        chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior"), (mem_cons or {}).get("mudou_entrada"),
+        chks += comp + referencias.consistencia(alvo, (mem_cons or {}).get("anterior_comparavel") or (mem_cons or {}).get("anterior"),
+                                                (mem_cons or {}).get("mudou_entrada"),
                                                 (mem_cons or {}).get("dias"))
         txt_mud = str(ia.get("mudancas", ""))[:400] if fonte == "ia" else ""
         txt_comp = str(ia.get("comparacao_planos", ""))[:500] if fonte == "ia" else ""
@@ -1240,8 +1398,8 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             if txt_comp and not conf.ok(txt_comp, "comparacao_planos"): txt_comp = ""
         if not txt_mud and mem_cons:
             ant = mem_cons["anterior"]
-            difs = [f"{regras.NOME[c].lower()} {v - ant.get(c, 0):+.0f} p.p." for c, v in alvo.items() if abs(v - ant.get(c, 0)) >= 2]
-            txt_mud = ((f"Em relação à recomendação {referencias.quando(mem_cons['dias'], True)}: " + ", ".join(difs) + ".") if difs else
+            difs = [f"{regras.NOME_MIN[c]} {v - ant.get(c, 0):+.0f} p.p." for c, v in alvo.items() if abs(v - ant.get(c, 0)) >= 2]
+            txt_mud = ((f"Em relação à recomendação {referencias.quando(mem_cons['dias'], True)}: " + ", ".join(difs)[:-1] + ".") if difs else
                        f"A alocação por classe ficou igual à da recomendação {referencias.quando(mem_cons['dias'], True)}.")
             if difs and mem_cons["mudancas"]:
                 txt_mud += " O que mudou desde então: " + "; ".join(mem_cons["mudancas"]) + "."
@@ -1275,13 +1433,17 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                 "alertas": (alertas + ia_alertas)[:5],
                 "ia": fonte == "ia", "fonte": fonte, "ia_configurada": usar_ia, "classes_padrao": list(origem), "usd": usd,
                 "modelo": MODELO_DECISOES if fonte == "ia" else None, "checagem": conf.resumo() if conf else None,
-                "otimizacao": otimizacao, "auditoria": auditoria, "mudancas": txt_mud,
+                "otimizacao": otimizacao, "auditoria": auditoria, "mudancas": txt_mud, "estrategia": est_info,
                 "objetivo": objetivo, "objetivo_analise": obj_an,
+                "renda": {"informada": round(sum(i.get("proventos_mes_informado", 0) for i in itens), 2),
+                          "estimada": round(sum(i.get("proventos_mes_estimado") or 0 for i in itens if i["classe"] in ("acao", "fii")), 2),
+                          "sem_informar": [i["ticker"] for i in itens if i["classe"] in ("acao", "fii") and not i.get("proventos_mes_informado")
+                                           and i["ticker"] not in ETF_ACAO | ETF_EXT | ETF_RF]},
                 "orcamento": {**orc, "reserva_atual": reserva_atual, "reserva_falta": round(falta_reserva, 2),
                               "meses_cobertos": round(reserva_atual / orc["contas_mensais"], 1) if orc["contas_mensais"] else None,
                               "reserva_ativo": reserva_ativo}}
     try:
-        res = cached(key, 1800, calc, ok=lambda v: v["fonte"] == "ia" or not usar_ia)
+        res = cached(key, 1800, calc, ok=lambda v: v["fonte"] in ("ia", "estrategia") or not usar_ia)
     except Exception as e:
         raise HTTPException(502, str(e))
     try:  # memória: a próxima recomendação sabe o que foi recomendado agora
@@ -1368,6 +1530,7 @@ class CarteiraDados(BaseModel):
     extra: list[str] = []
     perfil: str = "não informado"
     objetivo: str = ""
+    estrategia: str = "app"
 
 
 class SalvarReq(BaseModel):
@@ -1385,7 +1548,8 @@ def limpar_carteira(d):
                       if v == v}
     extra = list(dict.fromkeys(t for t in (norm(x) for x in d.extra[:300]) if OKT.match(t)))
     perfil = d.perfil if d.perfil in PERFIS else "não informado"
-    return {"pos": pos, "extra": extra, "perfil": perfil, "objetivo": " ".join(d.objetivo.split())[:600]}
+    est = {"estrategia": d.estrategia} if d.estrategia in ESTRATEGIA_NOMES and d.estrategia != estrategias.PADRAO else {}
+    return {"pos": pos, "extra": extra, "perfil": perfil, "objetivo": " ".join(d.objetivo.split())[:600], **est}
 
 
 def _info():
@@ -1831,6 +1995,138 @@ def b3_apagar(req: Request, authorization: str = Header("")):
     uid = auth(req, authorization)
     armazem.apagar("b3", uid)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- simulador do passado (e se alguém tivesse seguido o app?)
+
+_lock_simul = threading.Lock()
+
+
+def _simulador():
+    """Pesado (refaz 14 anos mês a mês): o resultado fica guardado no banco por 7 dias e sobrevive a reinícios."""
+    with _lock_simul:
+        d = armazem.ler("cache", "simulador")
+        if d and d["dados"].get("versao") == simulador.VERSAO and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400:
+            return d["dados"]
+        cabem = {}
+        for p in PERFIS:  # os planos no simulador são os que a pessoa pode escolher (mesmos critérios de queda e crise)
+            try:
+                cabem[p] = {e["id"] for e in estrategias_perfil(p)["estrategias"] if e["tipo"] == "plano" and e["cabe"]}
+            except Exception as e:
+                print("estratégias indisponíveis no simulador:", repr(e)[:200], flush=True)
+        r = simulador.tudo(PERFIS, PIOR_CRISE, anteriores=PERFIS_ANTERIOR, cabem=cabem)
+        for p, x in r["perfis"].items():  # a revisão do modelo do perfil: a pior crise real do antigo e do novo
+            if x.get("modelo_anterior") and p in REVISAO_MODELO:
+                cr = _crises({k: {a: m[c] * w for c, ws in simulador.NUCLEO.items() for a, w in ws.items() if m.get(c)}
+                              for k, m in (("antigo", x["modelo_anterior"]), ("novo", x["modelo"]))})
+                x["revisao"] = {"data": REVISAO_MODELO[p][0], "limite": PIOR_CRISE[p],
+                                **{k: list(v) for k, v in cr.items()}}
+        if r["perfis"] and not r.get("aproximado"):  # sem o Banco Central, mostra mas não guarda (refaz na próxima)
+            armazem.gravar("cache", "simulador", r)
+            _atualizar_padroes(sim=r)
+        return r
+
+
+_lock_corr = threading.Lock()
+
+
+def _corretora():
+    """Corretora simulada (estilo testador do MetaTrader): pesada como o simulador; fica guardada no banco por 7 dias."""
+    with _lock_corr:
+        d = armazem.ler("cache", "corretora")
+        if (d and d["dados"].get("versao") == corretora.VERSAO and d["dados"].get("versao_sim") == simulador.VERSAO
+                and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400):
+            return d["dados"]
+        r = corretora.tudo(PERFIS)
+        r["versao_sim"] = simulador.VERSAO
+        if r["perfis"] and not r.get("aproximado"):
+            armazem.gravar("cache", "corretora", r)
+            _atualizar_padroes(cor=r)
+        return r
+
+
+# ---------------------------------------------------------------- garantia de melhor decisão (estrategias.dominantes)
+# A recomendada de cada perfil é a carteira montada pelo app, a não ser que, nos dois testes com dados reais (simulador e
+# corretora simulada), uma estratégia que a pessoa pode escolher tenha rendido mais nas duas metades do período com queda
+# parecida ou menor. Aí a recomendada passa a seguir essa estratégia, e a tela explica. A conferência roda sozinha toda vez
+# que os testes são refeitos (uma vez por semana); PADRAO_INICIAL é o resultado da rodada de 23/11/2026
+# (ferramentas/melhor_estrategia.py), usado até a primeira conferência no servidor.
+PADRAO_INICIAL = {}
+
+
+def _padroes():
+    def ler():
+        base = {p: {"id": estrategias.PADRAO} for p in PERFIS}
+        base.update(PADRAO_INICIAL)
+        d = armazem.ler("decisao", "padrao")
+        if d:
+            base.update({p: v for p, v in d["dados"].items() if p in PERFIS})
+        return base
+    return cached("padroes", 300, ler)
+
+
+def _atualizar_padroes(sim=None, cor=None):
+    try:
+        if sim is None:
+            x = armazem.ler("cache", "simulador")
+            sim = x["dados"] if x and x["dados"].get("versao") == simulador.VERSAO else None
+        if cor is None:
+            x = armazem.ler("cache", "corretora")
+            cor = x["dados"] if x and x["dados"].get("versao") == corretora.VERSAO and x["dados"].get("versao_sim") == simulador.VERSAO else None
+        if not sim or not cor:
+            return
+        atual, novo, mudou = _padroes(), {}, False
+        for p in PERFIS:
+            cabem = [e["id"] for e in estrategias_perfil(p)["estrategias"] if e["cabe"]]
+            rec = atual[p].get("id", estrategias.PADRAO)
+            novo[p] = atual[p]
+            if rec not in cabem:  # deixou de caber no perfil: volta para a carteira do app
+                rec, novo[p], mudou = estrategias.PADRAO, {"id": estrategias.PADRAO, "desde": date.today().isoformat()}, True
+            dom = estrategias.dominantes(rec, estrategias.linhas_testes(sim["perfis"].get(p), cor, p, cabem))
+            if dom:
+                novo[p] = {"id": dom[0]["id"], "desde": date.today().isoformat(), "anterior": rec, "numeros": dom[0]}
+                mudou = True
+                print(f"melhor decisão: a recomendada do perfil {p} passa a seguir {dom[0]['id']} (antes: {rec})", flush=True)
+        if mudou:
+            armazem.gravar("decisao", "padrao", novo)
+            cache.pop("padroes", None)
+    except Exception as e:
+        print("conferência da melhor decisão falhou:", repr(e)[:300], flush=True)
+
+
+def texto_padrao(perfil, pad):
+    nome = ESTRATEGIA_NOMES.get(pad["id"], pad["id"])
+    n = pad.get("numeros") or {}
+    c, a = n.get("corretora") or {}, (n.get("antes") or {}).get("corretora") or {}
+    num = (f" Na corretora simulada, de 2013 a hoje: {regras.brl(c['final'], 0)} contra {regras.brl(a['final'], 0)}, rendendo "
+           f"{regras.br(c['metade1_aa'], 1)}% e {regras.br(c['metade2_aa'], 1)}% ao ano nas duas metades (contra "
+           f"{regras.br(a['metade1_aa'], 1)}% e {regras.br(a['metade2_aa'], 1)}%).") if c and a else ""
+    return (f"Nos dois testes com dados reais (simulador mês a mês e corretora simulada dia a dia), {nome} rendeu mais que a "
+            f"carteira montada pelo app nas duas metades do período (2013-2019 e 2020 até hoje), com queda parecida ou menor. "
+            f"Por isso, a recomendada para o perfil {perfil} segue {nome}.{num}")
+
+
+@app.get("/api/corretora")
+def corretora_ep(req: Request, authorization: str = Header("")):
+    auth(req, authorization)
+    try:
+        r = cached("corretora", 6 * 3600, _corretora, ok=lambda v: bool(v.get("perfis")), ttl_falha=600)
+    except Exception as e:
+        print("corretora simulada falhou:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui rodar a corretora simulada agora. Tente de novo em alguns minutos.")
+    pads = _padroes()
+    return {**r, "padroes": {p: {**v, "nome": ESTRATEGIA_NOMES.get(v["id"], v["id"]),
+                                 "texto": texto_padrao(p, v) if v["id"] != estrategias.PADRAO else None} for p, v in pads.items()}}
+
+
+@app.get("/api/simulador")
+def simulador_ep(req: Request, authorization: str = Header("")):
+    auth(req, authorization)
+    try:
+        return cached("simulador", 6 * 3600, _simulador, ok=lambda v: bool(v.get("perfis")), ttl_falha=600)
+    except Exception as e:
+        print("simulador falhou:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui rodar o simulador agora. Tente de novo em alguns minutos.")
 
 
 # ---------------------------------------------------------------- fundamentos e ranking

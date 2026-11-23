@@ -55,9 +55,15 @@ yf.Ticker = FakeTicker
 class R:
     def __init__(self, j=None, content=b""): self._j, self.content = j, content
     def json(self): return self._j
+    def raise_for_status(self): pass
 RSS = b"""<rss><channel><item><title>Copom mantem Selic e sinaliza cautela</title><link>https://ex.com/a</link><source>Valor</source><pubDate>Thu, 19 Nov 2026 10:00:00 GMT</pubDate></item>
 <item><title>Ibovespa sobe com exterior positivo</title><link>https://ex.com/b</link><source>InfoMoney</source></item></channel></rss>"""
 def fake_get(url, params=None, timeout=None, **kw):
+    if ("sgs.432/" in url or "sgs.13522/" in url) and params and "dataInicial" in params:  # Selic e IPCA 12m históricos
+        a0, a1 = int(params["dataInicial"][-4:]), int(params["dataFinal"][-4:])
+        hoje = pd.Timestamp.today()
+        return R([{"data": f"15/{m:02d}/{a}", "valor": ("10,50" if "432" in url else "4,80")}
+                  for a in range(a0, a1 + 1) for m in range(1, 13) if pd.Timestamp(a, m, 15) <= hoje])
     if "sgs.432" in url: return R([{"valor": "13,75"}])
     if "sgs.4389" in url: return R([{"valor": "13,65"}])
     if "sgs.13522" in url: return R([{"valor": "4,62"}])

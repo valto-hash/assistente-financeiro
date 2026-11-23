@@ -207,6 +207,33 @@ details[open]>summary::before{transform:rotate(45deg)}
 .act .mov{color:var(--ink);font-weight:600}
 .why{grid-column:1/-1;margin-top:6px}
 .why>summary{font-size:14px}
+.estr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:10px}
+.estr{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;text-align:left;border:1px solid var(--line);background:var(--sf);color:var(--ink);border-radius:12px;padding:12px;font:inherit;cursor:pointer}
+.estr:hover:not(:disabled){border-color:var(--acc)}
+.estr.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.estr:disabled{cursor:default;background:var(--sf2)}
+.estr:disabled .cbar{opacity:.6}
+.estr-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.estr-n{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:13px;color:var(--ink2)}
+.estr-motivo{display:flex;gap:6px;align-items:flex-start;font-size:13px;color:var(--ink2)}
+.estr-motivo svg{width:16px;height:16px;flex:0 0 16px;margin-top:1px;color:var(--warn)}
+.cbar{display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--line2)}
+.cbar i{display:block;height:100%}
+.cleg{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--ink2)}
+.cleg .dot{margin-right:4px}
+details.estr-fora{margin-top:12px}
+.rep{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0 18px;margin-top:6px}
+.rep-l{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line2);font-size:14px;min-width:0}
+.rep-l span{color:var(--ink2)}
+.rep-l small{flex-basis:100%;font-size:12px;color:var(--mut)}
+.renda-linha{margin:6px 0 0}
+.renda-lista{display:grid;gap:8px;margin-top:10px}
+.renda-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line2)}
+.renda-nm{min-width:0}.renda-nm small{display:block;color:var(--mut);font-size:12px}
+.renda-inp{flex:0 0 140px;max-width:140px;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--sf);padding:0 10px;min-height:42px}
+.renda-inp i{font-style:normal;color:var(--mut);font-size:14px}
+.renda-inp input{border:0;background:none;padding:9px 6px;width:100%;min-width:0;outline:none;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.renda-inp:focus-within{border-color:var(--acc)}
 .why[open]{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .why p{margin:8px 0;color:var(--ink);font-size:14px}
 .fatos{margin:8px 0}
@@ -502,6 +529,7 @@ body.travado{overflow:hidden}
       <div id="syncInfo" class="sync" aria-live="polite"></div>
       <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button><button class="btn" type="button" id="btnB3" style="flex:0 1 240px">Importar da B3</button></div>
     </div>
+    <div id="rendaCard"></div>
     <div id="list" class="grid2"></div>
   </section>
   <p class="disc">Ferramenta educacional: sugestões e simulações são estimativas automáticas, não recomendação profissional nem garantia de resultado. Rentabilidade passada não garante rentabilidade futura. Valores antes de impostos e taxas.</p>
@@ -552,20 +580,20 @@ const ICON = {
 
 let sess = raw('sessao') || '', eu = ld('eu', null);  // sessão e dados da pessoa que entrou
 const U = k => eu ? `u:${eu.id}:${k}` : k;          // cada pessoa tem os próprios dados neste aparelho
-let pos = {}, extra = [], perfil = 'não informado';
+let pos = {}, extra = [], perfil = 'não informado', estrategia = 'app';
 let objetivo = '', objDraft = '';  // objetivo aplicado e o texto em edição
 const EXEMPLOS = ['Montar minha reserva de emergência', 'Entrada de um apartamento em 5 anos', 'Aposentadoria daqui a 25 anos', 'Viagem em 2 anos', 'Fazer o dinheiro crescer no longo prazo'];
 let aporte = 5000, modo = 'aporte';
 const SIM_PADRAO = {inicial: null, mensal: 500, anos: 10, cenario: 'ponderado', real: false, foco: 'sugerida'};
 const simCfg = {...SIM_PADRAO};
 function carregarLocal() {
-  pos = ld(U('pos'), {}); extra = ld(U('extra'), []); perfil = raw(U('perfil')) || 'não informado';
+  pos = ld(U('pos'), {}); extra = ld(U('extra'), []); perfil = raw(U('perfil')) || 'não informado'; estrategia = raw(U('estrategia')) || 'app';
   objetivo = (raw(U('objetivo')) || '').slice(0, 600); objDraft = objetivo; aporte = ld(U('aporte'), 5000);
   Object.keys(simCfg).forEach(k => delete simCfg[k]); Object.assign(simCfg, SIM_PADRAO, ld(U('simcfg'), {}));
   sync = Object.assign({versao: 0, hash: null, quando: null}, ld(U('sync'), {}));
 }
 const st = {uni: {}, port: null, pan: null, sim: null, an: {}, portErr: null, panErr: null, simErr: null, portBusy: false, simBusy: false, tab: 'resumo'};
-const sv = () => { if (!eu) return; rawSet(U('pos'), JSON.stringify(pos)); rawSet(U('extra'), JSON.stringify(extra)); rawSet(U('perfil'), perfil);
+const sv = () => { if (!eu) return; rawSet(U('pos'), JSON.stringify(pos)); rawSet(U('extra'), JSON.stringify(extra)); rawSet(U('perfil'), perfil); rawSet(U('estrategia'), estrategia === 'app' ? null : estrategia);
   rawSet(U('objetivo'), objetivo || null); rawSet(U('aporte'), JSON.stringify(aporte)); rawSet(U('simcfg'), JSON.stringify(simCfg)); agendarEnvio(); };
 
 /* ---------- sincronização da carteira com o servidor ----------
@@ -578,21 +606,22 @@ function canon(d) {
   const pp = {};
   Object.keys(d.pos || {}).filter(t => OKT.test(t)).sort().forEach(t => {
     const p = d.pos[t] || {}, o = {};
-    for (const [k, def] of [['qtd', 0], ['pm', 0], ['saldo', 0], ['pct', 100]]) {
+    for (const [k, def] of [['qtd', 0], ['pm', 0], ['saldo', 0], ['pct', 100], ['renda', 0]]) {
       const v = Number(p[k]);
       if (p[k] != null && isFinite(v) && v !== def) o[k] = Math.round(Math.max(v, 0) * 1e6) / 1e6;
     }
     if (Object.keys(o).length) pp[t] = o;
   });
+  const est = typeof d.estrategia === 'string' && /^[a-z0-9_]{1,40}$/.test(d.estrategia) && d.estrategia !== 'app' ? {estrategia: d.estrategia} : {};
   return {pos: pp, extra: [...new Set((d.extra || []).filter(t => OKT.test(t)))], perfil: PERFIS[d.perfil] ? d.perfil : 'não informado',
-    objetivo: String(d.objetivo || '').replace(/\s+/g, ' ').trim().slice(0, 600)};
+    objetivo: String(d.objetivo || '').replace(/\s+/g, ' ').trim().slice(0, 600), ...est};
 }
-const dadosLocais = () => canon({pos, extra, perfil, objetivo});
+const dadosLocais = () => canon({pos, extra, perfil, objetivo, estrategia});
 const hashDe = d => JSON.stringify(d);
 const temDados = d => Object.keys(d.pos).length > 0 || d.extra.length > 0 || !!d.objetivo || d.perfil !== 'não informado';
 const nAtivos = d => Object.values(d.pos).filter(p => p.qtd > 0 || p.saldo > 0).length;
 const salvarSync = v => { sync = v; rawSet(U('sync'), JSON.stringify(sync)); };
-function aplicarDados(d) { pos = d.pos; extra = d.extra; perfil = d.perfil; objetivo = d.objetivo; objDraft = objetivo; }
+function aplicarDados(d) { pos = d.pos; extra = d.extra; perfil = d.perfil; objetivo = d.objetivo; objDraft = objetivo; estrategia = d.estrategia || 'app'; }
 async function apiSync(method, body) {
   const r = await fetch('/api/carteira', {method, headers: {Authorization: 'Bearer ' + sess, 'Content-Type': 'application/json'}, body: body && JSON.stringify(body)});
   let j = {};
@@ -1096,6 +1125,66 @@ function dispersaoSvg(linhas, limite, dom) {
     <text x="${W - pr}" y="${H - 2}" text-anchor="end">maior queda no período →</text><text x="${pl - 40}" y="${pt + 2}" text-anchor="start">ao ano</text>
     ${linhas.filter(l => !l.sua).map(ponto).join('')}${linhas.filter(l => l.sua).map(ponto).join('')}
   </svg></div>`;
+}
+
+/* ---------- simulador do passado: e se alguém tivesse seguido o app desde 2013? ---------- */
+st.simul = {perfil: null, dados: null, err: null, busy: false};
+async function loadSimul() {
+  st.simul.busy = true; st.simul.err = null; renderSimul();
+  try { st.simul.dados = await api('/api/simulador'); } catch (e) { st.simul.err = e.message; }
+  st.simul.busy = false; renderSimul();
+}
+function renderSimul() { const el = $('#simulCard'); if (el) { el.innerHTML = simulHtml(); ligarSimul(); } }
+function ligarSimul() { $$('#simulCard [data-sp]').forEach(b => b.onclick = () => { st.simul.perfil = b.dataset.sp; renderSimul(); }); }
+function simulHtml() {
+  const S = st.simul, d = S.dados;
+  if (!d) return `<div class="card"><h2>E se você tivesse seguido o app?</h2>${S.err ? `<p class="err-box">${esc(S.err)}</p><div class="btns"><button class="btn" type="button" onclick="loadSimul()">Tentar de novo</button></div>`
+    : busy('Seguindo o app mês a mês desde 2013… na primeira vez pode levar alguns minutos') + sk(4)}</div>`;
+  const perf = S.perfil || (d.perfis[perfil] ? perfil : 'moderado'), x = d.perfis[perf];
+  if (!x) return '';
+  const L = id => x.linhas.find(l => l.id === id), app = L('app'), fixo = L('fixo'), cdi = L('cdi'), antigo = L('app_antigo');
+  const reais = v => M(v).replace(/,00$/, '');
+  const dif = (a, b) => `${a - b >= 0 ? 'mais' : 'menos'} (${reais(Math.abs(a - b))})`;
+  const bomFixo = x.vs_fixo >= 0;
+  const linhas = [...x.linhas].sort((p, q) => (q.id === 'app') - (p.id === 'app') || q.final - p.final);
+  const nomeCl = {renda_fixa: 'renda fixa', acao: 'ações', fii: 'FIIs', exterior: 'exterior', cambio: 'dólar e ouro'};
+  const modeloTxt = m => Object.entries(m).filter(([, v]) => v).map(([c, v]) => `${N(v)}% ${nomeCl[c] || c}`).join(', ');
+  const rv = x.revisao;
+  const serie = {datas: x.datas, app: app.serie, fixo: fixo.serie, cdi: cdi.serie};
+  const v = d.vivo, vp = v && v.perfis ? v.perfis[perf] : null;
+  const estSim = estrategia === 'modelo_fixo' ? 'fixo' : estrategia, estLinha = x.linhas.find(l => l.id === estSim && l.id !== 'app');
+  const vivoEst = estLinha && v?.planos && v.planos[estSim] != null && v.planos_meses?.length ? v.planos[estSim] : null;
+  return `<div class="card">
+    <h2>E se você tivesse seguido o app?</h2>
+    <div class="chips" role="group" aria-label="Perfil simulado" style="margin-top:8px">${Object.keys(d.perfis).map(p => `<button type="button" data-sp="${p}" aria-pressed="${p === perf}">${esc(PERFIS[p]?.[0] || p)}</button>`).join('')}</div>
+    <p class="lead sm" style="margin-top:8px">Começando com ${reais(x.inicial)} em ${esc(x.desde)} e aplicando ${reais(x.mensal)} todo mês até ${esc(x.ate)}. No fim de cada mês, o app recebeu só os dados que existiam naquela data, montou a carteira com as regras de hoje e a pessoa simulada seguiu: dinheiro novo no que estava abaixo do recomendado, vendas só quando o app mandaria, ${N(d.custo_operacao, 1)}% de custo em cada compra e venda.</p>
+    ${d.aproximado && d.aproximado.length ? `<div class="note warn">${ICON.warn}<div>O Banco Central não respondeu agora, então ${esc(d.aproximado.join(' e '))} da época ${d.aproximado.length > 1 ? 'foram aproximados' : 'foi aproximado(a)'} e os números podem mudar um pouco. O teste é refeito com os dados certos na próxima vez que você abrir esta tela.</div></div>` : ''}
+    <div class="tiles"><div class="tile main"><div class="l">Seguindo o app</div><div class="v tn">${reais(app.final)}</div><div class="d">${P(app.tir_aa, 1, false)} ao ano sobre ${reais(app.investido)} aplicados</div></div>
+      <div class="tile"><div class="l">Modelo fixo do perfil</div><div class="v tn">${reais(fixo.final)}</div><div class="d">${P(fixo.tir_aa, 1, false)} ao ano, só ETFs e títulos</div></div>
+      <div class="tile"><div class="l">100% CDI</div><div class="v tn">${reais(cdi.final)}</div><div class="d">${P(cdi.tir_aa, 1, false)} ao ano</div></div></div>
+    <div class="note ${bomFixo ? 'good' : 'warn'}">${bomFixo ? ICON.check : ICON.warn}<div>${bomFixo
+      ? `<b>As decisões do app ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs, com queda máxima parecida (${P(app.maior_queda, 0)} contra ${P(fixo.maior_queda, 0)}).`
+      : `<b>As decisões do app não ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs. Para este perfil, o mais simples teria sido melhor.`}
+      Contra o CDI: ${dif(app.final, cdi.final)}. Entre as ${N(x.total)} estratégias comparadas, o app ficou em ${N(x.posicao)}º lugar.</div></div>
+    ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1], ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
+    <p class="mut xs" style="margin:2px 0 0">Quanto o patrimônio estava acima do total aplicado até cada mês (dinheiro novo não conta como ganho).</p>
+    <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR das vendas no caminho</small></th></tr></thead><tbody>
+      ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${['app_antigo', 'fixo_antigo'].includes(l.id) ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.id === estSim ? ` ${pill('good', 'check', 'Sua estratégia')}` : ''}${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
+        <td><b>${reais(l.final)}</b><small>${P(l.ganho_pct, 0)}</small></td><td>${P(l.tir_aa, 1, false)}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
+        <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${reais(l.custos)}<small>${reais(l.ir_estimado)}</small></td></tr>`).join('')}</tbody></table></div>
+    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes deste teste” mostra como era (${reais(antigo.final)} neste perfil).${x.modelo_anterior ? ` O modelo deste perfil também foi revisto: era ${esc(modeloTxt(x.modelo_anterior))}${rv?.antigo ? `, que teria caído ${N(Math.abs(rv.antigo[1]), 0)}% na pior crise testada (${esc(rv.antigo[0])}), quando o perfil aceita até ${N(Math.abs(rv.limite), 0)}%` : ''}; passou a ser ${esc(modeloTxt(x.modelo))}${rv?.novo ? `, que teria caído ${N(Math.abs(rv.novo[1]), 0)}%` : ''}. O novo foi escolhido entre vários candidatos definidos antes do teste, usando só 2013 a 2019, e confirmado em 2020 a 2026, período que não entrou na escolha.` : ''} Como essas mudanças saíram de testes com o passado, a prova que vale de verdade é a de baixo.</div></div>
+    <h3>Prova ao vivo</h3>
+    ${vp && v.meses.length ? `<p class="sm" style="margin:-4px 0 0">Desde ${esc(v.meses[0])} (${N(v.meses.length)} ${v.meses.length === 1 ? 'mês' : 'meses'}), a carteira que o app recomendava para este perfil rendeu <b>${P(vp.app, 2)}</b>, o modelo fixo ${P(vp.fixo, 2)} e o CDI ${P(vp.cdi, 2)}. Cada carteira foi guardada antes de o mês acontecer.</p>`
+      : `<p class="mut sm" style="margin:-4px 0 0">Todo mês, o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer. O resultado real aparece aqui a partir do mês que vem, sem nenhuma chance de ajustar regra olhando o resultado.</p>`}
+    ${vivoEst != null ? `<p class="sm" style="margin:6px 0 0">A estratégia que você escolheu, <b>${esc(estLinha.nome)}</b>, rendeu <b>${P(vivoEst, 2)}</b> desde ${esc(v.planos_meses[0])}, também guardada antes de cada mês.</p>` : ''}
+    <details style="margin-top:8px"><summary>Limites deste teste</summary><ul class="ink2 sm" style="padding-left:18px">
+      <li>A IA não entra: ela já “sabe” o que aconteceu depois, e testá-la no passado daria um resultado falso. O teste usa o motor de regras.</li>
+      <li>A lista de ativos é a de hoje: empresas que quebraram ficaram de fora (viés de sobrevivência).</li>
+      <li>Valores antes do imposto de renda. A coluna de IR mostra só o imposto das vendas feitas no caminho; o IR do resgate no fim (renda fixa e ganhos ainda não vendidos) não está nela, por isso o CDI aparece com zero.</li>
+      <li>O filtro de liquidez (volume negociado por dia) não roda no passado, porque a fonte não guarda o volume antigo.</li>
+      <li>A expectativa de inflação da época foi aproximada pelo IPCA dos 12 meses anteriores, e a simulação de 2.000 cenários e a reserva de emergência ficaram de fora.</li>
+      <li>O passado não garante o futuro.</li></ul></details>
+  </div>`;
 }
 
 /* ---------- gastos do dia a dia (lançamentos, categorias e limites) ---------- */
@@ -1645,6 +1734,7 @@ function renderInvestir() {
   if (!p) { el.innerHTML = st.portErr ? `<div class="card err-box">${esc(st.portErr)}</div>` : `<div class="card">${busy(portMsg())}${sk(5)}</div>`; return; }
   const grupos = CL.map(k => [k, p.sugerida.filter(s => s.classe === k)]).filter(([, g]) => g.length);
   el.innerHTML = `${objetivoHtml()}
+  <div id="estrCard">${estrHtml()}</div>
   <div class="grid2 top">
     <div class="card sticky">
       <h2>Quanto você quer investir agora?</h2>
@@ -1663,7 +1753,7 @@ function renderInvestir() {
       <div class="btns"><button class="btn" type="button" id="btnCopy">Copiar plano</button><button class="btn" type="button" onclick="go('sim')">Simular resultado</button></div>
     </div>
     <div class="card">
-      <h2>Carteira recomendada ${p.fonte === 'ia' ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Regras + dados')}</h2>
+      <h2>${p.fonte === 'estrategia' ? `Carteira da estratégia ${esc(p.estrategia.nome)} ${pill('info', '', 'Divisão fixa')}` : `Carteira recomendada ${p.fonte === 'ia' ? pill('info', 'spark', 'IA + dados') : pill('', '', 'Regras + dados')}`}</h2>
       <p class="lead sm">${esc(p.resumo || '')}</p>
       ${p.auditoria?.ia_reprovada ? `<div class="note warn">${ICON.warn}<div><b>A IA sugeriu uma carteira que não passou na auditoria</b>, por isso esta é a carteira das regras. Motivo: ${esc(p.auditoria.ia_reprovada.motivos.join(' '))}</div></div>` : ''}
       ${p.mudancas ? `<div class="note">${ICON.info}<div><b>Desde a última recomendação:</b> ${esc(p.mudancas)}</div></div>` : ''}
@@ -1683,7 +1773,7 @@ function renderInvestir() {
             `${s.preco ? `<span>Preço <b>${M(s.preco, s.moeda)}</b></span>` : ''}<span>12 meses <b>${P(s.ret_12m)}</b></span>${s.dy_12m ? `<span>Dividendos <b>${P(s.dy_12m, 1, false)}</b></span>` : ''}${s.vol_aa != null ? `<span>Oscilação <b>${P(s.vol_aa, 0, false)}</b></span>` : ''}`}</div>
           ${s.novo ? `<div class="btns" style="margin-top:10px"><button class="btn sm" type="button" data-follow="${esc(s.ticker)}">${extra.includes(s.ticker) || st.an[s.ticker] ? 'Acompanhando ✓' : 'Acompanhar em Meus ativos'}</button></div>` : ''}
         </div>`).join('')}`).join('')}
-      <p class="mut xs">A IA escolhe só entre ativos amplos e líquidos de uma lista fixa (ou os que você já tem), com métricas calculadas a partir do histórico real. Pesquise cada um antes de investir.</p>
+      <p class="mut xs">${p.fonte === 'estrategia' ? 'Cada parte da estratégia é seguida com um ETF amplo ou um título público, os mesmos usados no teste com o passado.' : 'A IA escolhe só entre ativos amplos e líquidos de uma lista fixa (ou os que você já tem), com métricas calculadas a partir do histórico real.'} Pesquise cada um antes de investir.</p>
     </div>
   </div>
   ${auditoriaHtml(p)}`;
@@ -1695,6 +1785,77 @@ function renderInvestir() {
   $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
   $('#btnCopy', el).onclick = copyPlan;
   bindObjetivo(el);
+  ligarEstr();
+  if (!st.estr.busy && (!st.estr.dados || st.estr.perfil !== perfilEf())) loadEstr();
+}
+
+/* ---------- estratégia: a recomendada pelo app, o modelo do perfil só com ETFs ou um plano consagrado ---------- */
+st.estr = {perfil: null, dados: null, err: null, busy: false, aberto: false};
+const perfilEf = () => PERFIS[perfil] ? perfil : 'moderado';
+async function loadEstr() {
+  const pf = perfilEf();
+  st.estr.busy = true; st.estr.err = null; st.estr.perfil = pf; st.estr.dados = null; renderEstr();
+  try { const d = await api('/api/estrategias?perfil=' + pf); if (st.estr.perfil === pf) st.estr.dados = d; }
+  catch (e) { st.estr.err = e.message; }
+  st.estr.busy = false; renderEstr();
+}
+function renderEstr() { const el = $('#estrCard'); if (el) { el.innerHTML = estrHtml(); ligarEstr(); } }
+function ligarEstr() {
+  $$('#estrCard [data-estr]').forEach(b => b.onclick = ev => { ev.preventDefault(); escolherEstr(b.dataset.estr); });
+  const dt = $('#estrCard details.estr-lista'); if (dt) dt.ontoggle = () => { st.estr.aberto = dt.open; };
+}
+function escolherEstr(id) {
+  if (id === estrategia) return;
+  const e = st.estr.dados?.estrategias.find(x => x.id === id);
+  estrategia = id; sv(); st.estr.aberto = false;
+  toast(`Estratégia: ${e ? e.nome : 'Recomendada pelo app'}`);
+  st.simul.dados && renderSimul();
+  loadPort(true);
+}
+const barraClasses = cls => {
+  const it = CL.filter(c => cls[c] > 0);
+  return `<span class="cbar" role="img" aria-label="${esc(it.map(c => `${N(cls[c], 0)}% ${CLN[c]}`).join(', '))}">${it.map(c => `<i style="width:${cls[c]}%;background:var(--c-${c})"></i>`).join('')}</span>
+    <span class="cleg">${it.map(c => `<span>${dot(c)}${N(cls[c], 0)}% ${esc(CLN[c])}</span>`).join('')}</span>`;
+};
+function estrItem(e, d, pode, motivo) {
+  const sel = e.id === estrategia, sim = d.simulador?.linhas?.[e.id], reais = v => M(v).replace(/,00$/, '');
+  return `<button type="button" class="estr${sel ? ' sel' : ''}" ${pode ? `data-estr="${esc(e.id)}" aria-pressed="${sel}"` : 'disabled'}>
+    <span class="estr-h"><b>${esc(e.nome)}</b>${e.id === 'app' ? pill('info', '', 'Padrão') : ''}${sel ? pill('good', 'check', 'Sua escolha') : ''}</span>
+    <span class="mut xs">${esc(e.autor)}</span>
+    ${barraClasses(e.classes)}
+    <span class="sm ink2">${esc(e.ideia)}</span>
+    <span class="estr-n"><span><b>${P(e.ret_aa, 1, false)}</b> ao ano</span><span>maior queda <b>${P(e.maior_queda, 0)}</b></span>
+      ${e.pior_crise ? `<span>pior crise <b>${P(e.pior_crise[1], 0)}</b> (${esc(e.pior_crise[0])})</span>` : ''}
+      ${sim ? `<span>no simulador: <b>${reais(sim.final)}</b></span>` : ''}</span>
+    ${motivo ? `<span class="estr-motivo">${ICON.warn}<span>${esc(motivo)}</span></span>` : ''}
+  </button>`;
+}
+function estrHtml() {
+  const S = st.estr, d = S.dados, p = st.port, info = p?.estrategia;
+  const atual = d?.estrategias.find(e => e.id === estrategia);
+  const nomeAtual = info?.nome || atual?.nome || 'Recomendada pelo app';
+  const curto = p?.objetivo_analise?.liquidez === 'ALTA';
+  const motivoDe = e => !e.cabe ? e.motivo_nao_cabe : (curto && e.tipo !== 'app' && e.classes.renda_fixa < 85)
+    ? `Tem ${N(e.classes.renda_fixa, 0)}% em renda fixa: para dinheiro que você vai usar em até 2 anos, o mínimo é 85%.` : '';
+  let corpo;
+  if (!d) corpo = S.err ? `<p class="err-box">${esc(S.err)}</p><div class="btns"><button class="btn sm" type="button" onclick="loadEstr()">Tentar de novo</button></div>`
+    : busy('Testando as estratégias com o passado…');
+  else {
+    const usaveis = d.estrategias.filter(e => !motivoDe(e)), fora = d.estrategias.filter(e => motivoDe(e));
+    const sm = d.simulador;
+    corpo = `<details class="estr-lista" ${S.aberto ? 'open' : ''}><summary>Ver e escolher entre ${usaveis.length} estratégias que cabem no seu perfil</summary>
+      <div class="estr-grid">${usaveis.map(e => estrItem(e, d, true, '')).join('')}</div>
+      ${fora.length ? `<details class="estr-fora"><summary>${fora.length} ${fora.length === 1 ? 'não cabe' : 'não cabem'} no seu perfil${curto ? ' ou no prazo do seu objetivo' : ''}</summary>
+        <div class="estr-grid">${fora.map(e => estrItem(e, d, false, motivoDe(e))).join('')}</div></details>` : ''}
+      <p class="mut xs" style="margin-top:10px">Números do teste com o passado de ${esc(d.periodo.desde)} a ${esc(d.periodo.ate)}, todas do mesmo jeito: rebalanceando uma vez por ano, sem custos e sem imposto. “Pior crise” é quanto teria caído na pior das crises reais testadas (2008, 2015, 2020…).${sm ? ` “No simulador” é quanto teria juntado quem começasse com ${M(sm.inicial).replace(/,00$/, '')} em ${esc(sm.desde)} e aplicasse ${M(sm.mensal).replace(/,00$/, '')} por mês até ${esc(sm.ate)}, com custos (detalhes em Mercado, Simulador do passado).` : ''} Só podem ser escolhidas as que, nesse teste, não caíram mais do que o perfil ${esc(PERFIS[d.perfil]?.[0].toLowerCase() || d.perfil)} aceita (${N(Math.abs(d.limite), 0)}%). O passado não garante o futuro.</p>
+    </details>`;
+  }
+  return `<div class="card">
+    <h2>Sua estratégia</h2>
+    <p class="lead sm" style="margin-bottom:6px">Você está seguindo <b>${esc(nomeAtual)}</b>${estrategia === 'app' ? ': o app parte do modelo do seu perfil e escolhe os ativos, com auditoria.' : '.'} Você pode trocar por outra que caiba no seu perfil, como um plano consagrado de divisão fixa.</p>
+    ${info && !info.seguida ? `<div class="note warn">${ICON.warn}<div><b>Não deu para seguir ${esc(info.nome)}.</b> ${esc(info.motivo || '')}${estrategia !== 'app' ? ' <a href="#" data-estr="app">Voltar para a recomendada</a>' : ''}</div></div>` : ''}
+    ${corpo}
+  </div>`;
 }
 const prazoTxt = a => a < 1 ? `${Math.max(1, Math.round(a * 12))} meses` : `${N(a, a % 1 ? 1 : 0)} ${a === 1 ? 'ano' : 'anos'}`;
 const metaPrincipal = () => (st.port?.objetivo_analise?.metas || []).find(m => m.valor_alvo > 0 || m.prazo_anos > 0) || null;
@@ -2025,9 +2186,148 @@ function renderMercado() {
   <div class="sect-t">Ranking de ações e FIIs</div>
   <div id="rankCard">${rankHtml()}</div>
   <div class="sect-t">Confiabilidade</div>
-  <div id="acertos">${acertosHtml()}</div>`;
+  <div id="acertos">${acertosHtml()}</div>
+  <div class="sect-t">Simulador do passado</div>
+  <div id="simulCard">${simulHtml()}</div>
+  <div class="sect-t">Corretora simulada</div>
+  <div id="corrCard">${corrHtml()}</div>`;
   ligarRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo);
+  ligarSimul(); if (!st.simul.dados && !st.simul.busy) loadSimul();
+  ligarCorr(); if (!st.corr.dados && !st.corr.busy) loadCorr();
 }
+
+/* ---------- corretora simulada: o app numa conta de corretora, dia a dia, com dados reais ---------- */
+st.corr = {perfil: null, est: null, dados: null, err: null, busy: false};
+async function loadCorr() {
+  st.corr.busy = true; st.corr.err = null; renderCorr();
+  try { st.corr.dados = await api('/api/corretora'); } catch (e) { st.corr.err = e.message; }
+  st.corr.busy = false; renderCorr();
+}
+function renderCorr() { const el = $('#corrCard'); if (el) { el.innerHTML = corrHtml(); ligarCorr(); } }
+function ligarCorr() {
+  $$('#corrCard [data-cp]').forEach(b => b.onclick = () => { st.corr.perfil = b.dataset.cp; st.corr.est = null; renderCorr(); });
+  const sel = $('#corrEst'); if (sel) sel.onchange = () => { st.corr.est = sel.value; renderCorr(); };
+}
+function corrHtml() {
+  const C = st.corr, d = C.dados;
+  if (!d) return `<div class="card"><h2>E se você tivesse seguido o app numa corretora?</h2>${C.err ? `<p class="err-box">${esc(C.err)}</p><div class="btns"><button class="btn" type="button" onclick="loadCorr()">Tentar de novo</button></div>`
+    : busy('Executando as ordens dia a dia desde 2013… na primeira vez pode levar alguns minutos') + sk(4)}</div>`;
+  const perf = C.perfil || (d.perfis[perfil] ? perfil : 'moderado'), px = d.perfis[perf];
+  if (!px) return '';
+  const nomes = {app: 'Recomendada pelo app', fixo: 'Modelo do perfil, só ETFs e títulos', ...d.nomes};
+  const minha = estrategia === 'modelo_fixo' ? 'fixo' : estrategia;
+  const est = C.est || (px[minha] || d.planos[minha] ? minha : 'app');
+  const x = px[est] || d.planos[est], cdi = d.planos.cdi;
+  if (!x) return '';
+  const reais = v => M(v).replace(/,00$/, ''), dif = x.final - cdi.final;
+  const serie = {datas: x.curva.datas.map(m => m + '-15'), est: x.curva.patrimonio.map((v, i) => v / x.curva.aplicado[i] * 100),
+    cdi: cdi.curva.patrimonio.map((v, i) => v / cdi.curva.aplicado[i] * 100)};
+  const pad = (d.padroes || {})[perf];
+  const linha = (k, v, sub) => `<div class="rep-l"><span>${k}</span><b class="tn">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const opc = [['app', nomes.app], ['fixo', nomes.fixo], ...Object.keys(d.planos).map(k => [k, nomes[k] || k])];
+  const tipo = {C: 'Compra', V: 'Venda'};
+  return `<div class="card">
+    <h2>E se você tivesse seguido o app numa corretora?</h2>
+    <div class="chips" role="group" aria-label="Perfil" style="margin-top:8px">${Object.keys(d.perfis).map(p => `<button type="button" data-cp="${p}" aria-pressed="${p === perf}">${esc(PERFIS[p]?.[0] || p)}</button>`).join('')}</div>
+    <label class="fld" style="margin-top:10px"><span>Estratégia</span><div class="inp"><select id="corrEst">${opc.map(([k, n]) => `<option value="${esc(k)}" ${k === est ? 'selected' : ''}>${esc(n)}${k === minha ? ' (a sua)' : ''}</option>`).join('')}</select></div></label>
+    <p class="lead sm" style="margin-top:8px">Começando com ${reais(d.inicial)} em ${esc(d.desde)} e aplicando ${reais(d.mensal)} por mês até ${esc(d.ate)}. Cada decisão do fim do mês virou ordens no pregão seguinte, pelo preço real do dia, em quantidades inteiras de cotas, com os custos da B3, a custódia do Tesouro, os proventos caindo na conta e o imposto de renda pago como a Receita manda.</p>
+    ${d.aproximado && d.aproximado.length ? `<div class="note warn">${ICON.warn}<div>O Banco Central não respondeu agora; ${esc(d.aproximado.join(' e '))} da época foram aproximados. O teste é refeito na próxima vez.</div></div>` : ''}
+    <div class="tiles"><div class="tile main"><div class="l">Patrimônio final</div><div class="v tn">${reais(x.final)}</div><div class="d">${P(x.tir_aa, 1, false)} ao ano sobre ${reais(x.aplicado)} aplicados</div></div>
+      <div class="tile"><div class="l">Lucro líquido</div><div class="v tn ${cl(x.lucro)}">${reais(x.lucro)}</div><div class="d">já descontados custos e imposto pago</div></div>
+      <div class="tile"><div class="l">Contra o CDI</div><div class="v tn ${cl(dif)}">${dif >= 0 ? '+' : '−'}${reais(Math.abs(dif))}</div><div class="d">100% CDI na mesma corretora: ${reais(cdi.final)}</div></div></div>
+    ${linhaSvg(serie, [['est', nomes[est] || est, 'var(--acc)'], ['cdi', '100% CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
+    <h3>Relatório do teste</h3>
+    <div class="rep">
+      ${linha('Retorno 2013 a 2019', P(x.metade1_aa, 1, false) + ' ao ano')}${linha('Retorno 2020 até hoje', P(x.metade2_aa, 1, false) + ' ao ano')}
+      ${linha('Maior queda, dia a dia', P(x.maior_queda, 1), `de ${esc(x.queda_de)} a ${esc(x.queda_ate)}`)}${linha('Ordens executadas', N(x.ordens), `${N(x.compras)} compras e ${N(x.vendas)} vendas`)}
+      ${linha('Vendas com lucro', `${N(x.vendas_com_lucro)} de ${N(x.vendas_com_lucro + x.vendas_com_prejuizo)}`, x.fator_lucro ? `fator de lucro ${N(x.fator_lucro, 2)} (ganhos ÷ perdas)` : x.vendas ? 'nenhuma venda com prejuízo' : 'sem vendas')}
+      ${linha('Lucro e prejuízo nas vendas', `${reais(x.lucro_bruto)} / ${reais(x.prejuizo_bruto)}`, `maior ganho ${reais(x.maior_ganho)}, maior perda ${reais(x.maior_perda)}`)}
+      ${linha('Proventos recebidos', reais(x.proventos), 'dividendos e rendimentos que caíram na conta')}${linha('Custos', reais(x.custos + x.custodia), `${reais(x.custos)} de B3 e câmbio, ${reais(x.custodia)} de custódia do Tesouro`)}
+      ${linha('Imposto de renda pago', reais(x.ir_pago), 'nas vendas e resgates, no caminho')}${linha('Imposto se resgatasse tudo hoje', reais(x.ir_se_resgatar), 'estimativa sobre o lucro ainda não realizado')}
+    </div>
+    <div class="note ${pad && pad.id !== 'app' ? 'good' : ''}">${pad && pad.id !== 'app' ? ICON.check : ICON.info}<div><b>Garantia de melhor decisão:</b> ${pad && pad.id !== 'app' ? esc(pad.texto || '') : `nenhuma estratégia que este perfil pode escolher rendeu mais que a recomendada nas duas metades do período (2013 a 2019 e 2020 até hoje), com queda parecida ou menor, nos dois testes com dados reais (este e o simulador mês a mês). Se isso acontecer, a recomendada passa a seguir a vencedora e a tela avisa. A conferência é refeita toda semana.`}</div></div>
+    <details style="margin-top:8px"><summary>Últimas ordens</summary><div class="scroll-x"><table class="tbl"><thead><tr><th>Data</th><th>Ativo</th><th>Ordem</th><th>Quantidade</th><th>Preço</th><th>Valor</th></tr></thead><tbody>
+      ${x.ultimas_ordens.slice().reverse().slice(0, 15).map(o => `<tr><td>${esc(new Date(o[0] + 'T12:00:00').toLocaleDateString('pt-BR'))}</td><td>${esc(rot(o[1]))}</td><td>${tipo[o[2]] || o[2]}</td><td>${N(o[3], o[3] % 1 ? 4 : 0)}</td><td>${M(o[4])}</td><td>${M(o[5])}</td></tr>`).join('')}</tbody></table></div></details>
+    <details style="margin-top:8px"><summary>Posição no fim do teste</summary><div class="scroll-x"><table class="tbl"><thead><tr><th>Ativo</th><th>Quantidade</th><th>Valor</th></tr></thead><tbody>
+      ${x.posicao_final.map(q => `<tr><td>${esc(rot(q[0]))}</td><td>${N(q[1], q[1] % 1 ? 4 : 0)}</td><td>${reais(q[2])}</td></tr>`).join('')}</tbody></table></div></details>
+    <details style="margin-top:8px"><summary>Como esta corretora funciona e limites</summary><ul class="ink2 sm" style="padding-left:18px">
+      <li>O app decide no último dia de cada mês só com os dados daquela data; as ordens saem no fechamento do pregão seguinte.</li>
+      <li>Ações, FIIs e ETFs em quantidades inteiras (mercado fracionário), pelo preço de tela da época, com 0,03% de emolumentos e 0,05% de diferença entre compra e venda; corretagem zero. Antes de um ETF existir, vale o índice que ele segue.</li>
+      <li>Tesouro Selic e CDB rendem o CDI; LCI/LCA, 90% do CDI sem imposto; Tesouro IPCA+ segue o IMA-B 5+; custódia do Tesouro de 0,20% ao ano; dólar com 0,5% de câmbio por operação.</li>
+      <li>Imposto: ações 15% sobre o lucro do mês quando as vendas passam de R$ 20 mil; ETFs 15% e FIIs 20% sempre; prejuízo compensado depois; Tesouro e CDB pela tabela regressiva; LCI/LCA isenta.</li>
+      <li>Dia a dia, as quedas aparecem maiores que no teste mês a mês (por exemplo, em março de 2020), porque as cotações oscilam dentro do mês.</li>
+      <li>A IA não entra (ela já sabe o que aconteceu depois), e a lista de ativos é a de hoje. O passado não garante o futuro.</li></ul></details>
+  </div>`;
+}
+
+/* ---------- quanto a pessoa ganha com cada FII e ação (proventos por mês) ---------- */
+const pulouRenda = () => ld(U('renda_pulado'), []);
+const pagaProventos = (t, classe) => ['acao', 'fii'].includes(classe || st.an[t]?.classe) && !/^ETF/.test(st.uni[t]?.setor || '');  // ETF não distribui
+const rendaEst = t => { const a = st.an[t], dy = a?.metricas?.dividend_yield_12m; return a && dy ? dy / 100 * a.valor / 12 : null; };
+function rendaLinha(a) {
+  const p = pos[a.ticker] || {}, r = p.renda, est = rendaEst(a.ticker), custo = (p.qtd || 0) * (p.pm || 0);
+  return `<p class="ink2 sm renda-linha">${r > 0
+    ? `Você recebe <b>${M(r)}</b> por mês de proventos${custo ? ` (${P(r * 12 / custo * 100, 1, false)} ao ano sobre o que pagou)` : ''}${est ? `; pelo histórico de 12 meses, cerca de ${M(est)}` : ''}${est && Math.abs(r - est) > 0.3 * Math.max(r, est) ? ' (bem diferente: confira)' : ''}. <a href="#" data-renda-edit="${esc(a.ticker)}">Alterar</a>`
+    : `Quanto você recebe por mês com ele?${est ? ` Pelo histórico de 12 meses, seria cerca de ${M(est)}.` : ''} <a href="#" data-renda-edit="${esc(a.ticker)}">Informar</a>`}</p>`;
+}
+function rendaHtml() {
+  const ts = Object.keys(pos).filter(t => pos[t]?.qtd > 0 && st.an[t] && pagaProventos(t));
+  if (!ts.length) return '';
+  const falta = ts.filter(t => !(pos[t].renda > 0) && !pulouRenda().includes(t)), inf = ts.filter(t => pos[t].renda > 0);
+  const totInf = inf.reduce((x, t) => x + pos[t].renda, 0), totEst = ts.reduce((x, t) => x + (rendaEst(t) || 0), 0);
+  const val = ts.reduce((x, t) => x + (st.an[t]?.pl_atual || 0), 0);
+  if (!falta.length) return inf.length ? `<div class="card"><h2>Quanto você ganha com FIIs e ações</h2>
+    <p class="lead sm">Proventos: você informou <b>${M(totInf)}</b> por mês${totEst ? ` (pelo histórico de 12 meses, seriam cerca de ${M(totEst)})` : ''}. Valorização das cotas até hoje: <b class="${cl(val)}">${M(val)}</b>. Antes de sugerir uma venda, o app mostra quanto de renda você deixaria de receber.</p>
+    <div class="btns"><button class="btn sm" type="button" id="rendaRevisar">Revisar os valores</button></div></div>` : '';
+  return `<div class="card">
+    <h2>Quanto você está ganhando com cada FII e ação?</h2>
+    <p class="lead sm">Conte quanto recebe por mês de proventos (dividendos e rendimentos) de cada um. O app compara com o que o histórico indica e, antes de sugerir uma venda, mostra quanto de renda você deixaria de receber.</p>
+    <div class="renda-lista">${falta.map(t => { const est = rendaEst(t), a = st.an[t]; return `<label class="renda-item"><span class="renda-nm"><b>${esc(rot(t))}</b><small>${a?.pl_atual != null && a.posicao?.qtd ? `valorização ${M(a.pl_atual)} (${P(a.pl_pct)})` : ''}${est ? `${a?.pl_atual != null ? ' · ' : ''}pelo histórico ≈ ${M(est)} por mês` : ''}</small></span>
+      <span class="inp renda-inp"><i>R$</i><input inputmode="decimal" data-renda="${esc(t)}" placeholder="0,00" aria-label="Proventos por mês de ${esc(rot(t))}"></span></label>`; }).join('')}</div>
+    <p class="mut xs">FIIs costumam pagar todo mês; ações, algumas vezes por ano: use a média por mês. Deixe em branco o que não souber.</p>
+    <div class="btns"><button class="btn primary sm" type="button" id="rendaSalvar">Salvar</button><button class="btn sm ghost" type="button" id="rendaPular">Agora não</button></div>
+  </div>`;
+}
+function renderRenda() {
+  const el = $('#rendaCard'); if (!el) return;
+  el.innerHTML = rendaHtml();
+  $('#rendaSalvar', el)?.addEventListener('click', () => {
+    const pul = pulouRenda();
+    $$('[data-renda]', el).forEach(i => { const t = i.dataset.renda, v = num(i.value);
+      if (v > 0 && pos[t]) pos[t].renda = Math.round(v * 100) / 100; else if (!pul.includes(t)) pul.push(t); });
+    rawSet(U('renda_pulado'), JSON.stringify(pul)); salvarRenda();
+  });
+  $('#rendaPular', el)?.addEventListener('click', () => {
+    rawSet(U('renda_pulado'), JSON.stringify([...new Set([...pulouRenda(), ...$$('[data-renda]', el).map(i => i.dataset.renda)])])); renderRenda();
+  });
+  $('#rendaRevisar', el)?.addEventListener('click', revisarRenda);
+}
+function salvarRenda(ts) {
+  sv(); renderRenda();
+  (ts || Object.keys(pos)).forEach(t => { const c = document.getElementById('r-' + t); if (c && st.an[t]) c.outerHTML = card(st.an[t]); });
+  posChanged(); toast('Proventos salvos');
+}
+async function revisarRenda() {
+  const ts = Object.keys(pos).filter(t => pos[t]?.qtd > 0 && st.an[t] && pagaProventos(t));
+  const v = await ask({title: 'Proventos por mês', desc: 'Quanto você recebe por mês, em média, de cada um. Deixe vazio o que não souber.',
+    fields: ts.map(t => ({name: 'r_' + t, label: rot(t), prefix: 'R$', mode: 'decimal', value: pos[t].renda ? N(pos[t].renda, 2) : '',
+      ph: '0,00', hint: rendaEst(t) ? `Pelo histórico de 12 meses, cerca de ${M(rendaEst(t))} por mês.` : ''})),
+    validate: v => ts.some(t => v['r_' + t].trim() && (isNaN(num(v['r_' + t])) || num(v['r_' + t]) < 0)) ? 'Use números (ou deixe vazio).' : ''});
+  if (!v) return;
+  ts.forEach(t => { const r = num(v['r_' + t]); if (r > 0) pos[t].renda = Math.round(r * 100) / 100; else delete pos[t].renda; });
+  salvarRenda(ts);
+}
+async function editarRenda(t) {
+  const est = rendaEst(t);
+  const v = await ask({title: `Proventos de ${rot(t)}`, desc: 'Quanto você recebe por mês, em média, de dividendos ou rendimentos deste ativo.',
+    fields: [{name: 'r', label: 'Por mês', prefix: 'R$', mode: 'decimal', value: pos[t]?.renda ? N(pos[t].renda, 2) : '', ph: '0,00',
+      hint: est ? `Pelo histórico de 12 meses, cerca de ${M(est)} por mês.` : 'FIIs costumam pagar todo mês; ações, algumas vezes por ano.'}],
+    validate: v => v.r.trim() && (isNaN(num(v.r)) || num(v.r) < 0) ? 'Use um número (ou deixe vazio).' : ''});
+  if (!v || !pos[t]) return;
+  const r = num(v.r); if (r > 0) pos[t].renda = Math.round(r * 100) / 100; else delete pos[t].renda;
+  salvarRenda([t]);
+}
+document.addEventListener('click', e => { const a = e.target.closest('[data-renda-edit]'); if (a) { e.preventDefault(); editarRenda(a.dataset.rendaEdit); } });
 
 /* ---------- Meus ativos ---------- */
 const rmBtn = t => extra.includes(t) ? `<button class="btn sm ghost" type="button" onclick="rm('${t}')">Remover</button>` : '';
@@ -2050,6 +2350,7 @@ function card(a) {
       ${spark(m.serie, 72, 28)}<div class="px">${M(m.preco, mo)}<small class="${cl(m.ret_1m)}">${P(m.ret_1m)} no mês</small></div></div>
     <div class="pl tn ${cl(a.pl_atual)}">${p.qtd ? `${a.pl_atual > 0 ? '+' : ''}${M(a.pl_atual, mo)} <span class="mut" style="font-size:15px;font-weight:500">${P(a.pl_pct)}</span>` : '<span class="mut" style="font-size:16px;font-weight:500">Sem posição</span>'}</div>
     <div class="mut sm">${p.qtd ? `${N(p.qtd, 4)} ${a.classe === 'cambio' && a.ticker === 'DOLAR' ? 'dólares' : 'cotas'} · preço médio ${M(p.pm, mo)} · total ${M(a.valor, mo)}` : 'Use “Editar posição” para informar o que você tem'}</div>
+    ${pagaProventos(a.ticker, a.classe) && p.qtd ? rendaLinha(a) : ''}
     <div class="sug">${pill(kd, ic, tx + (a.confianca != null ? ` · ${N(a.confianca)}%` : ''))}<span>${esc(a.sugestao)}</span></div>
     ${a.fonte === 'regras' ? `<p class="mut xs">${st.iaAtiva && premium() ? 'A IA não respondeu agora; ' : ''}análise por regras (tendência, médias móveis, RSI e volatilidade). Notícias não avaliadas.</p>` : consensoHtml(a)}
     <div class="pot"><div>Até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<b class="${cl(a.ganho_pot)}">${M(a.ganho_pot, mo)}</b></div><div>Até o stop (${a.stop ? M(a.stop, mo) : '—'})<b class="${cl(-a.perda_pot)}">${a.perda_pot != null ? M(-a.perda_pot, mo) : '—'}</b></div></div>
@@ -2073,6 +2374,7 @@ async function load(t) {
   if (!el) return;
   try { el.outerHTML = card(await api('/api/analyze', {ticker: t, pos: pos[t] || {}})); }
   catch (e) { el.innerHTML = `<b>${esc(t)}</b> <p class="err-box sm">${esc(e.message)}</p><div class="btns">${rmBtn(t)}</div>`; }
+  renderRenda();
 }
 function addRow(t) {
   const s = document.createElement('section'); s.className = 'card'; s.id = 'r-' + t;
@@ -2108,11 +2410,15 @@ async function edit(t, classe) {
   } else {
     const cur = pos[t] || {};
     if (!premium() && !(cur.qtd > 0) && nPosicoes() >= limiteAtivos()) return abrirPlanos(`No plano grátis dá para acompanhar até ${limiteAtivos()} investimentos com posição. Assine o Premium para registrar todos.`);
+    const prov = pagaProventos(t, classe);
     v = await ask({title: `Editar posição em ${t === 'DOLAR' ? 'dólar' : t}`, fields: [{name: 'q', label: t === 'DOLAR' ? 'Quantos dólares você tem?' : 'Quantidade de cotas', mode: 'decimal', value: cur.qtd ? N(cur.qtd, 6) : ''},
-      {name: 'p', label: 'Preço médio pago', prefix: t === 'VOO' ? 'US$' : 'R$', mode: 'decimal', value: cur.pm ? N(cur.pm, 4) : ''}],
-      validate: v => isNaN(num(v.q)) || num(v.q) < 0 ? 'Informe a quantidade (pode ser 0).' : isNaN(num(v.p)) || num(v.p) < 0 ? 'Informe o preço médio.' : ''});
+      {name: 'p', label: 'Preço médio pago', prefix: t === 'VOO' ? 'US$' : 'R$', mode: 'decimal', value: cur.pm ? N(cur.pm, 4) : ''},
+      ...(prov ? [{name: 'r', label: 'Quanto você recebe de proventos por mês (média)', prefix: 'R$', mode: 'decimal', value: cur.renda ? N(cur.renda, 2) : '',
+        hint: 'Dividendos e rendimentos. FIIs costumam pagar todo mês; ações, algumas vezes por ano: use a média por mês. Deixe vazio se não souber.'}] : [])],
+      validate: v => isNaN(num(v.q)) || num(v.q) < 0 ? 'Informe a quantidade (pode ser 0).' : isNaN(num(v.p)) || num(v.p) < 0 ? 'Informe o preço médio.'
+        : prov && v.r.trim() && (isNaN(num(v.r)) || num(v.r) < 0) ? 'Informe os proventos por mês (ou deixe vazio).' : ''});
     if (!v) return;
-    pos[t] = {qtd: num(v.q), pm: num(v.p)};
+    pos[t] = {qtd: num(v.q), pm: num(v.p), ...(prov && num(v.r) > 0 ? {renda: num(v.r)} : {})};
   }
   sv(); await load(t); posChanged();
 }
@@ -2182,7 +2488,7 @@ $('#btnPerfil').onclick = async () => {
   perfil = v.p; sv(); renderPerfilChip(); loadPort(true);
 };
 async function abrirBackup() {
-  const bk = JSON.stringify({pos, extra, perfil, objetivo});
+  const bk = JSON.stringify({pos, extra, perfil, objetivo, ...(estrategia !== 'app' ? {estrategia} : {})});
   const v = await ask({title: 'Backup e acesso', desc: 'Seus ativos já ficam salvos no servidor do app. Este texto é uma cópia extra: guarde-o em um lugar seguro; para restaurar, cole um backup e toque em Restaurar (ele substitui a carteira salva no servidor).',
     fields: [{name: 'bk', label: 'Backup das posições', type: 'textarea', value: bk}],
     extraHtml: `<p class="mut sm" style="margin:0">Análises: ${st.iaAtiva ? 'com IA (Claude).' : 'por regras, sem IA. Para usar a IA, configure ANTHROPIC_API_KEY no servidor.'}</p>
@@ -2195,6 +2501,7 @@ async function abrirBackup() {
     extra = (b.extra || []).filter(k => OKT.test(k));
     if (['conservador', 'moderado', 'arrojado', 'não informado'].includes(b.perfil)) perfil = b.perfil;
     if (typeof b.objetivo === 'string') objetivo = b.objetivo.slice(0, 600);
+    estrategia = canon(b).estrategia || 'app';
     sv();
     const g = await apiSync('GET').catch(() => null);  // a restauração é uma escolha explícita: substitui a do servidor
     if (g?.status === 200) { salvarSync({...sync, versao: g.j.versao}); syncSt.estado = 'ok'; await enviar(); }
@@ -2214,7 +2521,7 @@ async function loadPort(force) {
   else { renderInvestir(); $$('#t-resumo>*, #t-investir>*').forEach(x => x.classList.add('stale')); $('#t-investir .obj-card')?.classList.remove('stale'); }
   const tick = setInterval(() => { if (!st.port) { const m = $('.loading-msg span:last-child', $('#t-resumo')); if (m) m.textContent = portMsg(); } }, 3000);
   try {
-    const p = await api('/api/portfolio', {pos, perfil, objetivo});
+    const p = await api('/api/portfolio', {pos, perfil, objetivo, estrategia});
     if (my !== st.portReq) return;
     st.port = p;
     const mp = metaPrincipal(), an = p.objetivo_analise;

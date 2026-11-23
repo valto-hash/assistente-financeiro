@@ -24,10 +24,12 @@ def _gravar(uid, d):
     armazem.gravar("memoria", uid, d)
 
 
-def entrada(perfil, objetivo, ativos, orc):
-    """O que levou à recomendação. Se nada disso mudou, a recomendação também não deveria mudar muito."""
+def entrada(perfil, objetivo, ativos, orc, estrategia=None):
+    """O que levou à recomendação. Se nada disso mudou, a recomendação também não deveria mudar muito.
+    estrategia: o nome da estratégia escolhida pela pessoa (None = a recomendada pelo app)."""
     return {"perfil": perfil, "objetivo": " ".join((objetivo or "").split())[:300], "ativos": sorted(ativos),
-            "reserva_meses": orc.get("reserva_meses"), "contas_mensais": round(orc.get("contas_mensais") or 0)}
+            "reserva_meses": orc.get("reserva_meses"), "contas_mensais": round(orc.get("contas_mensais") or 0),
+            **({"estrategia": estrategia} if estrategia else {})}
 
 
 def evento(uid, tipo, texto):
@@ -55,6 +57,9 @@ def _mudancas(ant, atual):
     out = []
     if ant.get("perfil") != atual.get("perfil"):
         out.append(f"perfil mudou de {ant.get('perfil')} para {atual.get('perfil')}")
+    if ant.get("estrategia") != atual.get("estrategia"):
+        out.append(f"a estratégia seguida mudou de {ant.get('estrategia') or 'Recomendada pelo app'} para "
+                   f"{atual.get('estrategia') or 'Recomendada pelo app'}")
     if ant.get("objetivo") != atual.get("objetivo"):
         out.append("o objetivo foi reescrito" if atual.get("objetivo") else "o objetivo foi apagado")
     novos, saiu = sorted(set(atual["ativos"]) - set(ant.get("ativos", []))), sorted(set(ant.get("ativos", [])) - set(atual["ativos"]))

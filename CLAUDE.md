@@ -23,6 +23,9 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `memoria.py` | Memória por usuário: recomendações anteriores e compras/vendas, para a IA ser coerente |
 | `simulacao.py` | Histórico de preços (com limpeza), Monte Carlo, testes de estresse, série IPCA+ longo |
 | `acertos.py` | Quanto o app acerta: teste dos sinais e da escolha de ações com o passado, histórico real |
+| `simulador.py` | Simulador do passado (seguir o app mês a mês desde 2013) e a prova ao vivo mensal |
+| `estrategias.py` | Estratégias que a pessoa pode escolher (recomendada, modelo só com ETFs, planos consagrados) e a regra de melhor decisão |
+| `corretora.py` | Corretora simulada: o app dia a dia com ordens, custos, proventos e IR (estilo testador do MetaTrader) |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
 | `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
@@ -41,6 +44,20 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
    precisa explicar mudanças grandes. Mudança brusca sem motivo vira aviso na auditoria; as regras mantêm o nível
    de risco anterior quando a opção nova não é claramente melhor.
 4. Sinais de compra/venda só viram aviso quando IA e regras concordam.
+5. Mudança em regra de alocação ou escolha de ativos: rode o simulador (`simulador.tudo`) antes e depois e compare com o
+   modelo fixo do perfil. Regra que piora o resultado nos três perfis não entra (foi assim que `AJUSTE_MOMENTO` foi
+   desligado). Cuidado para não ajustar regra até "ganhar no passado": a prova que vale é a ao vivo.
+6. Mudança no modelo de um perfil (`server.PERFIS`): candidatos definidos antes de ver os resultados, escolha só com a
+   primeira metade (2013-2019) e confirmação na segunda (2020-2026), sem arriscar mais que o modelo atual nem passar da
+   pior crise do perfil. Guarde o modelo antigo em `PERFIS_ANTERIOR` (aparece no simulador) e o motivo em
+   `REVISAO_MODELO` (explica a mudança a quem tinha recomendação antiga). Foi assim com os três perfis em nov/2026
+   (`ferramentas/revisar_modelos.py`).
+7. Estratégia escolhida pela pessoa (`estrategias.py`): só pode ser seguida se couber no perfil (maior queda e pior crise
+   real dentro de `PIOR_CRISE`) e passar na auditoria; senão, vale a recomendada e a tela mostra o motivo.
+8. Garantia de melhor decisão (`estrategias.dominantes`, `server._atualizar_padroes`): se uma estratégia disponível vencer
+   a recomendada nas duas metades nos dois testes com dados reais (simulador e corretora), com queda não pior, a
+   recomendada passa a segui-la. Não afrouxe a regra (margem de 0,2 ponto por metade, 1 ponto de queda) para "ganhar
+   no passado".
 
 ## Armadilhas de dados já encontradas (o Yahoo erra)
 
@@ -52,6 +69,11 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
   quando duas contas independentes batem (`fundamentos.indicadores`).
 - Proventos de FIIs com anos faltando no Yahoo: ano zerado entre anos com pagamento é "sem dado".
 - O IPCA do Banco Central (série 433) e o CDI (série 4391) têm limite de 10 anos por consulta.
+- Preço ajustado do Yahoo embute os dividendos pagos depois: para dividend yield de uma data antiga, use o preço de
+  tela reconstruído (`acertos._fator_div`), conferido com o preço sem ajuste. Retornos podem usar o preço ajustado.
+- O IPCA de um mês só é divulgado uns 10 dias depois: em testes com o passado, no fim do mês t vale o IPCA de t-1.
+- Em testes com o passado, nada pode depender de dados posteriores à data (nem o tamanho total da série).
+  `testes/test_simulador.py` confere isso.
 
 ## Fluxo de trabalho
 
