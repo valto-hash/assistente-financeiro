@@ -24,6 +24,7 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `simulacao.py` | Histórico de preços (com limpeza), Monte Carlo, testes de estresse, série IPCA+ longo |
 | `acertos.py` | Quanto o app acerta: teste dos sinais e da escolha de ações com o passado, histórico real |
 | `simulador.py` | Simulador do passado (seguir o app mês a mês desde 2013) e a prova ao vivo mensal |
+| `estrategias.py` | Estratégias que a pessoa pode escolher (recomendada, modelo só com ETFs, planos consagrados) |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
 | `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
@@ -48,7 +49,10 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 6. Mudança no modelo de um perfil (`server.PERFIS`): candidatos definidos antes de ver os resultados, escolha só com a
    primeira metade (2013-2019) e confirmação na segunda (2020-2026), sem arriscar mais que o modelo atual nem passar da
    pior crise do perfil. Guarde o modelo antigo em `PERFIS_ANTERIOR` (aparece no simulador) e o motivo em
-   `REVISAO_MODELO` (explica a mudança a quem tinha recomendação antiga). Foi assim com o conservador em nov/2026.
+   `REVISAO_MODELO` (explica a mudança a quem tinha recomendação antiga). Foi assim com os três perfis em nov/2026
+   (`ferramentas/revisar_modelos.py`).
+7. Estratégia escolhida pela pessoa (`estrategias.py`): só pode ser seguida se couber no perfil (maior queda e pior crise
+   real dentro de `PIOR_CRISE`) e passar na auditoria; senão, vale a recomendada e a tela mostra o motivo.
 
 ## Armadilhas de dados já encontradas (o Yahoo erra)
 

@@ -98,10 +98,10 @@ for p, x in r["perfis"].items():
     ok({"app", "app_antigo", "fixo", "cdi"} <= set(ids) and len(app["serie"]) == len(x["datas"]) and app["investido"] > 0 and app["final"] > 0,
        f"{p}: app, versão antiga, modelo fixo e CDI com o mesmo dinheiro nas mesmas datas")
 xm = r["perfis"]["moderado"]
-ok(xm["total"] == len(xm["linhas"]) - 1 and 1 <= xm["posicao"] <= xm["total"], "a versão antiga do app não entra na contagem de posição")
-xc = r["perfis"]["conservador"]
-ok(any(l["id"] == "fixo_antigo" for l in xc["linhas"]) and xc["total"] == len(xc["linhas"]) - 2 and xc["modelo_anterior"]
-   and not xm.get("modelo_anterior"), "o modelo antigo do conservador aparece para comparação, fora da contagem de posição")
+ok(all(x["total"] == len(x["linhas"]) - 2 and 1 <= x["posicao"] <= x["total"] for x in r["perfis"].values()),
+   "a versão antiga do app e o modelo antigo não entram na contagem de posição")
+ok(all(any(l["id"] == "fixo_antigo" for l in x["linhas"]) and x["modelo_anterior"] == server.PERFIS_ANTERIOR[p]
+       for p, x in r["perfis"].items()), "o modelo antigo de cada perfil aparece para comparação")
 cdi = next(l for l in r["perfis"]["moderado"]["linhas"] if l["id"] == "cdi")
 ok(cdi["maior_queda"] == 0 and cdi["ir_estimado"] == 0, "CDI sem queda e sem IR de vendas (sanidade)")
 

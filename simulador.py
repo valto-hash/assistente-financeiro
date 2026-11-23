@@ -31,7 +31,7 @@ import simulacao as sim
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNIVERSO
 
 INICIO = "2013-01"
-VERSAO = 3               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
+VERSAO = 4               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
 CUSTO = 0.001            # 0,1% por compra ou venda (emolumentos da B3 + diferença entre compra e venda)
 INICIAL, MENSAL = 10000.0, 1000.0
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF
@@ -261,8 +261,18 @@ def _resumo(nome, x, extra=None):
             "serie": [round(v / a * 100, 1) for v, a in zip(x["valores"], np.cumsum(x["aportes"]))]}
 
 
-def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL, anterior=None):
-    """Roda o app e as estratégias de comparação para um perfil. anterior: o modelo do perfil antes de uma revisão."""
+def pesos_plano(pesos):
+    """Pesos por ativo de um plano consagrado (cada componente vira o ativo que a pessoa compra)."""
+    out = {}
+    for k, w in pesos.items():
+        for a, f in COMP_ATIVO[k].items():
+            out[a] = out.get(a, 0) + w * f
+    return out
+
+
+def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL, anterior=None, cabem=None):
+    """Roda o app e as estratégias de comparação para um perfil. anterior: o modelo do perfil antes de uma revisão.
+    cabem: os planos que cabem no perfil pelos critérios da auditoria (queda e crises); sem isso, só pela maior queda."""
     R = d["R"]
 
     app, app_antigo = decisor(d, modelo), decisor(d, anterior or modelo, momento=True, classe_pequena=6)
@@ -275,12 +285,9 @@ def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL, ant
     try:
         ref = referencias.para_perfil(referencias.planos_ref(), limite_queda)
         for p in ref["planos"]:
-            if p["id"] == "cdi" or not p["cabe"]:
+            if p["id"] == "cdi" or not (p["id"] in cabem if cabem is not None else p["cabe"]):
                 continue
-            pesos_p = {}
-            for k, w in p["pesos"].items():
-                for a, f in COMP_ATIVO[k].items():
-                    pesos_p[a] = pesos_p.get(a, 0) + w * f
+            pesos_p = pesos_plano(p["pesos"])
             linhas.append(_resumo(p["nome"], _rodar(d, lambda t, h, pp=pesos_p: pp, inicial, mensal), {"id": p["id"], "plano": True}))
     except Exception as e:
         print("planos no simulador falharam:", repr(e)[:200], flush=True)
@@ -323,11 +330,15 @@ def registrar_vivo(d, perfis):
     t = d["meses"][-1]
     k = t.strftime("%Y-%m")
     reg = (armazem.ler("simulador_vivo", "todos") or {}).get("dados") or {"meses": {}}
+    planos = {p["id"]: pesos_plano(p["pesos"]) for p in referencias.PLANOS}  # as estratégias que a pessoa pode escolher
     if k in reg["meses"]:
+        if "planos" not in reg["meses"][k]:  # o mês seguinte ainda não aconteceu: dá para guardar os planos também
+            reg["meses"][k]["planos"] = planos
+            armazem.gravar("simulador_vivo", "todos", reg)
         return reg
     reg["meses"][k] = {"app": {p: decisor(d, m)(t, {}) for p, m in perfis.items()},
                        "fixo": {p: {a: m[c] * w for c, ws in NUCLEO.items() for a, w in ws.items() if m.get(c)} for p, m in perfis.items()},
-                       "registrado": time.time()}
+                       "planos": planos, "registrado": time.time()}
     armazem.gravar("simulador_vivo", "todos", reg)
     return reg
 
@@ -336,6 +347,8 @@ def resultado_vivo(d, reg, perfis):
     """Quanto renderam, mês a mês, as carteiras guardadas (cada uma vale para o mês seguinte ao do registro)."""
     meses = sorted(reg["meses"])
     out = {p: {"app": 1.0, "fixo": 1.0, "cdi": 1.0} for p in perfis}
+    pl, pl_meses = {}, []
+    rend = lambda pesos, prox: sum(w / (sum(pesos.values()) or 1) * float(d["ret"].at[prox, a]) for a, w in pesos.items() if a in d["ret"])
     usados = []
     for k in meses:
         t = pd.Timestamp(k + "-01") + pd.offsets.MonthEnd(0)
@@ -349,14 +362,19 @@ def resultado_vivo(d, reg, perfis):
                 tot = sum(pesos.values()) or 1
                 out[p][chave] *= 1 + sum(w / tot * float(d["ret"].at[prox, a]) for a, w in pesos.items() if a in d["ret"])
             out[p]["cdi"] *= 1 + float(d["ret"].at[prox, "TESOURO_SELIC"])
+        if reg["meses"][k].get("planos"):
+            pl_meses.append(prox.strftime("%m/%Y"))
+            for pid, pesos in reg["meses"][k]["planos"].items():
+                pl[pid] = pl.get(pid, 1.0) * (1 + rend(pesos, prox))
     return {"desde": meses[0] if meses else None, "meses": usados,
-            "perfis": {p: {k: round((v - 1) * 100, 2) for k, v in x.items()} for p, x in out.items()}}
+            "perfis": {p: {k: round((v - 1) * 100, 2) for k, v in x.items()} for p, x in out.items()},
+            "planos": {pid: round((v - 1) * 100, 2) for pid, v in pl.items()}, "planos_meses": pl_meses}
 
 
-def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL, anteriores=None):
+def tudo(perfis, limites, inicial=INICIAL, mensal=MENSAL, anteriores=None, cabem=None):
     t0 = time.time()
     d = preparar()
-    out = {p: simular(d, p, perfis[p], limites[p], inicial, mensal, (anteriores or {}).get(p)) for p in perfis}
+    out = {p: simular(d, p, perfis[p], limites[p], inicial, mensal, (anteriores or {}).get(p), (cabem or {}).get(p)) for p in perfis}
     vivo = None
     try:
         vivo = resultado_vivo(d, registrar_vivo(d, perfis), perfis)

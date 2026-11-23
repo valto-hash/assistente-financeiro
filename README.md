@@ -70,13 +70,37 @@ O que o simulador mudou: ajustar a alocação pela tendência e pelo juro do mom
 perfis, então foi desligado (`regras.AJUSTE_MOMENTO`); com 4% ou mais em dólar e ouro, a carteira passa a ter os dois.
 A tela mostra também a versão antiga.
 
-O modelo do perfil conservador também foi revisto (nov/2026). O antigo (70% renda fixa, 8% ações, 10% FIIs, 9% exterior,
-3% dólar e ouro) caía 15% na crise de 2008, quase o dobro dos 8% que o perfil aceita. Cinco candidatos foram definidos
-antes de olhar os resultados, a escolha usou só 2013 a 2019 (maior retorno entre os que não arriscam mais que o atual) e a
-confirmação usou 2020 a 2026, que não entrou na escolha. Venceu 70% renda fixa, 7% ações, 3% FIIs, 10% exterior e 10%
-dólar e ouro: de 2013 a 2026, R$ 411.755 contra R$ 382.331 do app antigo (11,1% contra 10,2% ao ano), com maior queda de
-4,8% em vez de 8%, e pior crise de -9,4% (Covid) em vez de -15%. Moderado e arrojado não mudaram. Quem tinha uma
-recomendação feita com o modelo antigo vê o motivo da mudança (`server.REVISAO_MODELO`), e a IA também fica sabendo.
+### Modelos dos perfis (revistos em nov/2026)
+
+Cada perfil tem um modelo de divisão entre as classes (`server.PERFIS`). Os três foram revistos com validação fora da
+amostra (`ferramentas/revisar_modelos.py`): candidatos definidos antes de rodar (o modelo de antes, os planos consagrados
+levados para as classes do app e uma versão "global" do de antes), escolha só com 2013 a 2019 e confirmação com 2020 a
+2026, período que não entrou na escolha. Só é elegível o que aguenta a pior crise real testada dentro do limite do perfil
+(o mesmo critério da auditoria) e não cai mais do que o perfil aceita. Todos rodam com as regras do app.
+
+| Perfil | Antes | Agora | 2013-2026, app com o modelo (R$ 10 mil + R$ 1.000/mês) | Pior crise real |
+|---|---|---|---|---|
+| Conservador | 70% RF, 8% ações, 10% FIIs, 9% exterior, 3% dólar/ouro | 70% RF, 7% ações, 3% FIIs, 10% exterior, 10% dólar/ouro | R$ 385 mil → R$ 412 mil | -15% → -9% |
+| Moderado | 45% RF, 20% ações, 15% FIIs, 15% exterior, 5% dólar/ouro | 45% RF, 17% ações, 8% FIIs, 20% exterior, 10% dólar/ouro | R$ 431 mil → R$ 452 mil | -25% → -19% |
+| Arrojado | 25% RF, 32% ações, 15% FIIs, 22% exterior, 6% dólar/ouro | 40% RF, 30% ações, 30% exterior (a 60/40) | R$ 469 mil → R$ 520 mil | -32% → -26% |
+
+Os modelos antigos de moderado e arrojado teriam caído mais do que esses perfis aceitam na crise de 2008 (18% e 30%).
+O conservador foi revisto em 22/11 (mesmo método, cinco candidatos) e, na rodada de 23/11, continuou o melhor elegível:
+o All Weather rende mais, mas teria caído 11% em 2008. Os resultados dos planos no período inteiro já tinham aparecido no
+simulador antes da revisão; por isso a escolha usa só a primeira metade, e a prova que vale continua sendo a ao vivo.
+Quem tinha uma recomendação feita com o modelo antigo vê o motivo da mudança (`server.REVISAO_MODELO`), e a IA também.
+
+### Escolher a estratégia
+
+Na aba Investir, a pessoa escolhe qual estratégia seguir (`estrategias.py`, `GET /api/estrategias`): a recomendada pelo
+app (padrão), o modelo do perfil só com ETFs e títulos, ou um dos 11 planos consagrados. Cada uma mostra a divisão, a
+ideia, o teste com o passado (mesmo período e mesmo método para todas), a pior crise real e, quando já calculado, o
+resultado no simulador. Só podem ser escolhidas as que cabem no perfil pelos critérios da auditoria (maior queda e pior
+crise dentro do limite); com objetivo de curto prazo, também é preciso ter 85% ou mais em renda fixa. A carteira de uma
+estratégia de divisão fixa não usa IA: é montada com os mesmos ETFs e títulos do teste, passa pela auditoria completa e
+garante a reserva de emergência. Se ela não couber (mudou o perfil, objetivo de curto prazo), vale a recomendada e a tela
+diz o motivo. A escolha fica salva com a carteira no servidor, entra na memória (trocar de estratégia não vira aviso de
+incoerência), aparece destacada no simulador, e a prova ao vivo guarda todo mês também a carteira de cada plano.
 
 Como essas mudanças saíram de testes com o passado, existe a **prova ao vivo**: todo mês
 o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer, e o resultado real aparece depois.
