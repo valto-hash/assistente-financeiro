@@ -24,7 +24,8 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `simulacao.py` | Histórico de preços (com limpeza), Monte Carlo, testes de estresse, série IPCA+ longo |
 | `acertos.py` | Quanto o app acerta: teste dos sinais e da escolha de ações com o passado, histórico real |
 | `simulador.py` | Simulador do passado (seguir o app mês a mês desde 2013) e a prova ao vivo mensal |
-| `estrategias.py` | Estratégias que a pessoa pode escolher (recomendada, modelo só com ETFs, planos consagrados) |
+| `estrategias.py` | Estratégias que a pessoa pode escolher (recomendada, modelo só com ETFs, planos consagrados) e a regra de melhor decisão |
+| `corretora.py` | Corretora simulada: o app dia a dia com ordens, custos, proventos e IR (estilo testador do MetaTrader) |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
 | `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
@@ -53,6 +54,10 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
    (`ferramentas/revisar_modelos.py`).
 7. Estratégia escolhida pela pessoa (`estrategias.py`): só pode ser seguida se couber no perfil (maior queda e pior crise
    real dentro de `PIOR_CRISE`) e passar na auditoria; senão, vale a recomendada e a tela mostra o motivo.
+8. Garantia de melhor decisão (`estrategias.dominantes`, `server._atualizar_padroes`): se uma estratégia disponível vencer
+   a recomendada nas duas metades nos dois testes com dados reais (simulador e corretora), com queda não pior, a
+   recomendada passa a segui-la. Não afrouxe a regra (margem de 0,2 ponto por metade, 1 ponto de queda) para "ganhar
+   no passado".
 
 ## Armadilhas de dados já encontradas (o Yahoo erra)
 

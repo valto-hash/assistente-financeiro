@@ -58,7 +58,7 @@ def _mudancas(ant, atual):
     if ant.get("perfil") != atual.get("perfil"):
         out.append(f"perfil mudou de {ant.get('perfil')} para {atual.get('perfil')}")
     if ant.get("estrategia") != atual.get("estrategia"):
-        out.append(f"a estratégia escolhida mudou de {ant.get('estrategia') or 'Recomendada pelo app'} para "
+        out.append(f"a estratégia seguida mudou de {ant.get('estrategia') or 'Recomendada pelo app'} para "
                    f"{atual.get('estrategia') or 'Recomendada pelo app'}")
     if ant.get("objetivo") != atual.get("objetivo"):
         out.append("o objetivo foi reescrito" if atual.get("objetivo") else "o objetivo foi apagado")

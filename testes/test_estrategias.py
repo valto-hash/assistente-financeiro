@@ -81,7 +81,7 @@ p2 = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "moderado",
 kw = next(k for k in mocks.CALLS if "planejador" in k["system"])
 hist = json.loads(kw["messages"][0]["content"]).get("historico_do_investidor") or {}
 print("   memória:", hist.get("o_que_mudou_desde_entao"))
-ok(any("a estratégia escolhida mudou de " + cabe["nome"] in x for x in hist.get("o_que_mudou_desde_entao", [])),
+ok(any("a estratégia seguida mudou de " + cabe["nome"] in x for x in hist.get("o_que_mudou_desde_entao", [])),
    "voltar para a recomendada: a IA fica sabendo que a estratégia mudou")
 ok(not any(x["id"] == "consistencia" and not x["ok"] for x in p2["auditoria"]["checagens"]),
    "mudar de estratégia não vira aviso de incoerência")

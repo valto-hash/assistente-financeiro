@@ -102,3 +102,41 @@ def lista(perfil, modelo, limite, crises, ref=None):
 
 def resumo_texto(e):
     return ", ".join(f"{_br(v)}% em {NOME_CL[c]}" for c, v in sorted(e["classes"].items(), key=lambda kv: -kv[1]) if v)
+
+
+# ---------------------------------------------------------------- garantia de melhor decisão (ferramentas/melhor_estrategia.py)
+
+MARGEM_METADE, TOLERA_QUEDA = 0.2, 1.0
+
+
+def linhas_testes(sim_perfil, cor, perfil, ids):
+    """O resultado de cada estratégia nos dois testes com dados reais: {id: (linha do simulador, relatório da corretora)}."""
+    sl = {("modelo_fixo" if l["id"] == "fixo" else l["id"]): l for l in (sim_perfil or {}).get("linhas", [])}
+    cp = ((cor or {}).get("perfis") or {}).get(perfil) or {}
+    out = {}
+    for i in ids:
+        c = cp.get("app") if i == PADRAO else cp.get("fixo") if i == "modelo_fixo" else ((cor or {}).get("planos") or {}).get(i)
+        out[i] = (sl.get(i), c)
+    return out
+
+
+def dominantes(rec, linhas):
+    """As estratégias que, nos DOIS testes, renderam mais nas duas metades do período (por MARGEM_METADE ponto ou mais),
+    com maior queda no máximo TOLERA_QUEDA ponto pior e patrimônio final maior que a recomendada. A melhor primeiro."""
+    r = linhas.get(rec)
+    if not r or not all(r):
+        return []
+    out = []
+    for i, c in linhas.items():
+        if i == rec or not all(c):
+            continue
+        ok = all(x.get("metade1_aa") is not None and y.get("metade1_aa") is not None
+                 and x["metade1_aa"] >= y["metade1_aa"] + MARGEM_METADE and x["metade2_aa"] >= y["metade2_aa"] + MARGEM_METADE
+                 and x["maior_queda"] >= y["maior_queda"] - TOLERA_QUEDA and x["final"] > y["final"]
+                 for x, y in zip(c, r))
+        if ok:
+            out.append({"id": i, "simulador": {k: c[0][k] for k in ("final", "metade1_aa", "metade2_aa", "maior_queda")},
+                        "corretora": {k: c[1][k] for k in ("final", "metade1_aa", "metade2_aa", "maior_queda")},
+                        "antes": {"simulador": {k: r[0][k] for k in ("final", "metade1_aa", "metade2_aa", "maior_queda")},
+                                  "corretora": {k: r[1][k] for k in ("final", "metade1_aa", "metade2_aa", "maior_queda")}}})
+    return sorted(out, key=lambda x: -x["corretora"]["final"])

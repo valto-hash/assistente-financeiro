@@ -222,6 +222,18 @@ details[open]>summary::before{transform:rotate(45deg)}
 .cleg{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px;color:var(--ink2)}
 .cleg .dot{margin-right:4px}
 details.estr-fora{margin-top:12px}
+.rep{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0 18px;margin-top:6px}
+.rep-l{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--line2);font-size:14px;min-width:0}
+.rep-l span{color:var(--ink2)}
+.rep-l small{flex-basis:100%;font-size:12px;color:var(--mut)}
+.renda-linha{margin:6px 0 0}
+.renda-lista{display:grid;gap:8px;margin-top:10px}
+.renda-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line2)}
+.renda-nm{min-width:0}.renda-nm small{display:block;color:var(--mut);font-size:12px}
+.renda-inp{flex:0 0 140px;max-width:140px;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--sf);padding:0 10px;min-height:42px}
+.renda-inp i{font-style:normal;color:var(--mut);font-size:14px}
+.renda-inp input{border:0;background:none;padding:9px 6px;width:100%;min-width:0;outline:none;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.renda-inp:focus-within{border-color:var(--acc)}
 .why[open]{background:var(--sf);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 .why p{margin:8px 0;color:var(--ink);font-size:14px}
 .fatos{margin:8px 0}
@@ -517,6 +529,7 @@ body.travado{overflow:hidden}
       <div id="syncInfo" class="sync" aria-live="polite"></div>
       <div class="btns"><button class="btn primary" type="button" id="btnAdd" style="flex:0 1 240px">+ Adicionar ativo</button><button class="btn" type="button" id="btnB3" style="flex:0 1 240px">Importar da B3</button></div>
     </div>
+    <div id="rendaCard"></div>
     <div id="list" class="grid2"></div>
   </section>
   <p class="disc">Ferramenta educacional: sugestões e simulações são estimativas automáticas, não recomendação profissional nem garantia de resultado. Rentabilidade passada não garante rentabilidade futura. Valores antes de impostos e taxas.</p>
@@ -593,7 +606,7 @@ function canon(d) {
   const pp = {};
   Object.keys(d.pos || {}).filter(t => OKT.test(t)).sort().forEach(t => {
     const p = d.pos[t] || {}, o = {};
-    for (const [k, def] of [['qtd', 0], ['pm', 0], ['saldo', 0], ['pct', 100]]) {
+    for (const [k, def] of [['qtd', 0], ['pm', 0], ['saldo', 0], ['pct', 100], ['renda', 0]]) {
       const v = Number(p[k]);
       if (p[k] != null && isFinite(v) && v !== def) o[k] = Math.round(Math.max(v, 0) * 1e6) / 1e6;
     }
@@ -2175,10 +2188,146 @@ function renderMercado() {
   <div class="sect-t">Confiabilidade</div>
   <div id="acertos">${acertosHtml()}</div>
   <div class="sect-t">Simulador do passado</div>
-  <div id="simulCard">${simulHtml()}</div>`;
+  <div id="simulCard">${simulHtml()}</div>
+  <div class="sect-t">Corretora simulada</div>
+  <div id="corrCard">${corrHtml()}</div>`;
   ligarRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo);
   ligarSimul(); if (!st.simul.dados && !st.simul.busy) loadSimul();
+  ligarCorr(); if (!st.corr.dados && !st.corr.busy) loadCorr();
 }
+
+/* ---------- corretora simulada: o app numa conta de corretora, dia a dia, com dados reais ---------- */
+st.corr = {perfil: null, est: null, dados: null, err: null, busy: false};
+async function loadCorr() {
+  st.corr.busy = true; st.corr.err = null; renderCorr();
+  try { st.corr.dados = await api('/api/corretora'); } catch (e) { st.corr.err = e.message; }
+  st.corr.busy = false; renderCorr();
+}
+function renderCorr() { const el = $('#corrCard'); if (el) { el.innerHTML = corrHtml(); ligarCorr(); } }
+function ligarCorr() {
+  $$('#corrCard [data-cp]').forEach(b => b.onclick = () => { st.corr.perfil = b.dataset.cp; st.corr.est = null; renderCorr(); });
+  const sel = $('#corrEst'); if (sel) sel.onchange = () => { st.corr.est = sel.value; renderCorr(); };
+}
+function corrHtml() {
+  const C = st.corr, d = C.dados;
+  if (!d) return `<div class="card"><h2>E se você tivesse seguido o app numa corretora?</h2>${C.err ? `<p class="err-box">${esc(C.err)}</p><div class="btns"><button class="btn" type="button" onclick="loadCorr()">Tentar de novo</button></div>`
+    : busy('Executando as ordens dia a dia desde 2013… na primeira vez pode levar alguns minutos') + sk(4)}</div>`;
+  const perf = C.perfil || (d.perfis[perfil] ? perfil : 'moderado'), px = d.perfis[perf];
+  if (!px) return '';
+  const nomes = {app: 'Recomendada pelo app', fixo: 'Modelo do perfil, só ETFs e títulos', ...d.nomes};
+  const minha = estrategia === 'modelo_fixo' ? 'fixo' : estrategia;
+  const est = C.est || (px[minha] || d.planos[minha] ? minha : 'app');
+  const x = px[est] || d.planos[est], cdi = d.planos.cdi;
+  if (!x) return '';
+  const reais = v => M(v).replace(/,00$/, ''), dif = x.final - cdi.final;
+  const serie = {datas: x.curva.datas.map(m => m + '-15'), est: x.curva.patrimonio.map((v, i) => v / x.curva.aplicado[i] * 100),
+    cdi: cdi.curva.patrimonio.map((v, i) => v / cdi.curva.aplicado[i] * 100)};
+  const pad = (d.padroes || {})[perf];
+  const linha = (k, v, sub) => `<div class="rep-l"><span>${k}</span><b class="tn">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const opc = [['app', nomes.app], ['fixo', nomes.fixo], ...Object.keys(d.planos).map(k => [k, nomes[k] || k])];
+  const tipo = {C: 'Compra', V: 'Venda'};
+  return `<div class="card">
+    <h2>E se você tivesse seguido o app numa corretora?</h2>
+    <div class="chips" role="group" aria-label="Perfil" style="margin-top:8px">${Object.keys(d.perfis).map(p => `<button type="button" data-cp="${p}" aria-pressed="${p === perf}">${esc(PERFIS[p]?.[0] || p)}</button>`).join('')}</div>
+    <label class="fld" style="margin-top:10px"><span>Estratégia</span><div class="inp"><select id="corrEst">${opc.map(([k, n]) => `<option value="${esc(k)}" ${k === est ? 'selected' : ''}>${esc(n)}${k === minha ? ' (a sua)' : ''}</option>`).join('')}</select></div></label>
+    <p class="lead sm" style="margin-top:8px">Começando com ${reais(d.inicial)} em ${esc(d.desde)} e aplicando ${reais(d.mensal)} por mês até ${esc(d.ate)}. Cada decisão do fim do mês virou ordens no pregão seguinte, pelo preço real do dia, em quantidades inteiras de cotas, com os custos da B3, a custódia do Tesouro, os proventos caindo na conta e o imposto de renda pago como a Receita manda.</p>
+    ${d.aproximado && d.aproximado.length ? `<div class="note warn">${ICON.warn}<div>O Banco Central não respondeu agora; ${esc(d.aproximado.join(' e '))} da época foram aproximados. O teste é refeito na próxima vez.</div></div>` : ''}
+    <div class="tiles"><div class="tile main"><div class="l">Patrimônio final</div><div class="v tn">${reais(x.final)}</div><div class="d">${P(x.tir_aa, 1, false)} ao ano sobre ${reais(x.aplicado)} aplicados</div></div>
+      <div class="tile"><div class="l">Lucro líquido</div><div class="v tn ${cl(x.lucro)}">${reais(x.lucro)}</div><div class="d">já descontados custos e imposto pago</div></div>
+      <div class="tile"><div class="l">Contra o CDI</div><div class="v tn ${cl(dif)}">${dif >= 0 ? '+' : '−'}${reais(Math.abs(dif))}</div><div class="d">100% CDI na mesma corretora: ${reais(cdi.final)}</div></div></div>
+    ${linhaSvg(serie, [['est', nomes[est] || est, 'var(--acc)'], ['cdi', '100% CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
+    <h3>Relatório do teste</h3>
+    <div class="rep">
+      ${linha('Retorno 2013 a 2019', P(x.metade1_aa, 1, false) + ' ao ano')}${linha('Retorno 2020 até hoje', P(x.metade2_aa, 1, false) + ' ao ano')}
+      ${linha('Maior queda, dia a dia', P(x.maior_queda, 1), `de ${esc(x.queda_de)} a ${esc(x.queda_ate)}`)}${linha('Ordens executadas', N(x.ordens), `${N(x.compras)} compras e ${N(x.vendas)} vendas`)}
+      ${linha('Vendas com lucro', `${N(x.vendas_com_lucro)} de ${N(x.vendas_com_lucro + x.vendas_com_prejuizo)}`, x.fator_lucro ? `fator de lucro ${N(x.fator_lucro, 2)} (ganhos ÷ perdas)` : x.vendas ? 'nenhuma venda com prejuízo' : 'sem vendas')}
+      ${linha('Lucro e prejuízo nas vendas', `${reais(x.lucro_bruto)} / ${reais(x.prejuizo_bruto)}`, `maior ganho ${reais(x.maior_ganho)}, maior perda ${reais(x.maior_perda)}`)}
+      ${linha('Proventos recebidos', reais(x.proventos), 'dividendos e rendimentos que caíram na conta')}${linha('Custos', reais(x.custos + x.custodia), `${reais(x.custos)} de B3 e câmbio, ${reais(x.custodia)} de custódia do Tesouro`)}
+      ${linha('Imposto de renda pago', reais(x.ir_pago), 'nas vendas e resgates, no caminho')}${linha('Imposto se resgatasse tudo hoje', reais(x.ir_se_resgatar), 'estimativa sobre o lucro ainda não realizado')}
+    </div>
+    <div class="note ${pad && pad.id !== 'app' ? 'good' : ''}">${pad && pad.id !== 'app' ? ICON.check : ICON.info}<div><b>Garantia de melhor decisão:</b> ${pad && pad.id !== 'app' ? esc(pad.texto || '') : `nenhuma estratégia que este perfil pode escolher rendeu mais que a recomendada nas duas metades do período (2013 a 2019 e 2020 até hoje), com queda parecida ou menor, nos dois testes com dados reais (este e o simulador mês a mês). Se isso acontecer, a recomendada passa a seguir a vencedora e a tela avisa. A conferência é refeita toda semana.`}</div></div>
+    <details style="margin-top:8px"><summary>Últimas ordens</summary><div class="scroll-x"><table class="tbl"><thead><tr><th>Data</th><th>Ativo</th><th>Ordem</th><th>Quantidade</th><th>Preço</th><th>Valor</th></tr></thead><tbody>
+      ${x.ultimas_ordens.slice().reverse().slice(0, 15).map(o => `<tr><td>${esc(new Date(o[0] + 'T12:00:00').toLocaleDateString('pt-BR'))}</td><td>${esc(rot(o[1]))}</td><td>${tipo[o[2]] || o[2]}</td><td>${N(o[3], o[3] % 1 ? 4 : 0)}</td><td>${M(o[4])}</td><td>${M(o[5])}</td></tr>`).join('')}</tbody></table></div></details>
+    <details style="margin-top:8px"><summary>Posição no fim do teste</summary><div class="scroll-x"><table class="tbl"><thead><tr><th>Ativo</th><th>Quantidade</th><th>Valor</th></tr></thead><tbody>
+      ${x.posicao_final.map(q => `<tr><td>${esc(rot(q[0]))}</td><td>${N(q[1], q[1] % 1 ? 4 : 0)}</td><td>${reais(q[2])}</td></tr>`).join('')}</tbody></table></div></details>
+    <details style="margin-top:8px"><summary>Como esta corretora funciona e limites</summary><ul class="ink2 sm" style="padding-left:18px">
+      <li>O app decide no último dia de cada mês só com os dados daquela data; as ordens saem no fechamento do pregão seguinte.</li>
+      <li>Ações, FIIs e ETFs em quantidades inteiras (mercado fracionário), pelo preço de tela da época, com 0,03% de emolumentos e 0,05% de diferença entre compra e venda; corretagem zero. Antes de um ETF existir, vale o índice que ele segue.</li>
+      <li>Tesouro Selic e CDB rendem o CDI; LCI/LCA, 90% do CDI sem imposto; Tesouro IPCA+ segue o IMA-B 5+; custódia do Tesouro de 0,20% ao ano; dólar com 0,5% de câmbio por operação.</li>
+      <li>Imposto: ações 15% sobre o lucro do mês quando as vendas passam de R$ 20 mil; ETFs 15% e FIIs 20% sempre; prejuízo compensado depois; Tesouro e CDB pela tabela regressiva; LCI/LCA isenta.</li>
+      <li>Dia a dia, as quedas aparecem maiores que no teste mês a mês (por exemplo, em março de 2020), porque as cotações oscilam dentro do mês.</li>
+      <li>A IA não entra (ela já sabe o que aconteceu depois), e a lista de ativos é a de hoje. O passado não garante o futuro.</li></ul></details>
+  </div>`;
+}
+
+/* ---------- quanto a pessoa ganha com cada FII e ação (proventos por mês) ---------- */
+const pulouRenda = () => ld(U('renda_pulado'), []);
+const pagaProventos = (t, classe) => ['acao', 'fii'].includes(classe || st.an[t]?.classe) && !/^ETF/.test(st.uni[t]?.setor || '');  // ETF não distribui
+const rendaEst = t => { const a = st.an[t], dy = a?.metricas?.dividend_yield_12m; return a && dy ? dy / 100 * a.valor / 12 : null; };
+function rendaLinha(a) {
+  const p = pos[a.ticker] || {}, r = p.renda, est = rendaEst(a.ticker), custo = (p.qtd || 0) * (p.pm || 0);
+  return `<p class="ink2 sm renda-linha">${r > 0
+    ? `Você recebe <b>${M(r)}</b> por mês de proventos${custo ? ` (${P(r * 12 / custo * 100, 1, false)} ao ano sobre o que pagou)` : ''}${est ? `; pelo histórico de 12 meses, cerca de ${M(est)}` : ''}${est && Math.abs(r - est) > 0.3 * Math.max(r, est) ? ' (bem diferente: confira)' : ''}. <a href="#" data-renda-edit="${esc(a.ticker)}">Alterar</a>`
+    : `Quanto você recebe por mês com ele?${est ? ` Pelo histórico de 12 meses, seria cerca de ${M(est)}.` : ''} <a href="#" data-renda-edit="${esc(a.ticker)}">Informar</a>`}</p>`;
+}
+function rendaHtml() {
+  const ts = Object.keys(pos).filter(t => pos[t]?.qtd > 0 && st.an[t] && pagaProventos(t));
+  if (!ts.length) return '';
+  const falta = ts.filter(t => !(pos[t].renda > 0) && !pulouRenda().includes(t)), inf = ts.filter(t => pos[t].renda > 0);
+  const totInf = inf.reduce((x, t) => x + pos[t].renda, 0), totEst = ts.reduce((x, t) => x + (rendaEst(t) || 0), 0);
+  const val = ts.reduce((x, t) => x + (st.an[t]?.pl_atual || 0), 0);
+  if (!falta.length) return inf.length ? `<div class="card"><h2>Quanto você ganha com FIIs e ações</h2>
+    <p class="lead sm">Proventos: você informou <b>${M(totInf)}</b> por mês${totEst ? ` (pelo histórico de 12 meses, seriam cerca de ${M(totEst)})` : ''}. Valorização das cotas até hoje: <b class="${cl(val)}">${M(val)}</b>. Antes de sugerir uma venda, o app mostra quanto de renda você deixaria de receber.</p>
+    <div class="btns"><button class="btn sm" type="button" id="rendaRevisar">Revisar os valores</button></div></div>` : '';
+  return `<div class="card">
+    <h2>Quanto você está ganhando com cada FII e ação?</h2>
+    <p class="lead sm">Conte quanto recebe por mês de proventos (dividendos e rendimentos) de cada um. O app compara com o que o histórico indica e, antes de sugerir uma venda, mostra quanto de renda você deixaria de receber.</p>
+    <div class="renda-lista">${falta.map(t => { const est = rendaEst(t), a = st.an[t]; return `<label class="renda-item"><span class="renda-nm"><b>${esc(rot(t))}</b><small>${a?.pl_atual != null && a.posicao?.qtd ? `valorização ${M(a.pl_atual)} (${P(a.pl_pct)})` : ''}${est ? `${a?.pl_atual != null ? ' · ' : ''}pelo histórico ≈ ${M(est)} por mês` : ''}</small></span>
+      <span class="inp renda-inp"><i>R$</i><input inputmode="decimal" data-renda="${esc(t)}" placeholder="0,00" aria-label="Proventos por mês de ${esc(rot(t))}"></span></label>`; }).join('')}</div>
+    <p class="mut xs">FIIs costumam pagar todo mês; ações, algumas vezes por ano: use a média por mês. Deixe em branco o que não souber.</p>
+    <div class="btns"><button class="btn primary sm" type="button" id="rendaSalvar">Salvar</button><button class="btn sm ghost" type="button" id="rendaPular">Agora não</button></div>
+  </div>`;
+}
+function renderRenda() {
+  const el = $('#rendaCard'); if (!el) return;
+  el.innerHTML = rendaHtml();
+  $('#rendaSalvar', el)?.addEventListener('click', () => {
+    const pul = pulouRenda();
+    $$('[data-renda]', el).forEach(i => { const t = i.dataset.renda, v = num(i.value);
+      if (v > 0 && pos[t]) pos[t].renda = Math.round(v * 100) / 100; else if (!pul.includes(t)) pul.push(t); });
+    rawSet(U('renda_pulado'), JSON.stringify(pul)); salvarRenda();
+  });
+  $('#rendaPular', el)?.addEventListener('click', () => {
+    rawSet(U('renda_pulado'), JSON.stringify([...new Set([...pulouRenda(), ...$$('[data-renda]', el).map(i => i.dataset.renda)])])); renderRenda();
+  });
+  $('#rendaRevisar', el)?.addEventListener('click', revisarRenda);
+}
+function salvarRenda(ts) {
+  sv(); renderRenda();
+  (ts || Object.keys(pos)).forEach(t => { const c = document.getElementById('r-' + t); if (c && st.an[t]) c.outerHTML = card(st.an[t]); });
+  posChanged(); toast('Proventos salvos');
+}
+async function revisarRenda() {
+  const ts = Object.keys(pos).filter(t => pos[t]?.qtd > 0 && st.an[t] && pagaProventos(t));
+  const v = await ask({title: 'Proventos por mês', desc: 'Quanto você recebe por mês, em média, de cada um. Deixe vazio o que não souber.',
+    fields: ts.map(t => ({name: 'r_' + t, label: rot(t), prefix: 'R$', mode: 'decimal', value: pos[t].renda ? N(pos[t].renda, 2) : '',
+      ph: '0,00', hint: rendaEst(t) ? `Pelo histórico de 12 meses, cerca de ${M(rendaEst(t))} por mês.` : ''})),
+    validate: v => ts.some(t => v['r_' + t].trim() && (isNaN(num(v['r_' + t])) || num(v['r_' + t]) < 0)) ? 'Use números (ou deixe vazio).' : ''});
+  if (!v) return;
+  ts.forEach(t => { const r = num(v['r_' + t]); if (r > 0) pos[t].renda = Math.round(r * 100) / 100; else delete pos[t].renda; });
+  salvarRenda(ts);
+}
+async function editarRenda(t) {
+  const est = rendaEst(t);
+  const v = await ask({title: `Proventos de ${rot(t)}`, desc: 'Quanto você recebe por mês, em média, de dividendos ou rendimentos deste ativo.',
+    fields: [{name: 'r', label: 'Por mês', prefix: 'R$', mode: 'decimal', value: pos[t]?.renda ? N(pos[t].renda, 2) : '', ph: '0,00',
+      hint: est ? `Pelo histórico de 12 meses, cerca de ${M(est)} por mês.` : 'FIIs costumam pagar todo mês; ações, algumas vezes por ano.'}],
+    validate: v => v.r.trim() && (isNaN(num(v.r)) || num(v.r) < 0) ? 'Use um número (ou deixe vazio).' : ''});
+  if (!v || !pos[t]) return;
+  const r = num(v.r); if (r > 0) pos[t].renda = Math.round(r * 100) / 100; else delete pos[t].renda;
+  salvarRenda([t]);
+}
+document.addEventListener('click', e => { const a = e.target.closest('[data-renda-edit]'); if (a) { e.preventDefault(); editarRenda(a.dataset.rendaEdit); } });
 
 /* ---------- Meus ativos ---------- */
 const rmBtn = t => extra.includes(t) ? `<button class="btn sm ghost" type="button" onclick="rm('${t}')">Remover</button>` : '';
@@ -2201,6 +2350,7 @@ function card(a) {
       ${spark(m.serie, 72, 28)}<div class="px">${M(m.preco, mo)}<small class="${cl(m.ret_1m)}">${P(m.ret_1m)} no mês</small></div></div>
     <div class="pl tn ${cl(a.pl_atual)}">${p.qtd ? `${a.pl_atual > 0 ? '+' : ''}${M(a.pl_atual, mo)} <span class="mut" style="font-size:15px;font-weight:500">${P(a.pl_pct)}</span>` : '<span class="mut" style="font-size:16px;font-weight:500">Sem posição</span>'}</div>
     <div class="mut sm">${p.qtd ? `${N(p.qtd, 4)} ${a.classe === 'cambio' && a.ticker === 'DOLAR' ? 'dólares' : 'cotas'} · preço médio ${M(p.pm, mo)} · total ${M(a.valor, mo)}` : 'Use “Editar posição” para informar o que você tem'}</div>
+    ${pagaProventos(a.ticker, a.classe) && p.qtd ? rendaLinha(a) : ''}
     <div class="sug">${pill(kd, ic, tx + (a.confianca != null ? ` · ${N(a.confianca)}%` : ''))}<span>${esc(a.sugestao)}</span></div>
     ${a.fonte === 'regras' ? `<p class="mut xs">${st.iaAtiva && premium() ? 'A IA não respondeu agora; ' : ''}análise por regras (tendência, médias móveis, RSI e volatilidade). Notícias não avaliadas.</p>` : consensoHtml(a)}
     <div class="pot"><div>Até o alvo (${a.alvo ? M(a.alvo, mo) : '—'})<b class="${cl(a.ganho_pot)}">${M(a.ganho_pot, mo)}</b></div><div>Até o stop (${a.stop ? M(a.stop, mo) : '—'})<b class="${cl(-a.perda_pot)}">${a.perda_pot != null ? M(-a.perda_pot, mo) : '—'}</b></div></div>
@@ -2224,6 +2374,7 @@ async function load(t) {
   if (!el) return;
   try { el.outerHTML = card(await api('/api/analyze', {ticker: t, pos: pos[t] || {}})); }
   catch (e) { el.innerHTML = `<b>${esc(t)}</b> <p class="err-box sm">${esc(e.message)}</p><div class="btns">${rmBtn(t)}</div>`; }
+  renderRenda();
 }
 function addRow(t) {
   const s = document.createElement('section'); s.className = 'card'; s.id = 'r-' + t;
@@ -2259,11 +2410,15 @@ async function edit(t, classe) {
   } else {
     const cur = pos[t] || {};
     if (!premium() && !(cur.qtd > 0) && nPosicoes() >= limiteAtivos()) return abrirPlanos(`No plano grátis dá para acompanhar até ${limiteAtivos()} investimentos com posição. Assine o Premium para registrar todos.`);
+    const prov = pagaProventos(t, classe);
     v = await ask({title: `Editar posição em ${t === 'DOLAR' ? 'dólar' : t}`, fields: [{name: 'q', label: t === 'DOLAR' ? 'Quantos dólares você tem?' : 'Quantidade de cotas', mode: 'decimal', value: cur.qtd ? N(cur.qtd, 6) : ''},
-      {name: 'p', label: 'Preço médio pago', prefix: t === 'VOO' ? 'US$' : 'R$', mode: 'decimal', value: cur.pm ? N(cur.pm, 4) : ''}],
-      validate: v => isNaN(num(v.q)) || num(v.q) < 0 ? 'Informe a quantidade (pode ser 0).' : isNaN(num(v.p)) || num(v.p) < 0 ? 'Informe o preço médio.' : ''});
+      {name: 'p', label: 'Preço médio pago', prefix: t === 'VOO' ? 'US$' : 'R$', mode: 'decimal', value: cur.pm ? N(cur.pm, 4) : ''},
+      ...(prov ? [{name: 'r', label: 'Quanto você recebe de proventos por mês (média)', prefix: 'R$', mode: 'decimal', value: cur.renda ? N(cur.renda, 2) : '',
+        hint: 'Dividendos e rendimentos. FIIs costumam pagar todo mês; ações, algumas vezes por ano: use a média por mês. Deixe vazio se não souber.'}] : [])],
+      validate: v => isNaN(num(v.q)) || num(v.q) < 0 ? 'Informe a quantidade (pode ser 0).' : isNaN(num(v.p)) || num(v.p) < 0 ? 'Informe o preço médio.'
+        : prov && v.r.trim() && (isNaN(num(v.r)) || num(v.r) < 0) ? 'Informe os proventos por mês (ou deixe vazio).' : ''});
     if (!v) return;
-    pos[t] = {qtd: num(v.q), pm: num(v.p)};
+    pos[t] = {qtd: num(v.q), pm: num(v.p), ...(prov && num(v.r) > 0 ? {renda: num(v.r)} : {})};
   }
   sv(); await load(t); posChanged();
 }

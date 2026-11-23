@@ -107,6 +107,41 @@ o app guarda a carteira que recomendaria para cada perfil, antes de o mês acont
 Limites: a IA não entra (ela sabe o que aconteceu depois), lista de ativos de hoje (viés de sobrevivência), valores antes
 do IR. O resultado fica guardado no banco por 7 dias (`simulador.py`).
 
+### Corretora simulada (como o testador de estratégias do MetaTrader)
+
+Na aba Mercado, o segundo teste com dados reais (`corretora.py`, `GET /api/corretora`): as mesmas decisões do app (e do
+modelo fixo e de cada plano), mas executadas como numa conta de corretora, dia a dia, desde 2013. As ordens saem no
+pregão seguinte à decisão, pelo preço de tela da época, em quantidades inteiras de cotas, com emolumentos da B3 (0,03%),
+diferença entre compra e venda (0,05%), custódia do Tesouro (0,20% ao ano, descontada do título), câmbio do dólar (0,5%),
+proventos caindo na conta e o imposto de renda pago como a Receita manda (ações com a isenção de R$ 20 mil por mês, ETFs
+15%, FIIs 20%, prejuízo compensado, tabela regressiva no Tesouro e no CDB, LCI isenta). O relatório segue o do
+MetaTrader: patrimônio, lucro líquido, retorno de cada metade, maior queda dia a dia, ordens, vendas com lucro, fator de
+lucro, custos, imposto pago e o que ainda seria pago no resgate, além das últimas ordens e da posição final.
+
+Resultado de 23/11/2026 (R$ 10 mil em fev/2013 e R$ 1.000 por mês, já descontados custos e imposto pago): conservador
+R$ 402 mil, moderado R$ 446 mil, arrojado R$ 512 mil, contra R$ 378 mil no CDI na mesma corretora. Dia a dia as quedas
+aparecem maiores que no teste mês a mês (o conservador chegou a -11,6% em março de 2020), porque as cotações oscilam
+dentro do mês.
+
+### Garantia de melhor decisão
+
+Regra fixada antes de rodar com dados reais (`estrategias.dominantes`, `ferramentas/melhor_estrategia.py`): se uma
+estratégia que a pessoa pode escolher no perfil render mais que a recomendada nas duas metades do período (2013-2019 e
+2020 em diante, por 0,2 ponto ou mais em cada), nos dois testes (simulador e corretora), sem cair mais de 1 ponto além
+dela e terminando com mais dinheiro, a recomendada do perfil passa a seguir essa estratégia, e a tela explica o motivo.
+A conferência roda sozinha toda vez que os testes são refeitos (uma vez por semana) e fica guardada no banco
+(`decisao/padrao`). Em 23/11/2026, nenhuma estratégia venceu a recomendada em nenhum perfil: no moderado, o All Weather
+terminou com mais dinheiro, mas na primeira metade ganhou por só 0,1 ponto. Ninguém garante o futuro: a garantia é que a
+recomendada nunca fica atrás de uma alternativa disponível que se mostrou melhor de forma consistente nos testes.
+
+### Quanto você ganha com cada FII e ação
+
+Na aba Ativos, o app pergunta quanto a pessoa recebe por mês de proventos de cada ação e FII (campo `renda` da posição;
+ETFs ficam de fora, porque não distribuem). Mostra ao lado o que o histórico de 12 meses indica e avisa quando os dois
+são muito diferentes; o cartão de cada ativo mostra o rendimento sobre o que foi pago. A carteira recomendada usa isso: a
+IA recebe o informado e o estimado, e toda sugestão de venda ou redução diz quanto de renda por mês a pessoa deixaria de
+receber.
+
 ## Auditoria das recomendações, planos consagrados e memória
 
 - **Auditoria:** toda carteira recomendada (da IA ou das regras) passa por checagens objetivas antes de aparecer: soma

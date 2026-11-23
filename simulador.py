@@ -31,7 +31,7 @@ import simulacao as sim
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNIVERSO
 
 INICIO = "2013-01"
-VERSAO = 4               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
+VERSAO = 5               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
 CUSTO = 0.001            # 0,1% por compra ou venda (emolumentos da B3 + diferença entre compra e venda)
 INICIAL, MENSAL = 10000.0, 1000.0
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF
@@ -249,6 +249,14 @@ def _tir(aportes, final):
     return ((1 + (lo + hi) / 2) ** 12 - 1) * 100
 
 
+META = pd.Timestamp("2019-12-31")  # fim da 1ª metade (a mesma divisão da revisão dos modelos)
+
+
+def _metade(x, primeira):
+    r = [v for v, t in zip(x["rets"], x["datas"]) if (t <= META) == primeira]
+    return round((float(np.prod(1 + np.array(r))) ** (12 / len(r)) - 1) * 100, 1) if r else None
+
+
 def _resumo(nome, x, extra=None):
     idx = np.cumprod(1 + np.array(x["rets"]))
     dd = idx / np.maximum.accumulate(np.concatenate([[1.0], idx]))[1:] - 1
@@ -257,6 +265,7 @@ def _resumo(nome, x, extra=None):
     return {"nome": nome, **(extra or {}), "final": round(x["valores"][-1], 0), "investido": round(investido, 0),
             "ganho_pct": round((x["valores"][-1] / investido - 1) * 100, 1), "tir_aa": round(_tir(x["aportes"], x["valores"][-1]), 1),
             "maior_queda": round(float(dd.min()) * 100, 1), "pior_12m": round(min(r12) * 100, 1) if r12 else None,
+            "metade1_aa": _metade(x, True), "metade2_aa": _metade(x, False),
             "custos": round(x["custos"], 0), "ir_estimado": round(x["ir"], 0), "operacoes": x["operacoes"],
             "serie": [round(v / a * 100, 1) for v, a in zip(x["valores"], np.cumsum(x["aportes"]))]}
 
