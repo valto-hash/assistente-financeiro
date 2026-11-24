@@ -28,7 +28,7 @@ import simulacao as sim
 import simulador as S
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, UNIVERSO
 
-VERSAO = 2
+VERSAO = 3
 EMOL, SPREAD, CAMBIO = 0.0003, 0.0005, 0.005
 CUSTODIA_AA = 0.002
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF | {"GOLD11", "VOO"}
@@ -310,18 +310,19 @@ def _relatorio(cal, eq, twr, aportes, aplicado, ordens, vendas_res, tot, qtd, pm
 
 # ---------------------------------------------------------------- tudo: app, modelo fixo e planos
 
-def tudo(perfis, anteriores=None):
+def tudo(perfis, anteriores=None, nucleos=None, satelites=None):
     """Roda a corretora para a recomendada de cada perfil, o modelo fixo e todos os planos consagrados."""
     t0 = time.time()
     d = S.preparar()
     planos = {p["id"]: S.pesos_plano(p["pesos"]) for p in referencias.PLANOS}
-    fixos = {p: {a: m[c] * w for c, ws in S.NUCLEO.items() for a, w in ws.items() if m.get(c)} for p, m in perfis.items()}
+    nucleos, satelites = nucleos or {}, satelites or {}
+    fixos = {p: S.fixo_de(m, nucleos.get(p)) for p, m in perfis.items()}
     ativos = sorted(set(UNIVERSO) | {a for p in planos.values() for a in p} | {a for f in fixos.values() for a in f})
     ativos = [a for a in ativos if a in ("DOLAR",) or a in RF or a in d["ret"]]
     Pm, Dm = precos(ativos, d["meses"][0])
     out = {"perfis": {}, "planos": {}}
     for p, m in perfis.items():
-        out["perfis"][p] = {"app": rodar(d, Pm, Dm, S.decisor(d, m)),
+        out["perfis"][p] = {"app": rodar(d, Pm, Dm, S.decisor(d, m, nucleos=nucleos.get(p), satelites=satelites.get(p, True))),
                             "fixo": rodar(d, Pm, Dm, lambda t, h, w=fixos[p]: w)}
     for pid, w in planos.items():
         out["planos"][pid] = rodar(d, Pm, Dm, lambda t, h, w=w: w)
@@ -329,6 +330,7 @@ def tudo(perfis, anteriores=None):
     return _py({**out, "desde": cal[cal.searchsorted(d["meses"][0], side="right")].strftime("%d/%m/%Y"),
             "ate": cal[-1].strftime("%d/%m/%Y"), "inicial": S.INICIAL, "mensal": S.MENSAL, "versao": VERSAO,
             "nomes": {p["id"]: p["nome"] for p in referencias.PLANOS}, "aproximado": d.get("aproximado") or [],
+            "satelites": {p: satelites.get(p, True) for p in perfis},
             "calculado": time.time(), "segundos": round(time.time() - t0)})
 
 

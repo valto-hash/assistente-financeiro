@@ -341,11 +341,18 @@ def pontuacao(m, c, cdi=10.0):
     return round(s, 2)
 
 
-def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None, classe_pequena=None):
+NUCLEO_PADRAO = {"renda_fixa": {"TESOURO_SELIC": .3, "LCI_LCA": .15, "TESOURO_IPCA": .55},
+                 "acao": {"BOVA11": .6, "DIVO11": .4}, "fii": {"KNCR11": .5, "HGLG11": .5},
+                 "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": .5, "GOLD11": .5}}
+
+
+def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None, classe_pequena=None, nucleos=None, satelites=True):
     """Escolhe os ativos de cada classe. cand: {código: {classe, nome, descricao, m(métricas)}}; atual: {código: R$}.
-    Núcleo em ETFs/títulos amplos; complementos individuais (no máximo 10% cada, um por setor) escolhidos pela
-    qualidade de longo prazo, preferindo o que você já tem (vender gera custo e IR)."""
+    Núcleo em ETFs/títulos amplos (nucleos: a divisão de cada classe no perfil; padrão NUCLEO_PADRAO); complementos
+    individuais (no máximo 10% cada, um por setor) escolhidos pela qualidade de longo prazo, preferindo o que você já
+    tem (vender gera custo e IR). satelites=False: não compra ações nem FIIs individuais novos (mantém os que você tem)."""
     setores = setores or {}
+    nucleos = {**NUCLEO_PADRAO, **(nucleos or {})}
     pesos, motivos = {}, {}
     for c in CLASSES:
         alvo_c = alvo.get(c, 0)
@@ -354,8 +361,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
         g = {}
         if c == "renda_fixa":
             base = {"ALTA": {"TESOURO_SELIC": .6, "CDB_CDI": .4},
-                    "MEDIA": {"TESOURO_SELIC": .3, "LCI_LCA": .3, "TESOURO_IPCA": .4}}.get(
-                liq, {"TESOURO_SELIC": .3, "LCI_LCA": .15, "TESOURO_IPCA": .55})
+                    "MEDIA": {"TESOURO_SELIC": .3, "LCI_LCA": .3, "TESOURO_IPCA": .4}}.get(liq, nucleos["renda_fixa"])
             tot_meus = sum(meus.values())
             parte_meus = min(.5, tot_meus / max(sum(atual.values()), 1) * 100 / alvo_c) if tot_meus else 0
             for a, v in meus.items():
@@ -368,8 +374,7 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
             motivos.setdefault("LCI_LCA", "Isenta de IR e com garantia do FGC: rendendo 90% do CDI, equivale a um CDB de cerca de 106% do CDI.")
             motivos.setdefault("TESOURO_IPCA", "Protege da inflação: paga IPCA mais um juro real fixo; ideal para prazos mais longos.")
         else:
-            nucleo = {"acao": {"BOVA11": .6, "DIVO11": .4}, "fii": {"KNCR11": .5, "HGLG11": .5},
-                      "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": .5, "GOLD11": .5}}[c]
+            nucleo = dict(nucleos[c])
             if alvo_c < (CLASSE_PEQUENA if classe_pequena is None else classe_pequena):  # classe pequena: um ativo amplo basta
                 nucleo = {next(iter(nucleo)): 1.0}
             individuais = c in ("acao", "fii")
@@ -378,7 +383,9 @@ def escolher_ativos(alvo, cand, atual, sinais, liq, etfs, cdi=10.0, setores=None
             # um por setor. Sinais de curto prazo não tiram ninguém da carteira: no teste com o passado eles não acertaram mais que o acaso.
             meus_ok = sorted((a for a in meus if a not in nucleo and pontuacao(cand[a].get("m"), c, cdi) > -1.2), key=lambda a: -meus[a])
             n_sat = 0 if alvo_c < 8 else 1 if alvo_c < 18 else 2 if alvo_c < 28 else 3
-            if individuais:
+            if individuais and not satelites:  # o perfil não compra ações nem FIIs individuais novos
+                escolhidos = meus_ok[:n_sat]
+            elif individuais:
                 pont = {a: pontuacao(x.get("m"), c, cdi) for a, x in cand.items()
                         if x.get("classe") == c and a not in nucleo and a not in meus and a not in etfs and elegivel(x.get("m"), c)}
                 usados = {setores.get(a) for a in meus_ok[:n_sat or 2]}

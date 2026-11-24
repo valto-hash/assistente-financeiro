@@ -19,14 +19,17 @@ ok(c.get("/api/estrategias").status_code == 401, "precisa estar logado")
 j = c.get("/api/estrategias?perfil=moderado", headers=H).json()
 E = {e["id"]: e for e in j["estrategias"]}
 print("   ", [(e["id"], e["ret_aa"], e["maior_queda"], e["pior_crise"], e["cabe"]) for e in j["estrategias"]])
-ok(list(E)[:2] == ["app", "modelo_fixo"] and set(p["id"] for p in referencias.PLANOS) <= set(E),
-   "a recomendada, o modelo do perfil só com ETFs e os 11 planos consagrados")
+ok(list(E)[0] == "app" and "modelo_fixo" not in E and set(p["id"] for p in referencias.PLANOS) <= set(E) and not E["app"]["satelites"],
+   "moderado: a recomendada (que já é só com ETFs e títulos) e os 11 planos consagrados, sem a opção repetida")
+Ea = {e["id"]: e for e in c.get("/api/estrategias?perfil=arrojado", headers=H).json()["estrategias"]}
+ok(list(Ea)[:2] == ["app", "modelo_fixo"] and Ea["app"]["satelites"], "arrojado (o app escolhe ações): a recomendada e, à parte, o modelo só com ETFs")
 ok(all(abs(sum(e["classes"].values()) - 100) < 0.6 and abs(sum(e["ativos"].values()) - 100) < 0.6 for e in E.values()),
    "cada estratégia tem a divisão por classe e por ativo somando 100%")
-ok(E["app"]["classes"] == server.PERFIS["moderado"] and E["app"]["cabe"] and E["modelo_fixo"]["cabe"],
+ok(E["app"]["classes"] == server.PERFIS["moderado"] and E["app"]["cabe"] and Ea["modelo_fixo"]["cabe"],
    "a recomendada parte do modelo do perfil e sempre cabe nele")
 lim = j["limite"]
-regra = all(e["cabe"] == (e["maior_queda"] >= lim - 0.5 and (e["pior_crise"] is None or e["pior_crise"][1] >= lim - 2))
+regra = all(e["cabe"] == (e["maior_queda"] >= lim and (e["pior_crise"] is None or e["pior_crise"][1] >= lim)
+                          and (e["queda_dia"] is None or e["queda_dia"] >= lim))
             and bool(e["motivo_nao_cabe"]) == (not e["cabe"]) for e in E.values() if e["tipo"] == "plano")
 ok(regra, "um plano só cabe se a maior queda e a pior crise real ficarem dentro do limite do perfil, e o motivo aparece quando não cabe")
 ok(all(e["pior_crise"] for e in E.values()), "todas passaram pelo teste das crises reais")
@@ -104,4 +107,20 @@ ok(set(reg["meses"][k]["planos"]) == {p["id"] for p in referencias.PLANOS}, "a p
 reg["meses"][(d["meses"][-2]).strftime("%Y-%m")] = reg["meses"][k]
 v = S.resultado_vivo(d, reg, server.PERFIS)
 ok(len(v["planos_meses"]) == 1 and set(v["planos"]) == {p["id"] for p in referencias.PLANOS}, "e mostra o resultado real de cada plano")
+# ---- 8) perfis reformulados: a mesma definição em todo lugar
+import re, perfil as teste_perfil
+html = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "index.html")).read()
+for k, dd in teste_perfil.DEFINICOES.items():
+    ok(f"{k}: [{dd['nome']!r}, {dd['curto']!r}, {dd['para_quem']!r}]" in html and server.PIOR_CRISE[k] == -dd["limite"]
+       and str(dd["limite"]) + "%" in dd["curto"], f"{k}: a tela, o limite de queda do app e a definição dizem a mesma coisa")
+ok(all(abs(sum(m.values()) - 100) < 0.01 for m in server.PERFIS.values()), "cada modelo soma 100%")
+ok(all(abs(sum(n.values()) - 1) < 1e-9 for p in server.NUCLEOS.values() for n in p.values()), "cada divisão dentro de uma classe soma 100%")
+r = teste_perfil.avaliar({"queda": "vende_tudo", "frase": "seguranca", "impacto": "muito"})
+ok(r["perfil"] == "conservador" and r["definicao"]["limite"] == 8, "o teste de perfil devolve a definição do perfil")
+p = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "conservador", "objetivo": ""}).json()
+pesos = {s_["ticker"]: s_["peso"] for s_ in p["sugerida"]}
+print("   conservador:", p["fonte"], pesos)
+nucleo = {a for n in {**server.regras.NUCLEO_PADRAO, **server.NUCLEOS["conservador"]}.values() for a in n}
+ok(not any(server._individual(a) and a not in pos and a not in nucleo for a in pesos),
+   "conservador: nenhuma ação ou FII individual novo fora dos núcleos (escolher ativos não melhorou este perfil)")
 print("TUDO OK" if not falhas else f"{len(falhas)} FALHA(S)")

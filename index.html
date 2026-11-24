@@ -558,10 +558,11 @@ const RF_SETOR = {TESOURO_SELIC: 'Tesouro Direto', TESOURO_IPCA: 'Tesouro Direto
   LCI_LCA: 'Bancária', POUPANCA: 'Conta e poupança', PORQUINHO: 'Conta e poupança'};
 const FRACIONAVEL = new Set(['DOLAR', 'VOO']);  // dólar em qualquer valor e VOO em fração; o resto da B3 só em cotas inteiras
 const qtdTxt = (t, n) => n == null ? '' : t === 'DOLAR' ? `US$ ${N(n, 2)}` : FRACIONAVEL.has(t) ? `${N(n, 4)} cotas` : `${N(n)} ${n === 1 ? 'cota' : 'cotas'}`;
+// definição de cada tipo de investidor: a mesma de perfil.DEFINICOES (o teste test_perfis confere)
 const PERFIS = {
-  conservador: ['Conservador', 'Prioriza segurança e liquidez; aceita pouca oscilação.'],
-  moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento no longo prazo.'],
-  arrojado: ['Arrojado', 'Busca mais crescimento e aceita quedas fortes no caminho.'],
+  conservador: ['Conservador', 'Prioriza não perder dinheiro: aceita quedas de no máximo 8% no caminho.', 'Para quem pode precisar do dinheiro em pouco tempo, ainda está montando a reserva de emergência ou não ficaria tranquilo vendo o dinheiro cair.'],
+  moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento: aceita quedas de até 18% no caminho.', 'Para quem investe por alguns anos, já tem reserva de emergência e aceita ver a carteira cair de vez em quando em troca de render mais.'],
+  arrojado: ['Arrojado', 'Busca o maior crescimento no longo prazo: aceita quedas de até 30% no caminho.', 'Para quem investe por muitos anos, tem a reserva de emergência completa e não precisaria vender nada numa crise.'],
 };
 const ACAO = {AUMENTAR: ['good', 'up', 'Aumentar'], COMPRAR: ['good', 'up', 'Comprar'], MANTER: ['', 'flat', 'Manter'],
   REDUZIR: ['bad', 'down', 'Reduzir'], VENDER: ['bad', 'down', 'Vender'], REALIZAR_LUCRO: ['warn', 'down', 'Realizar lucro']};
@@ -1145,12 +1146,12 @@ function simulHtml() {
   const L = id => x.linhas.find(l => l.id === id), app = L('app'), fixo = L('fixo'), cdi = L('cdi'), antigo = L('app_antigo');
   const reais = v => M(v).replace(/,00$/, '');
   const dif = (a, b) => `${a - b >= 0 ? 'mais' : 'menos'} (${reais(Math.abs(a - b))})`;
-  const bomFixo = x.vs_fixo >= 0;
-  const linhas = [...x.linhas].sort((p, q) => (q.id === 'app') - (p.id === 'app') || q.final - p.final);
+  const bomFixo = x.vs_fixo >= 0, soEtf = x.satelites === false;
+  const linhas = [...x.linhas].filter(l => !l.igual_app).sort((p, q) => (q.id === 'app') - (p.id === 'app') || q.final - p.final);
   const nomeCl = {renda_fixa: 'renda fixa', acao: 'ações', fii: 'FIIs', exterior: 'exterior', cambio: 'dólar e ouro'};
   const modeloTxt = m => Object.entries(m).filter(([, v]) => v).map(([c, v]) => `${N(v)}% ${nomeCl[c] || c}`).join(', ');
   const rv = x.revisao;
-  const serie = {datas: x.datas, app: app.serie, fixo: fixo.serie, cdi: cdi.serie};
+  const serie = {datas: x.datas, app: app.serie, fixo: soEtf ? [] : fixo.serie, cdi: cdi.serie};
   const v = d.vivo, vp = v && v.perfis ? v.perfis[perf] : null;
   const estSim = estrategia === 'modelo_fixo' ? 'fixo' : estrategia, estLinha = x.linhas.find(l => l.id === estSim && l.id !== 'app');
   const vivoEst = estLinha && v?.planos && v.planos[estSim] != null && v.planos_meses?.length ? v.planos[estSim] : null;
@@ -1160,19 +1161,21 @@ function simulHtml() {
     <p class="lead sm" style="margin-top:8px">Começando com ${reais(x.inicial)} em ${esc(x.desde)} e aplicando ${reais(x.mensal)} todo mês até ${esc(x.ate)}. No fim de cada mês, o app recebeu só os dados que existiam naquela data, montou a carteira com as regras de hoje e a pessoa simulada seguiu: dinheiro novo no que estava abaixo do recomendado, vendas só quando o app mandaria, ${N(d.custo_operacao, 1)}% de custo em cada compra e venda.</p>
     ${d.aproximado && d.aproximado.length ? `<div class="note warn">${ICON.warn}<div>O Banco Central não respondeu agora, então ${esc(d.aproximado.join(' e '))} da época ${d.aproximado.length > 1 ? 'foram aproximados' : 'foi aproximado(a)'} e os números podem mudar um pouco. O teste é refeito com os dados certos na próxima vez que você abrir esta tela.</div></div>` : ''}
     <div class="tiles"><div class="tile main"><div class="l">Seguindo o app</div><div class="v tn">${reais(app.final)}</div><div class="d">${P(app.tir_aa, 1, false)} ao ano sobre ${reais(app.investido)} aplicados</div></div>
-      <div class="tile"><div class="l">Modelo fixo do perfil</div><div class="v tn">${reais(fixo.final)}</div><div class="d">${P(fixo.tir_aa, 1, false)} ao ano, só ETFs e títulos</div></div>
+      ${soEtf ? '' : `<div class="tile"><div class="l">Modelo fixo do perfil</div><div class="v tn">${reais(fixo.final)}</div><div class="d">${P(fixo.tir_aa, 1, false)} ao ano, só ETFs e títulos</div></div>`}
       <div class="tile"><div class="l">100% CDI</div><div class="v tn">${reais(cdi.final)}</div><div class="d">${P(cdi.tir_aa, 1, false)} ao ano</div></div></div>
-    <div class="note ${bomFixo ? 'good' : 'warn'}">${bomFixo ? ICON.check : ICON.warn}<div>${bomFixo
+    <div class="note ${bomFixo ? 'good' : 'warn'}">${bomFixo ? ICON.check : ICON.warn}<div>${soEtf
+      ? `<b>Neste perfil, a recomendada é só com ETFs e títulos:</b> nos testes com dados reais, escolher ações individuais não melhorou o resultado, então o app não faz isso aqui.`
+      : bomFixo
       ? `<b>As decisões do app ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs, com queda máxima parecida (${P(app.maior_queda, 0)} contra ${P(fixo.maior_queda, 0)}).`
       : `<b>As decisões do app não ajudaram neste perfil:</b> seguir o app deu ${dif(app.final, fixo.final)} que manter o modelo fixo do mesmo perfil só com ETFs. Para este perfil, o mais simples teria sido melhor.`}
       Contra o CDI: ${dif(app.final, cdi.final)}. Entre as ${N(x.total)} estratégias comparadas, o app ficou em ${N(x.posicao)}º lugar.</div></div>
-    ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1], ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
+    ${linhaSvg(serie, [['app', 'Seguindo o app', 'var(--acc)'], ...(soEtf ? [] : [['fixo', 'Modelo fixo do perfil', 'var(--c-fii)', 1]]), ['cdi', 'CDI', 'var(--mut)', 1]], 'Patrimônio sobre o total aplicado, mês a mês')}
     <p class="mut xs" style="margin:2px 0 0">Quanto o patrimônio estava acima do total aplicado até cada mês (dinheiro novo não conta como ganho).</p>
     <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia</th><th>Patrimônio final<small>ganho sobre o aplicado</small></th><th>Ao ano</th><th>Maior queda</th><th>Pior 12 meses</th><th>Custos<small>IR das vendas no caminho</small></th></tr></thead><tbody>
       ${linhas.map(l => `<tr class="${l.id === 'app' ? 'sua' : ''}${['app_antigo', 'fixo_antigo'].includes(l.id) ? ' fora' : ''}"><td><b>${esc(l.nome)}</b>${l.id === estSim ? ` ${pill('good', 'check', 'Sua estratégia')}` : ''}${l.plano ? '<small>plano consagrado que cabe no perfil</small>' : ''}</td>
         <td><b>${reais(l.final)}</b><small>${P(l.ganho_pct, 0)}</small></td><td>${P(l.tir_aa, 1, false)}</td><td class="${cl(l.maior_queda)}">${P(l.maior_queda, 0)}</td>
         <td class="${cl(Math.round(l.pior_12m))}">${P(Math.round(l.pior_12m) || 0, 0)}</td><td>${reais(l.custos)}<small>${reais(l.ir_estimado)}</small></td></tr>`).join('')}</tbody></table></div>
-    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes deste teste” mostra como era (${reais(antigo.final)} neste perfil).${x.modelo_anterior ? ` O modelo deste perfil também foi revisto: era ${esc(modeloTxt(x.modelo_anterior))}${rv?.antigo ? `, que teria caído ${N(Math.abs(rv.antigo[1]), 0)}% na pior crise testada (${esc(rv.antigo[0])}), quando o perfil aceita até ${N(Math.abs(rv.limite), 0)}%` : ''}; passou a ser ${esc(modeloTxt(x.modelo))}${rv?.novo ? `, que teria caído ${N(Math.abs(rv.novo[1]), 0)}%` : ''}. O novo foi escolhido entre vários candidatos definidos antes do teste, usando só 2013 a 2019, e confirmado em 2020 a 2026, período que não entrou na escolha.` : ''} Como essas mudanças saíram de testes com o passado, a prova que vale de verdade é a de baixo.</div></div>
+    <div class="note">${ICON.info}<div><b>O que este teste mudou no app:</b> ajustar a carteira pela tendência da bolsa e pelo juro do momento deixou o resultado menor nos três perfis, e por isso esse ajuste foi desligado. Com 4% ou mais em dólar e ouro, a carteira passou a ter os dois, e não só o dólar. A linha “O app antes das revisões” mostra como era (${reais(antigo.final)} neste perfil).${x.modelo_anterior ? ` O modelo deste perfil também foi revisto: era ${esc(modeloTxt(x.modelo_anterior))}${rv?.antigo ? `, que teria caído ${N(Math.abs(rv.antigo[1]), 0)}% na pior crise testada (${esc(rv.antigo[0])}), quando o perfil aceita até ${N(Math.abs(rv.limite), 0)}%` : ''}; passou a ser ${esc(modeloTxt(x.modelo))}${rv?.novo ? `, que teria caído ${N(Math.abs(rv.novo[1]), 0)}%` : ''}. O novo foi escolhido entre 639 carteiras definidas antes do teste, pelo maior retorno de 2013 a 2019 sem passar do limite de queda do perfil (${N(Math.abs(rv?.limite ?? 0), 0)}%), e confirmado de 2020 até hoje, período que não entrou na escolha.` : ''} Como essas mudanças saíram de testes com o passado, a prova que vale de verdade é a de baixo.</div></div>
     <h3>Prova ao vivo</h3>
     ${vp && v.meses.length ? `<p class="sm" style="margin:-4px 0 0">Desde ${esc(v.meses[0])} (${N(v.meses.length)} ${v.meses.length === 1 ? 'mês' : 'meses'}), a carteira que o app recomendava para este perfil rendeu <b>${P(vp.app, 2)}</b>, o modelo fixo ${P(vp.fixo, 2)} e o CDI ${P(vp.cdi, 2)}. Cada carteira foi guardada antes de o mês acontecer.</p>`
       : `<p class="mut sm" style="margin:-4px 0 0">Todo mês, o app guarda a carteira que recomendaria para cada perfil, antes de o mês acontecer. O resultado real aparece aqui a partir do mês que vem, sem nenhuma chance de ajustar regra olhando o resultado.</p>`}
@@ -1852,7 +1855,7 @@ function estrHtml() {
   }
   return `<div class="card">
     <h2>Sua estratégia</h2>
-    <p class="lead sm" style="margin-bottom:6px">Você está seguindo <b>${esc(nomeAtual)}</b>${estrategia === 'app' ? ': o app parte do modelo do seu perfil e escolhe os ativos, com auditoria.' : '.'} Você pode trocar por outra que caiba no seu perfil, como um plano consagrado de divisão fixa.</p>
+    <p class="lead sm" style="margin-bottom:6px">Você está seguindo <b>${esc(nomeAtual)}</b>${estrategia === 'app' ? ': o modelo do seu perfil, que nos testes com dados reais rendeu mais que todas as outras estratégias que cabem nele, sem passar do limite de queda do perfil. Toda recomendação passa pela auditoria.' : '.'} Você pode trocar por outra que caiba no seu perfil, como um plano consagrado de divisão fixa.</p>
     ${info && !info.seguida ? `<div class="note warn">${ICON.warn}<div><b>Não deu para seguir ${esc(info.nome)}.</b> ${esc(info.motivo || '')}${estrategia !== 'app' ? ' <a href="#" data-estr="app">Voltar para a recomendada</a>' : ''}</div></div>` : ''}
     ${corpo}
   </div>`;
@@ -2224,7 +2227,7 @@ function corrHtml() {
     cdi: cdi.curva.patrimonio.map((v, i) => v / cdi.curva.aplicado[i] * 100)};
   const pad = (d.padroes || {})[perf];
   const linha = (k, v, sub) => `<div class="rep-l"><span>${k}</span><b class="tn">${v}</b>${sub ? `<small>${sub}</small>` : ''}</div>`;
-  const opc = [['app', nomes.app], ['fixo', nomes.fixo], ...Object.keys(d.planos).map(k => [k, nomes[k] || k])];
+  const opc = [['app', nomes.app], ...((d.satelites || {})[perf] === false ? [] : [['fixo', nomes.fixo]]), ...Object.keys(d.planos).map(k => [k, nomes[k] || k])];
   const tipo = {C: 'Compra', V: 'Venda'};
   return `<div class="card">
     <h2>E se você tivesse seguido o app numa corretora?</h2>
@@ -2482,7 +2485,7 @@ let pcT; function posChanged() { clearTimeout(pcT); pcT = setTimeout(() => loadP
 /* ---------- perfil, configurações e backup ---------- */
 $('#btnPerfil').onclick = async () => {
   const v = await ask({title: 'Seu perfil de investidor', desc: 'Define a alocação ideal entre renda fixa, ações, FIIs, exterior e proteção.',
-    fields: [{name: 'p', type: 'radio', value: perfil, options: Object.entries(PERFIS).map(([k, [l, d]]) => ({value: k, label: l, desc: d}))}], ok: 'Usar este perfil',
+    fields: [{name: 'p', type: 'radio', value: perfil, options: Object.entries(PERFIS).map(([k, [l, d, q]]) => ({value: k, label: l, desc: `${d} ${q}`}))}], ok: 'Usar este perfil',
     validate: v => v.p ? '' : 'Escolha um perfil.'});
   if (!v || v.p === perfil) return;
   perfil = v.p; sv(); renderPerfilChip(); loadPort(true);

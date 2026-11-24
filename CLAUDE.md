@@ -47,11 +47,13 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 5. Mudança em regra de alocação ou escolha de ativos: rode o simulador (`simulador.tudo`) antes e depois e compare com o
    modelo fixo do perfil. Regra que piora o resultado nos três perfis não entra (foi assim que `AJUSTE_MOMENTO` foi
    desligado). Cuidado para não ajustar regra até "ganhar no passado": a prova que vale é a ao vivo.
-6. Mudança no modelo de um perfil (`server.PERFIS`): candidatos definidos antes de ver os resultados, escolha só com a
-   primeira metade (2013-2019) e confirmação na segunda (2020-2026), sem arriscar mais que o modelo atual nem passar da
-   pior crise do perfil. Guarde o modelo antigo em `PERFIS_ANTERIOR` (aparece no simulador) e o motivo em
-   `REVISAO_MODELO` (explica a mudança a quem tinha recomendação antiga). Foi assim com os três perfis em nov/2026
-   (`ferramentas/revisar_modelos.py`).
+6. Os tipos de investidor estão em `perfil.DEFINICOES` (nome, para quem, limite de queda); o limite vira
+   `server.PIOR_CRISE` e vale para três medidas: queda dia a dia na corretora, queda no simulador mês a mês e pior crise
+   real. Mudança no modelo de um perfil (`server.PERFIS`, `NUCLEOS`, `ESCOLHE_ATIVOS`): candidatos e regra escritos antes
+   de rodar, escolha só com 2013-2019 e conferência com 2020 até hoje, dentro do limite nas três medidas
+   (`ferramentas/rodadas_perfis.py`). Depois, `ferramentas/simulacao_app.py` tem de mostrar a recomendada vencendo todas
+   as estratégias que cabem no perfil, nos dois testes. Guarde o modelo anterior em `PERFIS_ANTERIOR` e o motivo em
+   `REVISAO_MODELO`. Foi assim em 24/11/2026.
 7. Estratégia escolhida pela pessoa (`estrategias.py`): só pode ser seguida se couber no perfil (maior queda e pior crise
    real dentro de `PIOR_CRISE`) e passar na auditoria; senão, vale a recomendada e a tela mostra o motivo.
 8. Garantia de melhor decisão (`estrategias.dominantes`, `server._atualizar_padroes`): se uma estratégia disponível vencer

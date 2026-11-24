@@ -7,6 +7,26 @@ risco (prazo, reserva de emergência, idade). O objetivo vira um texto que o res
 """
 from regras import brl
 
+# Cada tipo de investidor, reformulado em 24/11/2026. O limite é a maior queda que a carteira recomendada pode ter tido
+# em qualquer momento: dia a dia de 2013 até hoje (corretora simulada), mês a mês (simulador) e na pior crise real
+# testada (2008, 2015, 2020...). O servidor usa este limite em tudo (server.PIOR_CRISE).
+DEFINICOES = {
+    "conservador": {"nome": "Conservador", "limite": 8,
+                    "curto": "Prioriza não perder dinheiro: aceita quedas de no máximo 8% no caminho.",
+                    "para_quem": "Para quem pode precisar do dinheiro em pouco tempo, ainda está montando a reserva de emergência "
+                                 "ou não ficaria tranquilo vendo o dinheiro cair."},
+    "moderado": {"nome": "Moderado", "limite": 18,
+                 "curto": "Equilíbrio entre segurança e crescimento: aceita quedas de até 18% no caminho.",
+                 "para_quem": "Para quem investe por alguns anos, já tem reserva de emergência e aceita ver a carteira cair de "
+                              "vez em quando em troca de render mais."},
+    "arrojado": {"nome": "Arrojado", "limite": 30,
+                 "curto": "Busca o maior crescimento no longo prazo: aceita quedas de até 30% no caminho.",
+                 "para_quem": "Para quem investe por muitos anos, tem a reserva de emergência completa e não precisaria vender "
+                              "nada numa crise."}}
+for _k, _d in DEFINICOES.items():
+    _d["texto"] = (f"{_d['nome']}: {_d['curto'][0].lower() + _d['curto'][1:]} A carteira recomendada não pode ter caído mais de "
+                   f"{_d['limite']}% em nenhum momento dos testes com dados reais (dia a dia desde 2013 e nas crises reais).")
+
 PERGUNTAS = [
     {"id": "objetivo", "tipo": "escolha", "titulo": "Qual é o seu principal objetivo com os investimentos?", "opcoes": [
         {"v": "reserva", "t": "Montar minha reserva de emergência"},
@@ -112,7 +132,7 @@ def avaliar(r):
         if juntado < meta * 0.5:
             atencao.append(f"Só com os aportes você junta cerca de {brl(juntado, 0)} em {anos} anos, metade da meta ou menos: "
                            "talvez seja preciso aumentar o aporte ou o prazo. A simulação mostra a chance real.")
-    return {"perfil": perfil, "tolerancia": tolerancia, "teto": teto, "objetivo_texto": texto, "prazo_anos": anos,
+    return {"perfil": perfil, "definicao": DEFINICOES[perfil], "tolerancia": tolerancia, "teto": teto, "objetivo_texto": texto, "prazo_anos": anos,
             "meta": meta, "aporte": aporte, "renda": renda, "reserva": reserva, "motivos": motivos, "atencao": atencao,
             "respostas": {"objetivo": objetivo, "prazo": prazo, "meta": meta, "aporte": aporte, "renda": renda, "idade": idade,
                           "reserva": reserva, "experiencia": exp, "queda": queda, "frase": frase, "impacto": impacto}}

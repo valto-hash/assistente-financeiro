@@ -39,6 +39,11 @@ critério de sucesso pede vencer todas as alternativas do app nos dois testes. N
 se, nos DOIS testes, o patrimônio final for maior e o retorno de 2013-2019 não for menor que só com ETFs e títulos.
 Mostra também o patrimônio depois do imposto que ainda seria pago se a pessoa resgatasse tudo no fim.
 
+CORREÇÃO (24/11/2026, depois da simulação do app inteiro): nas versões 1 e 2 da etapa 2, a corretora deste script não
+tinha as cotações das ações individuais, então a "escolha de ativos" ficava parada como dinheiro e saía menor do que é
+(o servidor sempre teve todas). O script foi corrigido e a etapa 2 refeita (etapa2_v2_corrigida_resultado.txt). O
+simulador mês a mês, que decidiu tirar a escolha de ativos do moderado, não tinha esse problema.
+
 Uso, na raiz do repositório: python3 ferramentas/rodadas_perfis.py [rodada]  (precisa de internet)
 """
 import itertools, json, os, sys, tempfile, time
@@ -92,7 +97,9 @@ def preparar():
     global D, PM, DM
     D = S.preparar()
     planos = {p["id"]: S.pesos_plano(p["pesos"]) for p in referencias.PLANOS}
-    ativos = sorted({a for w in planos.values() for a in w} | set(RF_DIV["padrao"]) | {"LCI_LCA"} | {a for n in NUC.values() for a in n} | {"DOLAR", "GOLD11"})
+    # todos os ativos que o app pode escolher (sem eles, a escolha de ações ficaria parada como dinheiro na corretora)
+    ativos = sorted(set(server.UNIVERSO) | {a for w in planos.values() for a in w} | {"LCI_LCA", "DOLAR", "GOLD11"})
+    ativos = [a for a in ativos if a == "DOLAR" or a in server.RF or a in D["ret"]]
     PM, DM = C.precos(ativos, D["meses"][0])
     return planos
 
