@@ -1,0 +1,58 @@
+volta 1 | conservador: atual (70, 'pos', 'global', 'meio') (cor 1ª 12.1 2ª 11.5 R$ 431,528; queda dia -5.6) -> 4 vizinhas claramente melhores; nova: (70, 'pos', 'mais_exterior', 'ouro')
+volta 1 | moderado: atual (40, 'inflacao', 'global', 'meio') (cor 1ª 15.8 2ª 11.2 R$ 492,317; queda dia -16.1) -> 12 vizinhas claramente melhores; nova: (40, 'inflacao', 'mais_exterior', 'meio')
+volta 1 | arrojado: atual (20, 'inflacao', 'global', 'meio') (cor 1ª 16.9 2ª 13.0 R$ 547,863; queda dia -16.3) -> 57 vizinhas claramente melhores; nova: (15, 'inflacao', 'mais_exterior', 'meio')
+volta 2 | conservador: atual (70, 'pos', 'mais_exterior', 'ouro') (cor 1ª 12.5 2ª 12.4 R$ 456,560; queda dia -6.0) -> 0 vizinhas claramente melhores
+volta 2 | moderado: atual (40, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 16.7 2ª 11.8 R$ 514,663; queda dia -16.6) -> 0 vizinhas claramente melhores
+volta 2 | arrojado: atual (15, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.3 2ª 14.4 R$ 600,920; queda dia -17.1) -> 0 vizinhas claramente melhores
+
+===== RESULTADO DA RODADA 4
+
+CONSERVADOR (limite -8%): (70, 'pos', 'mais_exterior', 'ouro') -> classes {'renda_fixa': 70.0, 'acao': 6.0, 'fii': 0.0, 'exterior': 16.5, 'cambio': 7.5}
+  corretora R$ 456,560 (12.5% | 12.4%), queda dia -6.0%; simulador R$ 476,632, queda -3.0%; pior crise ['Pandemia de Covid-19', -3.4]
+  janelas de 5 anos (36): vence o CDI em 100%; pior janela 9.9% ao ano; mediana 12.2% ao ano; maior queda numa janela -2.9%
+    contra permanente      : vence em 44% das janelas
+    contra all_weather     : vence em 33% das janelas
+    contra 60_40           : vence em 31% das janelas
+    contra tres_fundos     : vence em 47% das janelas
+    contra wellesley       : vence em 42% das janelas
+    contra golden_butterfly: vence em 56% das janelas
+    contra coffeehouse     : vence em 61% das janelas
+    contra swensen         : vence em 56% das janelas
+    contra core_four       : vence em 47% das janelas
+    contra bolsa           : vence em 75% das janelas
+/home/user/assistente-financeiro/ferramentas/refinar_perfis.py:128: RuntimeWarning: Mean of empty slice
+  fii = np.nanmean([x for x in (var(c, ini, fim) for c in sim.FII_CESTA) if x is not None] or [np.nan])
+  (4) robusta: SIM | informação: pior crise se o real não tivesse se desvalorizado: ('Crise financeira global', -7.8)
+
+MODERADO (limite -18%): (40, 'inflacao', 'mais_exterior', 'meio') -> classes {'renda_fixa': 40.0, 'acao': 12.0, 'fii': 0.0, 'exterior': 33.0, 'cambio': 15.0}
+  corretora R$ 514,663 (16.7% | 11.8%), queda dia -16.6%; simulador R$ 524,958, queda -9.0%; pior crise ['Crise financeira global', -14.3]
+  janelas de 5 anos (36): vence o CDI em 86%; pior janela 9.2% ao ano; mediana 15.3% ao ano; maior queda numa janela -9.9%
+    contra permanente      : vence em 83% das janelas
+    contra all_weather     : vence em 89% das janelas
+    contra 60_40           : vence em 67% das janelas
+    contra tres_fundos     : vence em 83% das janelas
+    contra wellesley       : vence em 86% das janelas
+    contra golden_butterfly: vence em 97% das janelas
+    contra coffeehouse     : vence em 100% das janelas
+    contra swensen         : vence em 86% das janelas
+    contra core_four       : vence em 81% das janelas
+    contra bolsa           : vence em 86% das janelas
+  (4) robusta: SIM | informação: pior crise se o real não tivesse se desvalorizado: ('Crise financeira global', -26.0)
+
+ARROJADO (limite -30%): (15, 'inflacao', 'mais_exterior', 'meio') -> classes {'renda_fixa': 15.0, 'acao': 17.0, 'fii': 0.0, 'exterior': 46.75, 'cambio': 21.25}
+  corretora R$ 600,920 (18.3% | 14.4%), queda dia -17.1%; simulador R$ 605,528, queda -14.8%; pior crise ['Crise financeira global', -15.9]
+  janelas de 5 anos (36): vence o CDI em 92%; pior janela 10.3% ao ano; mediana 17.1% ao ano; maior queda numa janela -14.5%
+    contra permanente      : vence em 89% das janelas
+    contra all_weather     : vence em 94% das janelas
+    contra 60_40           : vence em 89% das janelas
+    contra tres_fundos     : vence em 97% das janelas
+    contra wellesley       : vence em 97% das janelas
+    contra golden_butterfly: vence em 100% das janelas
+    contra coffeehouse     : vence em 100% das janelas
+    contra swensen         : vence em 97% das janelas
+    contra core_four       : vence em 94% das janelas
+    contra bolsa           : vence em 94% das janelas
+  (4) robusta: SIM | informação: pior crise se o real não tivesse se desvalorizado: ('Crise financeira global', -32.5)
+
+resultado: {"conservador": {"carteira": [70, "pos", "mais_exterior", "ouro"], "classes": {"renda_fixa": 70.0, "acao": 6.0, "fii": 0.0, "exterior": 16.5, "cambio": 7.5}, "pesos": {"TESOURO_SELIC": 49.0, "LCI_LCA": 21.0, "BOVA11": 3.6, "DIVO11": 2.4, "IVVB11": 16.5, "GOLD11": 7.5}, "robusta": true, "voltas": [{"volta": 1, "atual": [70, "pos", "global", "meio"], "melhores": 4}, {"volta": 2, "atual": [70, "pos", "mais_exterior", "ouro"], "melhores": 0}], "vence_cdi_janelas": 1.0, "pior_queda_janelas": -2.9}, "moderado": {"carteira": [40, "inflacao", "mais_exterior", "meio"], "classes": {"renda_fixa": 40.0, "acao": 12.0, "fii": 0.0, "exterior": 33.0, "cambio": 15.0}, "pesos": {"TESOURO_SELIC": 6.0, "TESOURO_IPCA": 34.0, "BOVA11": 7.2, "DIVO11": 4.8, "IVVB11": 33.0, "DOLAR": 7.5, "GOLD11": 7.5}, "robusta": true, "voltas": [{"volta": 1, "atual": [40, "inflacao", "global", "meio"], "melhores": 12}, {"volta": 2, "atual": [40, "inflacao", "mais_exterior", "meio"], "melhores": 0}], "vence_cdi_janelas": 0.861, "pior_queda_janelas": -9.9}, "arrojado": {"carteira": [15, "inflacao", "mais_exterior", "meio"], "classes": {"renda_fixa": 15.0, "acao": 17.0, "fii": 0.0, "exterior": 46.75, "cambio": 21.25}, "pesos": {"TESOURO_SELIC": 2.25, "TESOURO_IPCA": 12.75, "BOVA11": 10.2, "DIVO11": 6.8, "IVVB11": 46.75, "DOLAR": 10.625, "GOLD11": 10.625}, "robusta": true, "voltas": [{"volta": 1, "atual": [20, "inflacao", "global", "meio"], "melhores": 57}, {"volta": 2, "atual": [15, "inflacao", "mais_exterior", "meio"], "melhores": 0}], "vence_cdi_janelas": 0.917, "pior_queda_janelas": -14.5}}
+(53s)

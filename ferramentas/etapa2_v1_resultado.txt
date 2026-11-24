@@ -1,0 +1,33 @@
+
+== conservador: modelo {'renda_fixa': 70.0, 'acao': 7.5, 'fii': 0, 'exterior': 13.5, 'cambio': 9.0}
+  so_etfs         cor R$   433,015  12.1| 11.5 queda   -5.6 IR R$ 3,355 | sim R$   446,203  12.3| 11.9 queda   -2.2
+  escolhe_ativos  cor R$   433,015  12.1| 11.5 queda   -5.6 IR R$ 3,355 | sim R$   446,203  12.3| 11.9 queda   -2.2
+  (conferência: pesos fixos na corretora R$ 433,007) -> escolha de ativos: SAI (só ETFs e títulos)
+
+== moderado: modelo {'renda_fixa': 40.0, 'acao': 15.0, 'fii': 0, 'exterior': 27.0, 'cambio': 18.0}
+  so_etfs         cor R$   495,732  15.8| 11.3 queda  -16.2 IR R$ 9,402 | sim R$   502,498  15.6| 11.5 queda   -7.7
+  escolhe_ativos  cor R$   498,884  16.1| 11.3 queda  -16.1 IR R$ 10,807 | sim R$   497,771  15.5| 11.5 queda   -7.9
+  (conferência: pesos fixos na corretora R$ 495,492) -> escolha de ativos: FICA
+
+== arrojado: modelo {'renda_fixa': 20.0, 'acao': 20.0, 'fii': 0, 'exterior': 36.0, 'cambio': 24.0}
+  so_etfs         cor R$   553,001  16.9| 13.2 queda  -16.4 IR R$ 7,530 | sim R$   549,987  16.7| 13.0 queda  -11.9
+  escolhe_ativos  cor R$   554,691  17.5| 13.2 queda  -14.8 IR R$ 19,145 | sim R$   557,280  16.7| 13.3 queda  -12.0
+  (conferência: pesos fixos na corretora R$ 552,731) -> escolha de ativos: FICA
+Traceback (most recent call last):
+  File "/home/user/assistente-financeiro/ferramentas/rodadas_perfis.py", line 186, in <module>
+    etapa2(json.loads(sys.argv[2]))
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/assistente-financeiro/ferramentas/rodadas_perfis.py", line 181, in etapa2
+    print("\netapa2:", json.dumps({p: {k: v for k, v in x.items() if k != "resultados"} for p, x in out.items()}, ensure_ascii=False))
+                       ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.13/json/__init__.py", line 242, in dumps
+    **kw).encode(obj)
+          ~~~~~~^^^^^
+  File "/usr/local/lib/python3.13/json/encoder.py", line 202, in encode
+    chunks = self.iterencode(o, _one_shot=True)
+  File "/usr/local/lib/python3.13/json/encoder.py", line 263, in iterencode
+    return _iterencode(o, 0)
+  File "/usr/local/lib/python3.13/json/encoder.py", line 182, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+                    f'is not JSON serializable')
+TypeError: Object of type bool is not JSON serializable

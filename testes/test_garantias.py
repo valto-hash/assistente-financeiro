@@ -80,11 +80,18 @@ def ia_ruim(**kw):
     return msg
 server.client.messages.create = ia_ruim
 mocks.CALLS.clear()
-p = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "conservador", "objetivo": ""}).json()
+server.ESCOLHE_ATIVOS["arrojado"] = True  # liga a escolha de ações só neste teste (senão a ação nova já vira ETF antes da auditoria)
+p = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "arrojado", "objetivo": ""}).json()
+server.ESCOLHE_ATIVOS["arrojado"] = False
 a = p["auditoria"]
 print("   IA reprovada:", a["ia_reprovada"], "| fonte:", p["fonte"])
 ok(p["fonte"] == "regras" and a["ia_reprovada"] and any("ITUB4" in m for m in a["ia_reprovada"]["motivos"]),
    "carteira absurda da IA (todas as ações numa empresa só) é descartada e as regras assumem")
+# perfil sem ações individuais (conservador): a ação nova que a IA sugerir vira o ETF da classe
+_, pesos_s, _, _ = server.montar_carteira({"alvo": dict(server.PERFIS["conservador"]), "carteira": [
+    {"ativo": "ITUB4", "peso": 7.5, "motivo": "x"}, {"ativo": "TESOURO_SELIC", "peso": 70, "motivo": "x"},
+    {"ativo": "IVVB11", "peso": 13.5, "motivo": "x"}, {"ativo": "GOLD11", "peso": 9, "motivo": "x"}]}, "conservador", {}, {}, False)
+ok("ITUB4" not in pesos_s and pesos_s.get("BOVA11", 0) > 0, f"no perfil sem ações individuais, a IA não consegue incluir uma ação nova ({pesos_s})")
 alvo_c, pesos_c, _, _ = server.montar_carteira({"alvo": {"renda_fixa": 5, "acao": 85, "fii": 5, "exterior": 5, "cambio": 0}, "carteira": []},
                                                "conservador", {}, {}, False)
 mod = server.PERFIS["conservador"]
@@ -101,7 +108,7 @@ server.client.messages.create = orig
 
 # ---- 5) memória: segunda recomendação sabe da primeira e das compras
 mem = memoria.ler(uid)
-ok(len(mem["recomendacoes"]) == 1 and mem["recomendacoes"][0]["entrada"]["perfil"] == "conservador", "recomendação guardada na memória")
+ok(len(mem["recomendacoes"]) == 1 and mem["recomendacoes"][0]["entrada"]["perfil"] == "arrojado", "recomendação guardada na memória")
 c.put("/api/carteira", headers=H, json={"dados": {"pos": pos}, "base": 0})
 pos2 = {**pos, "BOVA11": {"qtd": 30, "pm": 110}}
 c.put("/api/carteira", headers=H, json={"dados": {"pos": pos2}, "base": 1})
@@ -147,7 +154,7 @@ kw = next(k for k in mocks.CALLS if "planejador" in k["system"])
 hist = json.loads(kw["messages"][0]["content"]).get("historico_do_investidor") or {}
 co = next((x for x in p4["auditoria"]["checagens"] if x["id"] == "consistencia"), None)
 print("   revisão do modelo:", co)
-ok(p4["alvo"] == p3["alvo"] and any("revisto" in x for x in hist.get("o_que_mudou_desde_entao", [])) and co and co["ok"],
+ok(p4["alvo"] == p3["alvo"] and any("reformulado" in x for x in hist.get("o_que_mudou_desde_entao", [])) and co and co["ok"],
    "a IA fica sabendo que o modelo do perfil foi revisto, e a mudança que vem da revisão não vira aviso")
 ok(memoria.ler(uid) and c.request("DELETE", "/api/conta", headers=H, json={"email": "g@ex.com", "senha": "senhateste1"}).status_code == 200
    and armazem.ler("memoria", uid) is None, "excluir a conta apaga a memória")

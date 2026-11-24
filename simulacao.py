@@ -446,6 +446,43 @@ def simular(carteiras, ativos, macro, cenarios, cenario="ponderado", inicial=0.0
 
 # ---------------------------------------------------------------- testes de estresse
 
+def estresse_sem_cambio(carteiras, ativos):
+    """A pior crise real de cada carteira se o real NÃO tivesse se desvalorizado: exterior e ouro pela variação em dólar
+    (dados reais do S&P 500 e do ouro em dólar), dólar parado; o resto como no Brasil. Mostra o risco que a alta do
+    dólar escondeu nas crises de 2008 a 2024. Devolve {carteira: (nome da crise, variação %)}."""
+    baixar(["IBOV", "SP500", "OURO", "IPCA_LONGO", *FII_CESTA])
+    def var(c, ini, fim):
+        s = _hist.get(c, (0, pd.Series(dtype=float)))[1]
+        if s is None or s.empty or s.index[0] > pd.Timestamp(ini):
+            return None
+        a, b = s.asof(pd.Timestamp(ini)), s.asof(pd.Timestamp(fim))
+        return None if pd.isna(a) or pd.isna(b) or a <= 0 else float(b / a - 1)
+    out = {}
+    for nome, ini, fim, cdi in CRISES:
+        dias = (pd.Timestamp(fim) - pd.Timestamp(ini)).days
+        rf = (1 + cdi / 100) ** (dias / 365) - 1
+        fiis = [x for x in (var(c, ini, fim) for c in FII_CESTA) if x is not None]
+        r = {"acao": var("IBOV", ini, fim), "exterior": var("SP500", ini, fim), "ouro": var("OURO", ini, fim),
+             "ipca": var("IPCA_LONGO", ini, fim), "fii": float(np.mean(fiis)) if fiis else None}
+        if r["acao"] is None:
+            continue
+        for cn, pesos in carteiras.items():
+            pesos = {a: w for a, w in pesos.items() if a in ativos and w > 0}
+            tot = sum(pesos.values())
+            if not tot:
+                continue
+            v = 0.0
+            for a, w in pesos.items():
+                s_ = ativos[a]
+                x = (rf * s_.get("fator", 1.0) if s_["tipo"] == "pos" else r["ipca"] if s_["tipo"] == "ipca" or a == "TESOURO_IPCA"
+                     else 0.0 if a == "DOLAR" else r["ouro"] if a == "GOLD11" else r["exterior"] if s_["classe"] == "exterior"
+                     else r["fii"] if s_["classe"] == "fii" else r["acao"])
+                v += w / tot * (x if x is not None else r["acao"])
+            if cn not in out or v * 100 < out[cn][1]:
+                out[cn] = (nome, round(v * 100, 1))
+    return out
+
+
 def estresse(carteiras, ativos):
     """Quanto cada carteira teria variado em crises reais (buy and hold durante a janela da crise)."""
     mercado = [a for a, s in ativos.items() if s["tipo"] == "mercado"]  # títulos (pós e IPCA+) não têm cotação no Yahoo

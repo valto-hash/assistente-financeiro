@@ -70,25 +70,57 @@ O que o simulador mudou: ajustar a alocação pela tendência e pelo juro do mom
 perfis, então foi desligado (`regras.AJUSTE_MOMENTO`); com 4% ou mais em dólar e ouro, a carteira passa a ter os dois.
 A tela mostra também a versão antiga.
 
-### Modelos dos perfis (revistos em nov/2026)
+### Os três tipos de investidor (reformulados em 24/11/2026)
 
-Cada perfil tem um modelo de divisão entre as classes (`server.PERFIS`). Os três foram revistos com validação fora da
-amostra (`ferramentas/revisar_modelos.py`): candidatos definidos antes de rodar (o modelo de antes, os planos consagrados
-levados para as classes do app e uma versão "global" do de antes), escolha só com 2013 a 2019 e confirmação com 2020 a
-2026, período que não entrou na escolha. Só é elegível o que aguenta a pior crise real testada dentro do limite do perfil
-(o mesmo critério da auditoria) e não cai mais do que o perfil aceita. Todos rodam com as regras do app.
+Cada perfil tem uma definição só (`perfil.DEFINICOES`, a mesma na tela, no teste de perfil, na IA e na auditoria): para
+quem é, quanto aceita cair e a renda fixa mínima. O limite de queda vale para três medidas ao mesmo tempo: a maior queda
+dia a dia de 2013 até hoje na corretora simulada, a maior queda no simulador mês a mês e a pior crise real testada
+(2008, 2015, 2020...).
 
-| Perfil | Antes | Agora | 2013-2026, app com o modelo (R$ 10 mil + R$ 1.000/mês) | Pior crise real |
+| Perfil | Para quem | Aceita cair até | Renda fixa mínima | Carteira recomendada (só ETFs e títulos) |
 |---|---|---|---|---|
-| Conservador | 70% RF, 8% ações, 10% FIIs, 9% exterior, 3% dólar/ouro | 70% RF, 7% ações, 3% FIIs, 10% exterior, 10% dólar/ouro | R$ 385 mil → R$ 412 mil | -15% → -9% |
-| Moderado | 45% RF, 20% ações, 15% FIIs, 15% exterior, 5% dólar/ouro | 45% RF, 17% ações, 8% FIIs, 20% exterior, 10% dólar/ouro | R$ 431 mil → R$ 452 mil | -25% → -19% |
-| Arrojado | 25% RF, 32% ações, 15% FIIs, 22% exterior, 6% dólar/ouro | 40% RF, 30% ações, 30% exterior (a 60/40) | R$ 469 mil → R$ 520 mil | -32% → -26% |
+| Conservador | pode precisar do dinheiro em pouco tempo, está montando a reserva ou não ficaria tranquilo vendo o dinheiro cair | 8% | 70% | 70% renda fixa (Tesouro Selic 70%, LCI 30%), 6% ações, 16,5% exterior, 7,5% ouro |
+| Moderado | investe por alguns anos, já tem reserva e aceita quedas de vez em quando para render mais | 18% | 40% | 40% renda fixa (85% Tesouro IPCA+, 15% Selic), 12% ações, 33% exterior, 15% dólar e ouro |
+| Arrojado | investe por muitos anos, tem a reserva completa e não precisaria vender numa crise | 30% | 15% | 15% renda fixa (85% Tesouro IPCA+), 17% ações, 46,75% exterior, 21,25% dólar e ouro |
 
-Os modelos antigos de moderado e arrojado teriam caído mais do que esses perfis aceitam na crise de 2008 (18% e 30%).
-O conservador foi revisto em 22/11 (mesmo método, cinco candidatos) e, na rodada de 23/11, continuou o melhor elegível:
-o All Weather rende mais, mas teria caído 11% em 2008. Os resultados dos planos no período inteiro já tinham aparecido no
-simulador antes da revisão; por isso a escolha usa só a primeira metade, e a prova que vale continua sendo a ao vivo.
-Quem tinha uma recomendação feita com o modelo antigo vê o motivo da mudança (`server.REVISAO_MODELO`), e a IA também.
+Como chegaram aqui (regras escritas antes de cada rodada, resultados em `ferramentas/*_resultado.txt`):
+- rodada 1 (`ferramentas/rodadas_perfis.py`): 639 carteiras de ETFs e títulos; elegíveis só as que respeitam o limite
+  nas três medidas; escolhida a de maior retorno na corretora em 2013-2019 (a 2ª metade só conferiu);
+- rodada 3 (`ferramentas/refinar_perfis.py`): refinamento até nenhuma carteira vizinha ser claramente melhor. Sem uma
+  renda fixa mínima, levou moderado e arrojado à mesma carteira, com 85% em risco: o teste "ganhando no passado" (o dólar
+  e o ouro subiram justamente nas crises brasileiras). Não foi aplicada;
+- rodada 4: o mesmo refinamento com a renda fixa mínima de cada perfil; convergiu em duas voltas. É a carteira de hoje;
+- em todas, escolher ações individuais além dos ETFs foi testado e não melhorou nenhum perfil, então o app não faz isso.
+
+O app depois das mudanças (`ferramentas/simulacao_app.py`, 24/11/2026; R$ 10 mil em 2013 + R$ 1.000 por mês; a
+corretora já com custos e imposto pago):
+
+| Perfil | Simulador mês a mês | Corretora dia a dia | Maior queda dia a dia | Se o real não tivesse se desvalorizado (pior crise) | Melhor alternativa que cabe (corretora) | Vence o CDI em janelas de 5 anos |
+|---|---|---|---|---|---|---|
+| Conservador | R$ 477 mil | R$ 457 mil | -6,0% | -7,9% | 100% CDI: R$ 378 mil | 100% |
+| Moderado | R$ 525 mil | R$ 515 mil | -16,7% | -26,0% | All Weather: R$ 460 mil | 86% |
+| Arrojado | R$ 606 mil | R$ 604 mil | -17,1% | -32,5% | 60/40: R$ 484 mil | 92% |
+
+Em cada perfil, a recomendada respeita o limite e termina com mais dinheiro que todas as outras estratégias que o app
+oferece e cabem no perfil, nos dois testes; nenhuma a domina. Pontos honestos:
+- muitas carteiras foram testadas e as escolhas usaram o mesmo período, então parte da vantagem pode ser sorte dele;
+  a prova ao vivo (carteira de cada mês guardada antes de o mês acontecer) é o teste que vale;
+- o dólar e o ouro subiram em todas as crises brasileiras testadas e seguraram as quedas. Se numa crise o real não se
+  desvalorizar, a queda pode ser bem maior: em 2008, com o S&P 500 e o ouro pela variação em dólar, o moderado teria
+  caído 26% e o arrojado 32,5%, acima dos limites deles. O app mostra esse número em cada estratégia;
+- nos testes, o arrojado caiu quase o mesmo que o moderado (17,1% contra 16,7% dia a dia); o limite dele é maior porque
+  a proteção do câmbio pode não se repetir;
+- nenhuma carteira tem fundos imobiliários: nos testes, eles não melhoraram nenhum perfil.
+
+### Teste com a sua descrição
+
+Sempre que a pessoa descreve a situação dela (perfil, objetivo, prazo, aporte, meta ou estratégia), a aba Investir
+testa a carteira que ela segue, e todas as outras que cabem no perfil dela, com os números dela: o valor que tem, o
+aporte por mês e o prazo (`server.teste_pessoal`, `POST /api/teste_pessoal`). Usa todos os períodos reais desde 2013,
+um começando a cada 3 meses, com as regras e os custos de operação do simulador. Mostra quanto ela teria no período do
+meio, no pior e no melhor, a maior queda no caminho, em quantos períodos chegou à meta e venceu o CDI, e sugere outra
+estratégia só quando ela foi claramente melhor para aquela descrição (mais chance de chegar à meta, ou mais dinheiro no
+período do meio, sem um pior caso mais baixo). Prazo maior que o histórico disponível é limitado e avisado.
 
 ### Escolher a estratégia
 
@@ -118,20 +150,21 @@ proventos caindo na conta e o imposto de renda pago como a Receita manda (açõe
 MetaTrader: patrimônio, lucro líquido, retorno de cada metade, maior queda dia a dia, ordens, vendas com lucro, fator de
 lucro, custos, imposto pago e o que ainda seria pago no resgate, além das últimas ordens e da posição final.
 
-Resultado de 23/11/2026 (R$ 10 mil em fev/2013 e R$ 1.000 por mês, já descontados custos e imposto pago): conservador
-R$ 402 mil, moderado R$ 446 mil, arrojado R$ 512 mil, contra R$ 378 mil no CDI na mesma corretora. Dia a dia as quedas
-aparecem maiores que no teste mês a mês (o conservador chegou a -11,6% em março de 2020), porque as cotações oscilam
-dentro do mês.
+Resultado de 24/11/2026, com os perfis da rodada 4 (R$ 10 mil em fev/2013 e R$ 1.000 por mês, já descontados custos e
+imposto pago): conservador R$ 457 mil, moderado R$ 515 mil, arrojado R$ 604 mil, contra R$ 378 mil no CDI na mesma
+corretora. Dia a dia as quedas aparecem maiores que no teste mês a mês, porque as cotações oscilam dentro do mês; por
+isso o limite de cada perfil é conferido também dia a dia.
 
 ### Garantia de melhor decisão
 
 Regra fixada antes de rodar com dados reais (`estrategias.dominantes`, `ferramentas/melhor_estrategia.py`): se uma
 estratégia que a pessoa pode escolher no perfil render mais que a recomendada nas duas metades do período (2013-2019 e
 2020 em diante, por 0,2 ponto ou mais em cada), nos dois testes (simulador e corretora), sem cair mais de 1 ponto além
-dela e terminando com mais dinheiro, a recomendada do perfil passa a seguir essa estratégia, e a tela explica o motivo.
+dela e terminando com mais dinheiro, a recomendada do perfil passa a seguir essa estratégia, e a tela explica o motivo. Uma estratégia só "cabe" no perfil
+se as três medidas de queda ficarem dentro do limite dele.
 A conferência roda sozinha toda vez que os testes são refeitos (uma vez por semana) e fica guardada no banco
-(`decisao/padrao`). Em 23/11/2026, nenhuma estratégia venceu a recomendada em nenhum perfil: no moderado, o All Weather
-terminou com mais dinheiro, mas na primeira metade ganhou por só 0,1 ponto. Ninguém garante o futuro: a garantia é que a
+(`decisao/padrao`). Em 24/11/2026, com os perfis reformulados, a recomendada terminou com mais dinheiro que todas as
+alternativas que cabem em cada perfil, nos dois testes, e nenhuma a domina. Ninguém garante o futuro: a garantia é que a
 recomendada nunca fica atrás de uma alternativa disponível que se mostrou melhor de forma consistente nos testes.
 
 ### Quanto você ganha com cada FII e ação

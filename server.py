@@ -60,28 +60,39 @@ NOME_CLASSE = {"renda_fixa": "Renda fixa", "acao": "Ações Brasil", "fii": "Fun
 
 PADRAO = {"renda_fixa": {"TESOURO_SELIC": 0.5, "TESOURO_IPCA": 0.5}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4},
           "fii": {"HGLG11": 0.35, "KNRI11": 0.35, "KNCR11": 0.3}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}
-# Modelos revistos em nov/2026 com o simulador do passado e validação fora da amostra: candidatos definidos antes de
-# rodar, escolha só com 2013-2019 e confirmação com 2020-2026 (scripts e números no README). Elegível só o que aguenta a
-# pior crise real dentro do limite do perfil (PIOR_CRISE): os modelos antigos de moderado e arrojado teriam caído 25% e
-# 32% na crise de 2008, além do que esses perfis aceitam; o conservador antigo, 15%.
-# - conservador (22/11): menos FIIs (sofrem com os mesmos juros da renda fixa), mais exterior, dólar e ouro.
-# - moderado (23/11): a mesma lição ("global"): menos FIIs e um pouco menos de bolsa daqui, mais exterior, dólar e ouro.
-# - arrojado (23/11): a 60/40 clássica (metade das ações no Brasil, metade nos EUA, 40% em renda fixa): rendeu mais nas
-#   duas metades e caiu menos que o antigo.
-PERFIS_ANTERIOR = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},
+# Perfis reformulados em 24/11/2026 (ferramentas/rodadas_perfis.py e refinar_perfis.py; resultados em ferramentas/).
+# Cada perfil tem um limite de queda e uma renda fixa mínima (perfil.DEFINICOES). O limite vale para três medidas: a
+# maior queda dia a dia de 2013 até hoje na corretora simulada, a maior queda no simulador mês a mês e a pior crise real
+# testada (2008, 2015, 2020...). Rodada 1: 639 carteiras de ETFs e títulos, escolha pela 1ª metade (2013-2019). Rodada 4
+# (refinamento até nenhuma carteira vizinha ser claramente melhor, com a renda fixa mínima): as carteiras abaixo. Elas
+# vencem, nos dois testes, todas as outras estratégias que o app oferece e cabem no perfil, e vencem o CDI em 86% a 100%
+# das janelas de 5 anos. Escolher ações individuais não melhorou nenhuma delas, então os três perfis usam só ETFs e
+# títulos. Os modelos de 22-23/11 não cabiam nos próprios perfis (o conservador caiu 11,6% dia a dia em março de 2020).
+PERFIS_ORIGINAL = {"conservador": {"renda_fixa": 70, "acao": 8, "fii": 10, "exterior": 9, "cambio": 3},   # até 21/11/2026
                    "moderado": {"renda_fixa": 45, "acao": 20, "fii": 15, "exterior": 15, "cambio": 5},
                    "arrojado": {"renda_fixa": 25, "acao": 32, "fii": 15, "exterior": 22, "cambio": 6}}
+PERFIS_ANTERIOR = {"conservador": {"renda_fixa": 70, "acao": 7, "fii": 3, "exterior": 10, "cambio": 10},  # de 22-23/11/2026
+                   "moderado": {"renda_fixa": 45, "acao": 17, "fii": 8, "exterior": 20, "cambio": 10},
+                   "arrojado": {"renda_fixa": 40, "acao": 30, "fii": 0, "exterior": 30, "cambio": 0}}
 REVISAO_MODELO = {
-    "conservador": ("2026-11-22", "o modelo do perfil conservador foi revisto em nov/2026 com testes no passado: "
-                                  "menos fundos imobiliários e mais exterior, dólar e ouro, que protegem melhor nas crises"),
-    "moderado": ("2026-11-23", "o modelo do perfil moderado foi revisto em nov/2026 com testes no passado: menos fundos "
-                               "imobiliários e um pouco menos de bolsa brasileira, mais exterior, dólar e ouro, que protegem melhor nas crises"),
-    "arrojado": ("2026-11-23", "o modelo do perfil arrojado foi revisto em nov/2026 com testes no passado: passou a seguir a "
-                               "carteira 60/40 (ações do Brasil e dos EUA e 40% em renda fixa, sem fundos imobiliários), que rendeu "
-                               "mais e caiu menos que o modelo antigo")}
-PERFIS = {"conservador": {"renda_fixa": 70, "acao": 7, "fii": 3, "exterior": 10, "cambio": 10},
-          "moderado": {"renda_fixa": 45, "acao": 17, "fii": 8, "exterior": 20, "cambio": 10},
-          "arrojado": {"renda_fixa": 40, "acao": 30, "fii": 0, "exterior": 30, "cambio": 0}}
+    "conservador": ("2026-11-24", "o perfil conservador foi reformulado em 24/11/2026 com testes com dados reais: a renda fixa "
+                                  "passou a ser pós-fixada (Tesouro Selic e LCI) em vez de Tesouro IPCA+ longo, com mais exterior, "
+                                  "ouro no lugar do dólar e nenhum fundo imobiliário, para nunca ter caído mais de 8%"),
+    "moderado": ("2026-11-24", "o perfil moderado foi reformulado em 24/11/2026 com testes com dados reais: menos renda fixa "
+                               "(mais Tesouro IPCA+), mais exterior e nenhum fundo imobiliário, que rendeu mais e ficou dentro "
+                               "do limite de queda de 18%"),
+    "arrojado": ("2026-11-24", "o perfil arrojado foi reformulado em 24/11/2026 com testes com dados reais: menos renda fixa, "
+                               "mais exterior, dólar e ouro e nenhuma ação de setor específico, que rendeu mais e ficou dentro "
+                               "do limite de queda de 30%")}
+PERFIS = {"conservador": {"renda_fixa": 70, "acao": 6, "fii": 0, "exterior": 16.5, "cambio": 7.5},
+          "moderado": {"renda_fixa": 40, "acao": 12, "fii": 0, "exterior": 33, "cambio": 15},
+          "arrojado": {"renda_fixa": 15, "acao": 17, "fii": 0, "exterior": 46.75, "cambio": 21.25}}
+# a divisão de cada classe em ETFs e títulos, por perfil (o que não está aqui segue regras.NUCLEO_PADRAO)
+NUCLEOS = {"conservador": {"renda_fixa": {"TESOURO_SELIC": .7, "LCI_LCA": .3}, "cambio": {"GOLD11": 1.0}},
+           "moderado": {"renda_fixa": {"TESOURO_SELIC": .15, "TESOURO_IPCA": .85}},
+           "arrojado": {"renda_fixa": {"TESOURO_SELIC": .15, "TESOURO_IPCA": .85}}}
+# o app escolhe ações e FIIs individuais além dos ETFs? Só onde isso melhorou os dois testes com dados reais (em nenhum)
+ESCOLHE_ATIVOS = {"conservador": False, "moderado": False, "arrojado": False}
 TEMAS = {"juros": ("Copom Selic juros", "renda_fixa"), "inflacao": ("inflação IPCA", "renda_fixa"),
          "bolsa": ("Ibovespa bolsa de valores", "acao"), "fii": ("fundos imobiliários IFIX", "fii"),
          "exterior": ("Wall Street S&P 500 Fed", "exterior"), "cambio": ("dólar real câmbio", "cambio")}
@@ -577,6 +588,10 @@ Em posicao_atual, "proventos_mes_informado" é quanto a pessoa diz receber por m
 "proventos_mes_estimado" é o que o histórico dos últimos 12 meses indica. Ao sugerir vender ou reduzir um ativo que paga
 proventos, diga quanto de renda por mês ela deixaria de receber; se o informado for muito diferente do estimado, peça para
 ela conferir.
+"perfil_definicao" diz quanto a pessoa aceita ver a carteira cair: não monte nada que possa cair mais do que isso.
+Use "divisao_dentro_das_classes" como referência para dividir cada classe. Se "escolher_acoes_individuais" for falso, não
+sugira ações nem FIIs individuais novos (só os ETFs e títulos): nos testes com dados reais, isso não melhorou o resultado
+neste perfil.
 Não prometa retorno. Responda em português do Brasil."""
 
 PROMPT_OBJETIVO = """
@@ -655,6 +670,8 @@ def montar_carteira(ia, perfil_ef, atual, sinais, com_objetivo=False):
             faixa[c] = (modelo[c] - 10, 100) if c == "renda_fixa" else (0, modelo[c] + 10)
         else:
             faixa[c] = (modelo[c] - 10, modelo[c] + 10)
+        if c == "renda_fixa":  # nunca abaixo da renda fixa mínima do perfil
+            faixa[c] = (max(faixa[c][0], teste_perfil.DEFINICOES[perfil_ef]["rf_min"]), faixa[c][1])
     for _ in range(8):  # limita e normaliza algumas vezes: normalizar uma vez só pode empurrar uma classe para fora da faixa
         alvo = {c: min(max(v, faixa[c][0], 0), faixa[c][1]) for c, v in alvo.items()}
         s = sum(alvo.values()) or 1
@@ -669,13 +686,19 @@ def montar_carteira(ia, perfil_ef, atual, sinais, com_objetivo=False):
         if a in permitidos and w and w > 0:
             pesos[a] = pesos.get(a, 0) + w
             motivos[a] = str(it.get("motivo", ""))[:320]
+    if not ESCOLHE_ATIVOS.get(perfil_ef, True):  # perfil sem ações e FIIs individuais novos: o peso vai para o ETF da classe
+        nuc = {**regras.NUCLEO_PADRAO, **NUCLEOS.get(perfil_ef, {})}
+        for a in [a for a in pesos if _individual(a) and a not in atual]:
+            principal = next(iter(nuc[classe(a)]))
+            pesos[principal] = pesos.get(principal, 0) + pesos.pop(a)
+            motivos.pop(a, None)
     final, origem = {}, {}
     for c in CORE:
         if alvo[c] <= 0: continue
         g = {a: w for a, w in pesos.items() if classe(a) == c}
         if not g:  # IA não escolheu nada nesta classe: usa os atuais que não têm sinal de venda + ETFs padrão
             meus = {a: v for a, v in atual.items() if classe(a) == c and v > 0 and sinais.get(a) != "VENDER"}
-            g = {k: v * (0.5 if meus else 1) for k, v in PADRAO[c].items()}
+            g = {k: v * (0.5 if meus else 1) for k, v in {**regras.NUCLEO_PADRAO, **NUCLEOS.get(perfil_ef, {})}[c].items()}
             tot = sum(meus.values())
             for a, v in meus.items():
                 w = 0.5 * v / tot
@@ -712,7 +735,8 @@ CONTRA_PADRAO = {
 }
 
 
-PIOR_CRISE = {"conservador": -8.0, "moderado": -18.0, "arrojado": -30.0}  # perda tolerada na pior crise real (2008, 2015, 2020...)
+# o limite de queda de cada perfil (perfil.DEFINICOES): dia a dia, mês a mês e na pior crise real (2008, 2015, 2020...)
+PIOR_CRISE = {p: -float(d["limite"]) for p, d in teste_perfil.DEFINICOES.items()}
 
 
 def otimizar_risco(pesos, alvo, perfil_ef, meta, anos, inicial, mensal, pan, pos, risco_anterior=None):
@@ -837,8 +861,12 @@ def _elegivel_novo(a, univ):
 def checagens_duras(pesos, alvo, perfil_ef, obj_an, held, univ, specs, modelo=None):
     """modelo: a divisão de referência da faixa de cada classe (a do perfil; numa estratégia escolhida, a dela, que já
     passou pelos limites de queda e de crise do perfil)."""
-    return referencias.checar(pesos, alvo, modelo or PERFIS[perfil_ef], perfil_ef, (obj_an or {}).get("liquidez"), set(held), _individual,
-                              lambda a: _elegivel_novo(a, univ), PIOR_CRISE[perfil_ef], _pior_crise(pesos, specs), bool(obj_an))
+    out = referencias.checar(pesos, alvo, modelo or PERFIS[perfil_ef], perfil_ef, (obj_an or {}).get("liquidez"), set(held), _individual,
+                             lambda a: _elegivel_novo(a, univ), PIOR_CRISE[perfil_ef], _pior_crise(pesos, specs), bool(obj_an))
+    rf_min, rf = teste_perfil.DEFINICOES[perfil_ef]["rf_min"], alvo.get("renda_fixa", 0)
+    out.insert(2, {"id": "rf_min", "titulo": f"Pelo menos {rf_min}% em renda fixa", "ok": rf >= rf_min - 0.6,
+                   "bloqueia": rf < rf_min - 0.6, "detalhe": f"Renda fixa: {referencias._br(rf, 0)}%; o perfil {perfil_ef} pede pelo menos {rf_min}%."})
+    return out
 
 
 # ---------------------------------------------------------------- estratégias que a pessoa pode escolher (estrategias.py)
@@ -861,9 +889,42 @@ def _crises(carteiras):
     return out
 
 
+# maior queda dia a dia de cada plano na corretora simulada, na rodada de 24/11/2026 (usada até a corretora ser refeita aqui)
+QUEDA_DIA_REF = {"cdi": 0.0, "permanente": -13.6, "all_weather": -15.4, "60_40": -27.6, "tres_fundos": -26.4, "wellesley": -18.0,
+                 "golden_butterfly": -20.8, "coffeehouse": -27.7, "swensen": -25.7, "core_four": -30.7, "bolsa": -46.9}
+
+
+def _quedas_dia(perfil):
+    """A maior queda dia a dia de cada estratégia na corretora simulada (a guardada no banco, se houver)."""
+    out = dict(QUEDA_DIA_REF)
+    try:
+        x = armazem.ler("cache", "corretora")
+        d = x["dados"] if x and x["dados"].get("versao") == corretora.VERSAO else None
+        if d:
+            out.update({k: v["maior_queda"] for k, v in d.get("planos", {}).items()})
+            pp = d.get("perfis", {}).get(perfil) or {}
+            if pp.get("app"):
+                out["app"] = pp["app"]["maior_queda"]
+            if pp.get("fixo"):
+                out["modelo_fixo"] = pp["fixo"]["maior_queda"]
+    except Exception as e:
+        print("queda dia a dia indisponível:", repr(e)[:200], flush=True)
+    return out
+
+
+def _crises_sem_cambio(carteiras):
+    """A pior crise real de cada carteira se o real não tivesse se desvalorizado (exterior e ouro em dólar, dólar parado)."""
+    specs = {}
+    for p in carteiras.values():
+        specs.update(_specs(p, {}))
+    return sim.estresse_sem_cambio(carteiras, specs)
+
+
 def estrategias_perfil(perfil):
     ref = cached("ref:planos", 12 * 3600, referencias.planos_ref, ok=lambda v: bool(v["planos"]), ttl_falha=600)
-    return cached(f"estr:{perfil}", 12 * 3600, lambda: estrategias.lista(perfil, PERFIS[perfil], PIOR_CRISE[perfil], _crises, ref),
+    return cached(f"estr:{perfil}", 12 * 3600, lambda: estrategias.lista(perfil, PERFIS[perfil], PIOR_CRISE[perfil], _crises, ref,
+                                                                         NUCLEOS[perfil], ESCOLHE_ATIVOS[perfil], _quedas_dia(perfil),
+                                                                         teste_perfil.DEFINICOES[perfil]["rf_min"], _crises_sem_cambio),
                   ok=lambda v: all(e["pior_crise"] for e in v["estrategias"]), ttl_falha=600)
 
 
@@ -1212,6 +1273,9 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
             **({"objetivo": objetivo} if objetivo else {}), **({"orcamento": orc_ia} if tem_orc else {}),
             "perfil": r.perfil[:30], "total_brl": round(total, 2), "posicao_atual": itens, "classes_atuais_pct": classes,
             "alocacao_modelo_do_perfil": PERFIS[perfil_ef],
+            "perfil_definicao": teste_perfil.DEFINICOES[perfil_ef]["texto"],
+            "divisao_dentro_das_classes": {c: v for c, v in {**regras.NUCLEO_PADRAO, **NUCLEOS[perfil_ef]}.items() if PERFIS[perfil_ef].get(c)},
+            "escolher_acoes_individuais": ESCOLHE_ATIVOS[perfil_ef],
             "panorama": {"resumo": pan["resumo"], "classes": {c: {k: v[k] for k in ("visao", "ajuste", "motivo")} for c, v in pan["classes"].items()},
                          "cenarios": [{k: s[k] for k in ("nome", "prob", "descricao")} for s in pan["cenarios"]]},
             "taxas": {k: taxas[k] for k in ("selic", "cdi", "ipca12", "ipca_esperado", "focus")},
@@ -1313,7 +1377,7 @@ def portfolio(req: Request, r: PortReq, authorization: str = Header("")):
                                           "vol_aa": mm.get("volatilidade_anual"), "dy_12m": mm.get("dividend_yield_12m"),
                                           "queda_max_12m": mm.get("queda_max_12m"), "giro_dia": mm.get("giro_dia")} if mm else None})
             pesos, motivos = regras.escolher_ativos(alvo, cand, atual, sinais, (obj_an or {}).get("liquidez"), ETF_ACAO | ETF_EXT | ETF_RF,
-                                                    taxas.get("cdi") or 10.0, SETOR)
+                                                    taxas.get("cdi") or 10.0, SETOR, None, NUCLEOS[perfil_ef], ESCOLHE_ATIVOS[perfil_ef])
             origem, textos = {}, {}
             # alocação pela meta: testa versões mais e menos arriscadas em 2.000 cenários e fica com a melhor dentro do risco aceito
             meta_p = ((obj_an or {}).get("metas") or [{}])[0]
@@ -2014,11 +2078,11 @@ def _simulador():
                 cabem[p] = {e["id"] for e in estrategias_perfil(p)["estrategias"] if e["tipo"] == "plano" and e["cabe"]}
             except Exception as e:
                 print("estratégias indisponíveis no simulador:", repr(e)[:200], flush=True)
-        r = simulador.tudo(PERFIS, PIOR_CRISE, anteriores=PERFIS_ANTERIOR, cabem=cabem)
+        r = simulador.tudo(PERFIS, PIOR_CRISE, anteriores=PERFIS_ANTERIOR, cabem=cabem, nucleos=NUCLEOS, satelites=ESCOLHE_ATIVOS,
+                           originais=PERFIS_ORIGINAL)
         for p, x in r["perfis"].items():  # a revisão do modelo do perfil: a pior crise real do antigo e do novo
             if x.get("modelo_anterior") and p in REVISAO_MODELO:
-                cr = _crises({k: {a: m[c] * w for c, ws in simulador.NUCLEO.items() for a, w in ws.items() if m.get(c)}
-                              for k, m in (("antigo", x["modelo_anterior"]), ("novo", x["modelo"]))})
+                cr = _crises({"antigo": simulador.fixo_de(x["modelo_anterior"]), "novo": simulador.fixo_de(x["modelo"], NUCLEOS.get(p))})
                 x["revisao"] = {"data": REVISAO_MODELO[p][0], "limite": PIOR_CRISE[p],
                                 **{k: list(v) for k, v in cr.items()}}
         if r["perfis"] and not r.get("aproximado"):  # sem o Banco Central, mostra mas não guarda (refaz na próxima)
@@ -2037,7 +2101,7 @@ def _corretora():
         if (d and d["dados"].get("versao") == corretora.VERSAO and d["dados"].get("versao_sim") == simulador.VERSAO
                 and time.time() - (d["dados"].get("calculado") or 0) < 7 * 86400):
             return d["dados"]
-        r = corretora.tudo(PERFIS)
+        r = corretora.tudo(PERFIS, nucleos=NUCLEOS, satelites=ESCOLHE_ATIVOS)
         r["versao_sim"] = simulador.VERSAO
         if r["perfis"] and not r.get("aproximado"):
             armazem.gravar("cache", "corretora", r)
@@ -2117,6 +2181,117 @@ def corretora_ep(req: Request, authorization: str = Header("")):
     pads = _padroes()
     return {**r, "padroes": {p: {**v, "nome": ESTRATEGIA_NOMES.get(v["id"], v["id"]),
                                  "texto": texto_padrao(p, v) if v["id"] != estrategias.PADRAO else None} for p, v in pads.items()}}
+
+
+# ---------------------------------------------------------------- teste pessoal: a carteira com os números da pessoa
+
+class TestePessoalReq(BaseModel):
+    perfil: str = "moderado"
+    estrategia: str = "app"
+    inicial: float = 0
+    mensal: float = 0
+    anos: float = 10
+    meta: float = 0
+
+
+def _dados_simulador():
+    return cached("sim:dados", 12 * 3600, simulador.preparar, ok=lambda v: not v.get("aproximado"), ttl_falha=900)
+
+
+def teste_pessoal(perfil, est, inicial, mensal, anos, meta):
+    """Testa a estratégia que a pessoa segue (e todas as outras que cabem no perfil dela) com os números dela: o valor que
+    ela tem, o aporte por mês e o prazo, em todos os períodos reais desde 2013 (um começando a cada 3 meses), com as regras
+    de operação e os custos do simulador. Só dados reais; nada aqui é previsão."""
+    d = _dados_simulador()
+    meses = list(d["meses"])
+    max_anos = (len(meses) - 1) // 12 - 3          # deixa pelo menos uns 12 períodos para comparar
+    anos_ef = int(min(max(round(anos), 1), max_anos))
+    padrao = not (inicial > 0 or mensal > 0)
+    inicial, mensal = (simulador.INICIAL, simulador.MENSAL) if padrao else (max(inicial, 0), max(mensal, 0))
+    lst = estrategias_perfil(perfil)["estrategias"]
+    pad = _padroes().get(perfil, {})
+    segue = pad.get("id") if est == estrategias.PADRAO and pad.get("id") not in (None, estrategias.PADRAO) else None
+    sua = segue or est
+    cands = {e["id"]: e for e in lst if e["cabe"]}
+    if sua not in cands:
+        sua = estrategias.PADRAO
+    n_mes = anos_ef * 12
+    res = []
+    for i, e in cands.items():
+        w = e["ativos"]
+        finais, quedas = [], []
+        for k in range(0, len(meses) - n_mes, 3):
+            dd = {**d, "meses": pd.DatetimeIndex(meses[k:k + n_mes + 1])}
+            x = simulador._rodar(dd, lambda t, h, w=w: w, inicial, mensal)
+            r = pd.Series(x["rets"]).add(1).cumprod()
+            finais.append(x["valores"][-1])
+            quedas.append(float((r / r.cummax().clip(lower=1) - 1).min()) * 100)
+        nome = e["nome"]
+        if segue and i == estrategias.PADRAO:  # a recomendada hoje segue outra estratégia: esta linha é o modelo do perfil
+            nome = "Modelo do perfil, só ETFs e títulos"
+        elif segue and i == segue:
+            nome = f"Recomendada pelo app (hoje seguindo {e['nome']})"
+        res.append({"id": i, "nome": nome, "finais": finais, "maior_queda": round(min(quedas), 1)})
+    cdi = next((r for r in res if r["id"] == "cdi"), None)
+    out = []
+    for r in res:
+        f = sorted(r["finais"])
+        item = {"id": r["id"], "nome": r["nome"], "mediana": round(float(pd.Series(f).median()), 0), "pior": round(f[0], 0),
+                "melhor": round(f[-1], 0), "maior_queda": r["maior_queda"], "sua": r["id"] == sua,
+                "recomendada": r["id"] == estrategias.PADRAO,
+                "chance_meta": round(sum(v >= meta for v in f) / len(f) * 100) if meta > 0 else None,
+                "vence_cdi": round(sum(a > b for a, b in zip(r["finais"], cdi["finais"])) / len(f) * 100) if cdi and r["id"] != "cdi" else None}
+        out.append(item)
+    out.sort(key=lambda x: (-(x["chance_meta"] or 0), -x["mediana"]))
+    minha = next(x for x in out if x["sua"])
+    melhor = None
+    for x in out:
+        if x["sua"] or x["id"] == "cdi":
+            continue
+        if meta > 0:
+            claro = x["chance_meta"] >= minha["chance_meta"] + 10 and x["pior"] >= minha["pior"]
+        else:
+            claro = x["mediana"] >= minha["mediana"] * 1.03 and x["pior"] >= minha["pior"] and x["maior_queda"] >= minha["maior_queda"] - 1
+        if claro:
+            melhor = x
+            break
+    aplicado = inicial + mensal * n_mes
+    br = lambda v: regras.brl(v, 0)
+    texto = (f"Testei {minha['nome']} com os seus números: {br(inicial)} agora e {br(mensal)} por mês, por {anos_ef} "
+             f"{'ano' if anos_ef == 1 else 'anos'} ({br(aplicado)} aplicados), em {len(res[0]['finais'])} períodos reais desde "
+             f"{meses[0]:%m/%Y}. No período do meio, você terminaria com {br(minha['mediana'])}; no pior, {br(minha['pior'])}; no melhor, "
+             f"{br(minha['melhor'])}. A maior queda no caminho foi de {referencias._br(-minha['maior_queda'], 0)}%.")
+    if meta > 0:
+        texto += f" Sua meta de {br(meta)} foi alcançada em {minha['chance_meta']}% dos períodos."
+    if minha.get("vence_cdi") is not None:
+        texto += f" Rendeu mais que o CDI em {minha['vence_cdi']}% dos períodos."
+    if padrao:
+        texto = texto.replace("com os seus números", "com valores de exemplo (você ainda não informou quanto tem e quanto aplica)")
+    if round(anos) > anos_ef:
+        texto += f" Seu prazo é de {round(anos)} anos; o histórico disponível permite testar até {anos_ef}."
+    return {"anos": anos_ef, "periodos": len(res[0]["finais"]), "inicial": inicial, "mensal": mensal, "meta": meta or None,
+            "aplicado": aplicado, "exemplo": padrao, "estrategias": out, "sua": sua, "texto": texto,
+            "melhor": ({"id": melhor["id"], "nome": melhor["nome"],
+                        "texto": (f"Para a sua descrição, {melhor['nome']} foi claramente melhor nesses períodos: "
+                                  + (f"chegou à meta em {melhor['chance_meta']}% deles (contra {minha['chance_meta']}%)" if meta > 0 else
+                                     f"no período do meio terminaria com {br(melhor['mediana'])} (contra {br(minha['mediana'])})")
+                                  + f", sem um pior caso mais baixo. Ela também cabe no seu perfil.")} if melhor else None),
+            "desde": f"{meses[0]:%m/%Y}", "ate": f"{meses[-1]:%m/%Y}"}
+
+
+@app.post("/api/teste_pessoal")
+def teste_pessoal_ep(req: Request, r: TestePessoalReq, authorization: str = Header("")):
+    """Roda sempre que a pessoa descreve a situação dela (perfil, objetivo, prazo, aporte, meta ou estratégia mudam)."""
+    auth(req, authorization)
+    p = r.perfil if r.perfil in PERFIS else "moderado"
+    est = r.estrategia if r.estrategia in ESTRATEGIA_NOMES else estrategias.PADRAO
+    chave = f"tp:{p}:{est}:{round(r.inicial, -2)}:{round(r.mensal, -1)}:{round(r.anos)}:{round(r.meta, -3)}"
+    try:
+        return cached(chave, 12 * 3600, lambda: teste_pessoal(p, est, round(r.inicial, -2), round(r.mensal, -1), r.anos,
+                                                               round(r.meta, -3)))
+    except Exception as e:
+        print("teste pessoal falhou:", repr(e)[:300], flush=True)
+        raise HTTPException(502, "Não consegui testar a sua carteira agora. Tente de novo em alguns minutos.")
 
 
 @app.get("/api/simulador")
