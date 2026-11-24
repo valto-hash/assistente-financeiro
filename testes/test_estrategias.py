@@ -21,15 +21,17 @@ E = {e["id"]: e for e in j["estrategias"]}
 print("   ", [(e["id"], e["ret_aa"], e["maior_queda"], e["pior_crise"], e["cabe"]) for e in j["estrategias"]])
 ok(list(E)[0] == "app" and "modelo_fixo" not in E and set(p["id"] for p in referencias.PLANOS) <= set(E) and not E["app"]["satelites"],
    "moderado: a recomendada (que já é só com ETFs e títulos) e os 11 planos consagrados, sem a opção repetida")
-Ea = {e["id"]: e for e in c.get("/api/estrategias?perfil=arrojado", headers=H).json()["estrategias"]}
-ok(list(Ea)[:2] == ["app", "modelo_fixo"] and Ea["app"]["satelites"], "arrojado (o app escolhe ações): a recomendada e, à parte, o modelo só com ETFs")
+for pf in server.PERFIS:  # o "modelo só com ETFs" só aparece à parte onde o app escolhe ações (hoje, em nenhum perfil)
+    Ea = {e["id"]: e for e in c.get(f"/api/estrategias?perfil={pf}", headers=H).json()["estrategias"]}
+    ok(("modelo_fixo" in Ea) == server.ESCOLHE_ATIVOS[pf] and Ea["app"]["satelites"] == server.ESCOLHE_ATIVOS[pf]
+       and Ea["app"].get("crise_sem_cambio"), f"{pf}: opções sem repetição, e a crise se o real não se desvalorizar aparece")
 ok(all(abs(sum(e["classes"].values()) - 100) < 0.6 and abs(sum(e["ativos"].values()) - 100) < 0.6 for e in E.values()),
    "cada estratégia tem a divisão por classe e por ativo somando 100%")
-ok(E["app"]["classes"] == server.PERFIS["moderado"] and E["app"]["cabe"] and Ea["modelo_fixo"]["cabe"],
+ok(E["app"]["classes"] == server.PERFIS["moderado"] and E["app"]["cabe"],
    "a recomendada parte do modelo do perfil e sempre cabe nele")
 lim = j["limite"]
 regra = all(e["cabe"] == (e["maior_queda"] >= lim and (e["pior_crise"] is None or e["pior_crise"][1] >= lim)
-                          and (e["queda_dia"] is None or e["queda_dia"] >= lim))
+                          and (e["queda_dia"] is None or e["queda_dia"] >= lim) and e["classes"]["renda_fixa"] >= j["rf_min"] - 0.5)
             and bool(e["motivo_nao_cabe"]) == (not e["cabe"]) for e in E.values() if e["tipo"] == "plano")
 ok(regra, "um plano só cabe se a maior queda e a pior crise real ficarem dentro do limite do perfil, e o motivo aparece quando não cabe")
 ok(all(e["pior_crise"] for e in E.values()), "todas passaram pelo teste das crises reais")
@@ -123,4 +125,22 @@ print("   conservador:", p["fonte"], pesos)
 nucleo = {a for n in {**server.regras.NUCLEO_PADRAO, **server.NUCLEOS["conservador"]}.values() for a in n}
 ok(not any(server._individual(a) and a not in pos and a not in nucleo for a in pesos),
    "conservador: nenhuma ação ou FII individual novo fora dos núcleos (escolher ativos não melhorou este perfil)")
+# ---- 9) teste pessoal: depois da descrição da pessoa, a carteira dela testada com os números dela
+ok(c.post("/api/teste_pessoal", json={}).status_code == 401, "teste pessoal: precisa estar logado")
+t = c.post("/api/teste_pessoal", headers=H, json={"perfil": "moderado", "estrategia": "app", "inicial": 20000, "mensal": 1500,
+                                                    "anos": 5, "meta": 150000}).json()
+print("   teste pessoal:", t["texto"][:220])
+ok(t["anos"] == 5 and t["periodos"] >= 10 and t["inicial"] == 20000 and t["mensal"] == 1500 and not t["exemplo"]
+   and t["aplicado"] == 20000 + 1500 * 60, "usa o valor, o aporte e o prazo da pessoa, em vários períodos reais")
+ids = {x["id"] for x in t["estrategias"]}
+cabem = {e["id"] for e in server.estrategias_perfil("moderado")["estrategias"] if e["cabe"]}
+ok(ids == cabem and sum(x["sua"] for x in t["estrategias"]) == 1 and next(x for x in t["estrategias"] if x["sua"])["id"] == "app",
+   "compara a estratégia da pessoa com todas as que cabem no perfil")
+ok(all(x["pior"] <= x["mediana"] <= x["melhor"] and 0 <= x["chance_meta"] <= 100 for x in t["estrategias"]) and "meta" in t["texto"],
+   "pior, mediana e melhor caso coerentes, e a chance de chegar à meta")
+t2 = c.post("/api/teste_pessoal", headers=H, json={"perfil": "conservador", "estrategia": "app", "anos": 40}).json()
+ok(t2["exemplo"] and t2["anos"] < 40 and "até" in t2["texto"], "sem valores informados usa exemplo e avisa; prazo maior que o histórico é limitado e avisado")
+t3 = c.post("/api/teste_pessoal", headers=H, json={"perfil": "moderado", "estrategia": "all_weather", "inicial": 20000, "mensal": 1500,
+                                                     "anos": 5, "meta": 150000}).json()
+ok(next(x for x in t3["estrategias"] if x["sua"])["id"] == "all_weather", "quem escolheu outra estratégia vê o teste dela")
 print("TUDO OK" if not falhas else f"{len(falhas)} FALHA(S)")

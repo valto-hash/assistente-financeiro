@@ -31,7 +31,7 @@ import simulacao as sim
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, SETOR, UNIVERSO
 
 INICIO = "2013-01"
-VERSAO = 6               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
+VERSAO = 7               # mude quando o cálculo mudar: o resultado guardado no banco é refeito
 CUSTO = 0.001            # 0,1% por compra ou venda (emolumentos da B3 + diferença entre compra e venda)
 INICIAL, MENSAL = 10000.0, 1000.0
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF
@@ -310,7 +310,7 @@ def simular(d, perfil, modelo, limite_queda, inicial=INICIAL, mensal=MENSAL, ant
         print("planos no simulador falharam:", repr(e)[:200], flush=True)
     if anterior and anterior != modelo:
         fixo_ant = fixo_de(anterior)
-        linhas.append(_resumo("Modelo anterior do perfil (22 a 24/11/2026), só ETFs", _rodar(d, lambda t, h: fixo_ant, inicial, mensal),
+        linhas.append(_resumo("Modelo anterior do perfil (22 e 23/11/2026), só ETFs", _rodar(d, lambda t, h: fixo_ant, inicial, mensal),
                               {"id": "fixo_antigo"}))
     app_, fixo_, cdi_ = linhas[0], linhas[2], linhas[3]
     melhores = sorted((l for l in linhas if l["id"] not in ("app_antigo", "fixo_antigo") and not l.get("igual_app")), key=lambda l: -l["final"])

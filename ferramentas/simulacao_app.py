@@ -28,7 +28,7 @@ if __name__ == "__main__":
         print(f"  modelo: {server.PERFIS[p]} | renda fixa: {({**server.regras.NUCLEO_PADRAO, **server.NUCLEOS[p]})['renda_fixa']}"
               f" | escolhe ações: {'sim' if server.ESCOLHE_ATIVOS[p] else 'não'}")
         print(f"  queda máxima da recomendada: dia a dia {c_app['maior_queda']}% | mês a mês {s_app['maior_queda']}% | pior crise "
-              f"{rec['pior_crise'][0]} {rec['pior_crise'][1]}% (limite {lim:.0f}%)")
+              f"{rec['pior_crise'][0]} {rec['pior_crise'][1]}% (limite {lim:.0f}%) | se o real não se desvalorizar: {rec.get('crise_sem_cambio')}")
         dentro = c_app["maior_queda"] >= lim and s_app["maior_queda"] >= lim and rec["pior_crise"][1] >= lim
         if not dentro:
             problemas.append(f"{p}: a recomendada passa do limite de queda")

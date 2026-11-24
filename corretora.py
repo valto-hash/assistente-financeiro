@@ -28,7 +28,7 @@ import simulacao as sim
 import simulador as S
 from ativos import ETF_ACAO, ETF_EXT, ETF_RF, RF, UNIVERSO
 
-VERSAO = 3
+VERSAO = 4
 EMOL, SPREAD, CAMBIO = 0.0003, 0.0005, 0.005
 CUSTODIA_AA = 0.002
 ETFS = ETF_ACAO | ETF_EXT | ETF_RF | {"GOLD11", "VOO"}

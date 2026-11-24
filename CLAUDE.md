@@ -26,6 +26,7 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `simulador.py` | Simulador do passado (seguir o app mês a mês desde 2013) e a prova ao vivo mensal |
 | `estrategias.py` | Estratégias que a pessoa pode escolher (recomendada, modelo só com ETFs, planos consagrados) e a regra de melhor decisão |
 | `corretora.py` | Corretora simulada: o app dia a dia com ordens, custos, proventos e IR (estilo testador do MetaTrader) |
+| `perfil.py` | Teste de perfil e a definição de cada tipo de investidor (`DEFINICOES`) |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
 | `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
@@ -47,16 +48,19 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 5. Mudança em regra de alocação ou escolha de ativos: rode o simulador (`simulador.tudo`) antes e depois e compare com o
    modelo fixo do perfil. Regra que piora o resultado nos três perfis não entra (foi assim que `AJUSTE_MOMENTO` foi
    desligado). Cuidado para não ajustar regra até "ganhar no passado": a prova que vale é a ao vivo.
-6. Os tipos de investidor estão em `perfil.DEFINICOES` (nome, para quem, limite de queda); o limite vira
-   `server.PIOR_CRISE` e vale para três medidas: queda dia a dia na corretora, queda no simulador mês a mês e pior crise
-   real. Mudança no modelo de um perfil (`server.PERFIS`, `NUCLEOS`, `ESCOLHE_ATIVOS`): candidatos e regra escritos antes
-   de rodar, escolha só com 2013-2019 e conferência com 2020 até hoje, dentro do limite nas três medidas
-   (`ferramentas/rodadas_perfis.py`). Depois, `ferramentas/simulacao_app.py` tem de mostrar a recomendada vencendo todas
+6. Os tipos de investidor estão em `perfil.DEFINICOES` (nome, para quem, limite de queda, renda fixa mínima); o limite
+   vira `server.PIOR_CRISE` e vale para três medidas: queda dia a dia na corretora, queda no simulador mês a mês e pior
+   crise real; a renda fixa mínima vale na IA, na auditoria e no encaixe das estratégias. Mudança no modelo de um perfil
+   (`server.PERFIS`, `NUCLEOS`, `ESCOLHE_ATIVOS`): candidatos e regra escritos antes de rodar, dentro do limite nas três
+   medidas e da renda fixa mínima (`ferramentas/rodadas_perfis.py`, `ferramentas/refinar_perfis.py`). Se a busca
+   igualar dois perfis ou empurrar tudo para o máximo de risco, é sinal de "ganhar no passado": não aplique. Depois, `ferramentas/simulacao_app.py` tem de mostrar a recomendada vencendo todas
    as estratégias que cabem no perfil, nos dois testes. Guarde o modelo anterior em `PERFIS_ANTERIOR` e o motivo em
    `REVISAO_MODELO`. Foi assim em 24/11/2026.
 7. Estratégia escolhida pela pessoa (`estrategias.py`): só pode ser seguida se couber no perfil (maior queda e pior crise
    real dentro de `PIOR_CRISE`) e passar na auditoria; senão, vale a recomendada e a tela mostra o motivo.
-8. Garantia de melhor decisão (`estrategias.dominantes`, `server._atualizar_padroes`): se uma estratégia disponível vencer
+8. Sempre que a pessoa descreve a situação dela (perfil, objetivo, prazo, aporte, meta, estratégia), a tela roda o teste
+   pessoal (`server.teste_pessoal`) com os números dela, em todos os períodos reais desde 2013. Não tire esse gatilho.
+9. Garantia de melhor decisão (`estrategias.dominantes`, `server._atualizar_padroes`): se uma estratégia disponível vencer
    a recomendada nas duas metades nos dois testes com dados reais (simulador e corretora), com queda não pior, a
    recomendada passa a segui-la. Não afrouxe a regra (margem de 0,2 ponto por metade, 1 ponto de queda) para "ganhar
    no passado".

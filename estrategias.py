@@ -65,8 +65,10 @@ def classes(pesos_comp):
     return {c: round(out.get(c, 0), 1) for c in NOME_CL}
 
 
-def motivo_fora(perfil, limite, maior_queda, pior_crise, queda_dia):
-    """Por que uma estratégia não cabe no perfil (None se cabe): as três medidas têm de ficar dentro do limite."""
+def motivo_fora(perfil, limite, maior_queda, pior_crise, queda_dia, rf=None, rf_min=None):
+    """Por que uma estratégia não cabe no perfil (None se cabe): renda fixa mínima e as três medidas de queda."""
+    if rf_min is not None and rf is not None and rf < rf_min - 0.5:
+        return f"Tem {_br(rf)}% em renda fixa; o perfil {perfil} pede pelo menos {rf_min}%."
     if queda_dia is not None and queda_dia < limite:
         return f"Na corretora simulada, chegou a cair {_br(-queda_dia, 1)}% (dia a dia, desde 2013); o perfil {perfil} aceita até {_br(-limite)}%."
     if maior_queda is not None and maior_queda < limite:
@@ -77,7 +79,7 @@ def motivo_fora(perfil, limite, maior_queda, pior_crise, queda_dia):
     return None
 
 
-def lista(perfil, modelo, limite, crises, ref=None, nucleo=None, satelites=True, quedas_dia=None):
+def lista(perfil, modelo, limite, crises, ref=None, nucleo=None, satelites=True, quedas_dia=None, rf_min=None, crises_sem_cambio=None):
     """Todas as estratégias para o perfil, com o teste com o passado e se cabem nele (pelas três medidas de queda do perfil:
     teste mês a mês, pior crise real e, quando já calculada, a corretora simulada dia a dia).
     crises(carteiras) -> {id: (nome da crise, variação %)}: a pior crise real de cada carteira (por ativo).
@@ -89,8 +91,8 @@ def lista(perfil, modelo, limite, crises, ref=None, nucleo=None, satelites=True,
     at_m, mot_m = ativos_modelo(modelo, perfil, nucleo)
     mm = referencias.metricas(referencias.rodar(_comp_de_ativos(at_m), R), R) or {}
     est = [{"id": PADRAO, "nome": NOME_PADRAO, "tipo": "app", "autor": f"modelo do perfil {perfil}, reformulado em 24/11/2026",
-            "ideia": ("O modelo do seu perfil, escolhido entre 639 carteiras com testes com dados reais por ter rendido mais "
-                      "sem passar do limite de queda do perfil. " +
+            "ideia": ("O modelo do seu perfil, escolhido com testes com dados reais (639 carteiras e depois um refinamento até "
+                      "nenhuma vizinha ser claramente melhor) por ter rendido mais sem passar do limite de queda do perfil. " +
                       ("Além dos ETFs, o app escolhe até 2 ações de empresas de qualidade (no máximo 10% cada): nos testes, isso "
                        "melhorou o resultado neste perfil. " if satelites else
                        "Só ETFs e títulos: nos testes, escolher ações individuais não melhorou o resultado neste perfil. ") +
@@ -106,13 +108,16 @@ def lista(perfil, modelo, limite, crises, ref=None, nucleo=None, satelites=True,
                     "ativos": at, "motivos": mot, **{k: p.get(k) for k in CAMPOS}})
     cr = crises({e["id"]: e["ativos"] for e in est if e["id"] != "modelo_fixo"})
     cr["modelo_fixo"] = cr.get(PADRAO)
+    sc = crises_sem_cambio({e["id"]: e["ativos"] for e in est if e["id"] != "modelo_fixo"}) if crises_sem_cambio else {}
+    sc["modelo_fixo"] = sc.get(PADRAO)
     for e in est:
         e["pior_crise"] = list(cr[e["id"]]) if cr.get(e["id"]) else None
         e["queda_dia"] = quedas_dia.get(e["id"])
-        motivo = motivo_fora(perfil, limite, e["maior_queda"], e["pior_crise"], e["queda_dia"])
+        e["crise_sem_cambio"] = list(sc[e["id"]]) if sc.get(e["id"]) else None
+        motivo = motivo_fora(perfil, limite, e["maior_queda"], e["pior_crise"], e["queda_dia"], e["classes"].get("renda_fixa"), rf_min)
         e["cabe"] = e["tipo"] != "plano" or motivo is None
         e["motivo_nao_cabe"] = motivo if e["tipo"] == "plano" else None
-    return {"perfil": perfil, "limite": limite, "padrao": PADRAO, "estrategias": est,
+    return {"perfil": perfil, "limite": limite, "rf_min": rf_min, "padrao": PADRAO, "estrategias": est,
             "periodo": {"desde": ref["desde"], "ate": ref["ate"]}, "componentes": ref["componentes"]}
 
 

@@ -7,25 +7,27 @@ risco (prazo, reserva de emergência, idade). O objetivo vira um texto que o res
 """
 from regras import brl
 
-# Cada tipo de investidor, reformulado em 24/11/2026. O limite é a maior queda que a carteira recomendada pode ter tido
+# Cada tipo de investidor, reformulado em 24/11/2026. "limite" é a maior queda que a carteira recomendada pode ter tido
 # em qualquer momento: dia a dia de 2013 até hoje (corretora simulada), mês a mês (simulador) e na pior crise real
-# testada (2008, 2015, 2020...). O servidor usa este limite em tudo (server.PIOR_CRISE).
+# testada (2008, 2015, 2020...). "rf_min" é a parte mínima em renda fixa (rodada 4 de ferramentas/refinar_perfis.py: sem
+# ela, a busca deixava moderado e arrojado iguais, com 85% em risco). O servidor usa os dois em tudo.
 DEFINICOES = {
-    "conservador": {"nome": "Conservador", "limite": 8,
-                    "curto": "Prioriza não perder dinheiro: aceita quedas de no máximo 8% no caminho.",
+    "conservador": {"nome": "Conservador", "limite": 8, "rf_min": 70,
+                    "curto": "Prioriza não perder dinheiro: pelo menos 70% em renda fixa e quedas de no máximo 8% no caminho.",
                     "para_quem": "Para quem pode precisar do dinheiro em pouco tempo, ainda está montando a reserva de emergência "
                                  "ou não ficaria tranquilo vendo o dinheiro cair."},
-    "moderado": {"nome": "Moderado", "limite": 18,
-                 "curto": "Equilíbrio entre segurança e crescimento: aceita quedas de até 18% no caminho.",
+    "moderado": {"nome": "Moderado", "limite": 18, "rf_min": 40,
+                 "curto": "Equilíbrio entre segurança e crescimento: pelo menos 40% em renda fixa e quedas de até 18% no caminho.",
                  "para_quem": "Para quem investe por alguns anos, já tem reserva de emergência e aceita ver a carteira cair de "
                               "vez em quando em troca de render mais."},
-    "arrojado": {"nome": "Arrojado", "limite": 30,
-                 "curto": "Busca o maior crescimento no longo prazo: aceita quedas de até 30% no caminho.",
+    "arrojado": {"nome": "Arrojado", "limite": 30, "rf_min": 15,
+                 "curto": "Busca o maior crescimento no longo prazo: pelo menos 15% em renda fixa e quedas de até 30% no caminho.",
                  "para_quem": "Para quem investe por muitos anos, tem a reserva de emergência completa e não precisaria vender "
                               "nada numa crise."}}
 for _k, _d in DEFINICOES.items():
     _d["texto"] = (f"{_d['nome']}: {_d['curto'][0].lower() + _d['curto'][1:]} A carteira recomendada não pode ter caído mais de "
-                   f"{_d['limite']}% em nenhum momento dos testes com dados reais (dia a dia desde 2013 e nas crises reais).")
+                   f"{_d['limite']}% em nenhum momento dos testes com dados reais (dia a dia desde 2013 e nas crises reais) e "
+                   f"tem pelo menos {_d['rf_min']}% em renda fixa.")
 
 PERGUNTAS = [
     {"id": "objetivo", "tipo": "escolha", "titulo": "Qual é o seu principal objetivo com os investimentos?", "opcoes": [

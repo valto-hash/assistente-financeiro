@@ -1,42 +1,41 @@
 
-===== CONSERVADOR: Prioriza não perder dinheiro: aceita quedas de no máximo 8% no caminho.
-  modelo: {'renda_fixa': 70, 'acao': 7.5, 'fii': 0, 'exterior': 13.5, 'cambio': 9} | renda fixa: {'TESOURO_SELIC': 0.7, 'LCI_LCA': 0.3} | escolhe ações: não
-  queda máxima da recomendada: dia a dia -5.6% | mês a mês -2.2% | pior crise Pandemia de Covid-19 -3.2% (limite -8%)
+===== CONSERVADOR: Prioriza não perder dinheiro: pelo menos 70% em renda fixa e quedas de no máximo 8% no caminho.
+  modelo: {'renda_fixa': 70, 'acao': 6, 'fii': 0, 'exterior': 16.5, 'cambio': 7.5} | renda fixa: {'TESOURO_SELIC': 0.7, 'LCI_LCA': 0.3} | escolhe ações: não
+  queda máxima da recomendada: dia a dia -6.0% | mês a mês -3.0% | pior crise Pandemia de Covid-19 -3.4% (limite -8%) | se o real não se desvalorizar: ['Crise financeira global', -7.9]
   estratégia                                            simulador mês a mês          corretora dia a dia (custos e IR)
-  Recomendada pelo app                     R$   446,203  12.3| 11.9% q   -2.2   R$   433,015  12.1| 11.5% q   -5.6 IR   3,355
-  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,609   9.7| 10.1% q    0.0 IR       0
+  Recomendada pelo app                     R$   476,634  12.7| 13.0% q   -3.0   R$   456,563  12.5| 12.4% q   -6.0 IR   5,470
+  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,606   9.7| 10.1% q    0.0 IR       0
   não cabem no perfil: Portfólio Permanente, All Weather (Todas as Estações), 60/40 clássica, Três fundos, Renda e crescimento 35/65, Golden Butterfly (Borboleta Dourada), Coffeehouse, Carteira de Swensen (Yale), Core Four, 100% bolsa brasileira
   dominam a recomendada: nenhuma | simulador: 1º de 2
 
-===== MODERADO: Equilíbrio entre segurança e crescimento: aceita quedas de até 18% no caminho.
-  modelo: {'renda_fixa': 40, 'acao': 15, 'fii': 0, 'exterior': 27, 'cambio': 18} | renda fixa: {'TESOURO_SELIC': 0.15, 'TESOURO_IPCA': 0.85} | escolhe ações: não
-  queda máxima da recomendada: dia a dia -16.2% | mês a mês -7.7% | pior crise Crise financeira global -14.3% (limite -18%)
+===== MODERADO: Equilíbrio entre segurança e crescimento: pelo menos 40% em renda fixa e quedas de até 18% no caminho.
+  modelo: {'renda_fixa': 40, 'acao': 12, 'fii': 0, 'exterior': 33, 'cambio': 15} | renda fixa: {'TESOURO_SELIC': 0.15, 'TESOURO_IPCA': 0.85} | escolhe ações: não
+  queda máxima da recomendada: dia a dia -16.7% | mês a mês -9.0% | pior crise Crise financeira global -14.3% (limite -18%) | se o real não se desvalorizar: ['Crise financeira global', -26.0]
   estratégia                                            simulador mês a mês          corretora dia a dia (custos e IR)
-  Recomendada pelo app                     R$   502,498  15.6| 11.5% q   -7.7   R$   495,732  15.8| 11.3% q  -16.2 IR   9,402
-  All Weather (Todas as Estações)          R$   472,230  13.6| 10.9% q   -8.3   R$   462,179  13.7| 10.6% q  -15.4 IR   7,444
-  Portfólio Permanente                     R$   447,951  10.9| 11.0% q  -12.6   R$   438,452  11.1| 10.6% q  -13.6 IR   5,806
-  Renda e crescimento 35/65                R$   443,414  13.8|  9.6% q  -10.3   R$   437,672  14.0|  9.4% q  -18.0 IR   3,241
-  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,609   9.7| 10.1% q    0.0 IR       0
+  Recomendada pelo app                     R$   525,370  16.5| 12.1% q   -9.0   R$   514,999  16.7| 11.8% q  -16.7 IR  10,631
+  All Weather (Todas as Estações)          R$   472,230  13.6| 10.9% q   -8.3   R$   459,522  13.7| 10.5% q  -15.4 IR   7,444
+  Renda e crescimento 35/65                R$   443,414  13.8|  9.6% q  -10.3   R$   436,851  14.0|  9.4% q  -18.0 IR   3,241
+  Portfólio Permanente                     R$   447,951  10.9| 11.0% q  -12.6   R$   435,342  11.1| 10.5% q  -13.6 IR   5,806
+  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,606   9.7| 10.1% q    0.0 IR       0
   não cabem no perfil: 60/40 clássica, Três fundos, Golden Butterfly (Borboleta Dourada), Coffeehouse, Carteira de Swensen (Yale), Core Four, 100% bolsa brasileira
   dominam a recomendada: nenhuma | simulador: 1º de 5
 
-===== ARROJADO: Busca o maior crescimento no longo prazo: aceita quedas de até 30% no caminho.
-  modelo: {'renda_fixa': 20, 'acao': 20, 'fii': 0, 'exterior': 36, 'cambio': 24} | renda fixa: {'TESOURO_SELIC': 0.15, 'TESOURO_IPCA': 0.85} | escolhe ações: sim
-  queda máxima da recomendada: dia a dia -16.5% | mês a mês -12.0% | pior crise Crise financeira global -15.6% (limite -30%)
+===== ARROJADO: Busca o maior crescimento no longo prazo: pelo menos 15% em renda fixa e quedas de até 30% no caminho.
+  modelo: {'renda_fixa': 15, 'acao': 17, 'fii': 0, 'exterior': 46.75, 'cambio': 21.25} | renda fixa: {'TESOURO_SELIC': 0.15, 'TESOURO_IPCA': 0.85} | escolhe ações: não
+  queda máxima da recomendada: dia a dia -17.1% | mês a mês -14.8% | pior crise Crise financeira global -15.9% (limite -30%) | se o real não se desvalorizar: ['Crise financeira global', -32.5]
   estratégia                                            simulador mês a mês          corretora dia a dia (custos e IR)
-  Recomendada pelo app                     R$   557,280  16.7| 13.3% q  -12.0   R$   565,060  16.9| 13.5% q  -16.5 IR   9,167
-  Modelo do perfil, só ETFs e títulos      R$   549,758  16.7| 13.0% q  -11.9   R$   552,731  16.9| 13.2% q  -16.3 IR   7,499
-  60/40 clássica                           R$   496,909  16.2| 10.3% q  -15.8   R$   486,754  16.4| 10.0% q  -27.6 IR   8,477
-  All Weather (Todas as Estações)          R$   472,230  13.6| 10.9% q   -8.3   R$   462,179  13.7| 10.6% q  -15.4 IR   7,444
-  Três fundos                              R$   463,151  13.9| 10.2% q  -17.0   R$   449,383  14.1|  9.7% q  -26.4 IR   5,494
-  Portfólio Permanente                     R$   447,951  10.9| 11.0% q  -12.6   R$   438,452  11.1| 10.6% q  -13.6 IR   5,806
-  Renda e crescimento 35/65                R$   443,414  13.8|  9.6% q  -10.3   R$   437,672  14.0|  9.4% q  -18.0 IR   3,241
-  Golden Butterfly (Borboleta Dourada)     R$   388,374  10.7|  7.7% q  -14.0   R$   389,470  10.9|  7.8% q  -20.8 IR   5,996
-  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,609   9.7| 10.1% q    0.0 IR       0
+  Recomendada pelo app                     R$   606,015  18.1| 14.4% q  -14.8   R$   604,294  18.3| 14.4% q  -17.1 IR  10,691
+  60/40 clássica                           R$   496,909  16.2| 10.3% q  -15.8   R$   484,266  16.4|  9.9% q  -27.6 IR   8,477
+  All Weather (Todas as Estações)          R$   472,230  13.6| 10.9% q   -8.3   R$   459,522  13.7| 10.5% q  -15.4 IR   7,444
+  Três fundos                              R$   463,151  13.9| 10.2% q  -17.0   R$   447,379  14.1|  9.6% q  -26.4 IR   5,494
+  Renda e crescimento 35/65                R$   443,414  13.8|  9.6% q  -10.3   R$   436,851  14.0|  9.4% q  -18.0 IR   3,241
+  Portfólio Permanente                     R$   447,951  10.9| 11.0% q  -12.6   R$   435,342  11.1| 10.5% q  -13.6 IR   5,806
+  Golden Butterfly (Borboleta Dourada)     R$   388,374  10.7|  7.7% q  -14.0   R$   387,462  10.9|  7.7% q  -20.8 IR   5,996
+  100% CDI                                 R$   378,847   9.7| 10.1% q    0.0   R$   377,606   9.7| 10.1% q    0.0 IR       0
   não cabem no perfil: Coffeehouse, Carteira de Swensen (Yale), Core Four, 100% bolsa brasileira
-  dominam a recomendada: nenhuma | simulador: 1º de 9
+  dominam a recomendada: nenhuma | simulador: 1º de 8
 
 prova ao vivo: desde 2026-10; meses já medidos: []
 
 TUDO CERTO: em cada perfil, a recomendada respeita o limite e vence todas as que cabem, nos dois testes
-(39s)
+(40s)

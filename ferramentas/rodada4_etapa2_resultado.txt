@@ -1,0 +1,17 @@
+
+== conservador: {'renda_fixa': 70.0, 'acao': 6.0, 'fii': 0.0, 'exterior': 16.5, 'cambio': 7.5}
+  so_etfs         cor R$   456,563  12.5| 12.4 queda   -6.0, depois do resgate R$ 425,509 | sim R$   476,634  12.7| 13.0
+  escolhe_ativos  cor R$   456,563  12.5| 12.4 queda   -6.0, depois do resgate R$ 425,509 | sim R$   476,634  12.7| 13.0
+  -> escolha de ações: SAI (só ETFs e títulos)
+
+== moderado: {'renda_fixa': 40.0, 'acao': 12.0, 'fii': 0.0, 'exterior': 33.0, 'cambio': 15.0}
+  so_etfs         cor R$   514,999  16.7| 11.8 queda  -16.7, depois do resgate R$ 472,674 | sim R$   525,370  16.5| 12.1
+  escolhe_ativos  cor R$   509,173  16.6| 11.7 queda  -16.3, depois do resgate R$ 467,411 | sim R$   517,027  16.3| 12.0
+  -> escolha de ações: SAI (só ETFs e títulos)
+
+== arrojado: {'renda_fixa': 15.0, 'acao': 17.0, 'fii': 0.0, 'exterior': 46.75, 'cambio': 21.25}
+  so_etfs         cor R$   604,294  18.3| 14.4 queda  -17.1, depois do resgate R$ 548,676 | sim R$   606,015  18.1| 14.4
+  escolhe_ativos  cor R$   595,155  18.2| 14.3 queda  -17.1, depois do resgate R$ 544,745 | sim R$   600,662  17.9| 14.4
+  -> escolha de ações: SAI (só ETFs e títulos)
+
+etapa2: {"conservador": {"modelo": {"renda_fixa": 70.0, "acao": 6.0, "fii": 0.0, "exterior": 16.5, "cambio": 7.5}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.7, "LCI_LCA": 0.3}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"GOLD11": 1.0}}, "satelites": false}, "moderado": {"modelo": {"renda_fixa": 40.0, "acao": 12.0, "fii": 0.0, "exterior": 33.0, "cambio": 15.0}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.15, "TESOURO_IPCA": 0.85}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}, "satelites": false}, "arrojado": {"modelo": {"renda_fixa": 15.0, "acao": 17.0, "fii": 0.0, "exterior": 46.75, "cambio": 21.25}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.15, "TESOURO_IPCA": 0.85}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}, "satelites": false}}

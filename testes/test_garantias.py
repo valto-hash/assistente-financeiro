@@ -80,7 +80,9 @@ def ia_ruim(**kw):
     return msg
 server.client.messages.create = ia_ruim
 mocks.CALLS.clear()
-p = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "arrojado", "objetivo": ""}).json()  # perfil que escolhe ações
+server.ESCOLHE_ATIVOS["arrojado"] = True  # liga a escolha de ações só neste teste (senão a ação nova já vira ETF antes da auditoria)
+p = c.post("/api/portfolio", headers=H, json={"pos": pos, "perfil": "arrojado", "objetivo": ""}).json()
+server.ESCOLHE_ATIVOS["arrojado"] = False
 a = p["auditoria"]
 print("   IA reprovada:", a["ia_reprovada"], "| fonte:", p["fonte"])
 ok(p["fonte"] == "regras" and a["ia_reprovada"] and any("ITUB4" in m for m in a["ia_reprovada"]["motivos"]),

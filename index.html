@@ -560,9 +560,9 @@ const FRACIONAVEL = new Set(['DOLAR', 'VOO']);  // dólar em qualquer valor e VO
 const qtdTxt = (t, n) => n == null ? '' : t === 'DOLAR' ? `US$ ${N(n, 2)}` : FRACIONAVEL.has(t) ? `${N(n, 4)} cotas` : `${N(n)} ${n === 1 ? 'cota' : 'cotas'}`;
 // definição de cada tipo de investidor: a mesma de perfil.DEFINICOES (o teste test_perfis confere)
 const PERFIS = {
-  conservador: ['Conservador', 'Prioriza não perder dinheiro: aceita quedas de no máximo 8% no caminho.', 'Para quem pode precisar do dinheiro em pouco tempo, ainda está montando a reserva de emergência ou não ficaria tranquilo vendo o dinheiro cair.'],
-  moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento: aceita quedas de até 18% no caminho.', 'Para quem investe por alguns anos, já tem reserva de emergência e aceita ver a carteira cair de vez em quando em troca de render mais.'],
-  arrojado: ['Arrojado', 'Busca o maior crescimento no longo prazo: aceita quedas de até 30% no caminho.', 'Para quem investe por muitos anos, tem a reserva de emergência completa e não precisaria vender nada numa crise.'],
+  conservador: ['Conservador', 'Prioriza não perder dinheiro: pelo menos 70% em renda fixa e quedas de no máximo 8% no caminho.', 'Para quem pode precisar do dinheiro em pouco tempo, ainda está montando a reserva de emergência ou não ficaria tranquilo vendo o dinheiro cair.'],
+  moderado: ['Moderado', 'Equilíbrio entre segurança e crescimento: pelo menos 40% em renda fixa e quedas de até 18% no caminho.', 'Para quem investe por alguns anos, já tem reserva de emergência e aceita ver a carteira cair de vez em quando em troca de render mais.'],
+  arrojado: ['Arrojado', 'Busca o maior crescimento no longo prazo: pelo menos 15% em renda fixa e quedas de até 30% no caminho.', 'Para quem investe por muitos anos, tem a reserva de emergência completa e não precisaria vender nada numa crise.'],
 };
 const ACAO = {AUMENTAR: ['good', 'up', 'Aumentar'], COMPRAR: ['good', 'up', 'Comprar'], MANTER: ['', 'flat', 'Manter'],
   REDUZIR: ['bad', 'down', 'Reduzir'], VENDER: ['bad', 'down', 'Vender'], REALIZAR_LUCRO: ['warn', 'down', 'Realizar lucro']};
@@ -1738,6 +1738,7 @@ function renderInvestir() {
   const grupos = CL.map(k => [k, p.sugerida.filter(s => s.classe === k)]).filter(([, g]) => g.length);
   el.innerHTML = `${objetivoHtml()}
   <div id="estrCard">${estrHtml()}</div>
+  <div id="tpCard">${tpHtml()}</div>
   <div class="grid2 top">
     <div class="card sticky">
       <h2>Quanto você quer investir agora?</h2>
@@ -1788,8 +1789,46 @@ function renderInvestir() {
   $$('[data-follow]', el).forEach(b => b.onclick = () => follow(b.dataset.follow, b));
   $('#btnCopy', el).onclick = copyPlan;
   bindObjetivo(el);
-  ligarEstr();
+  ligarEstr(); ligarTp();
   if (!st.estr.busy && (!st.estr.dados || st.estr.perfil !== perfilEf())) loadEstr();
+}
+
+/* ---------- teste pessoal: sempre que a pessoa descreve a situação dela, o app testa a carteira com os números dela ---------- */
+st.tp = {sig: null, dados: null, err: null, busy: false};
+function descricaoTp() {
+  const p = st.port; if (!p) return null;
+  const mp = metaPrincipal(), an = p.objetivo_analise || {};
+  const mensal = an.aporte_mensal || (p.orcamento?.sobra > 0 ? Math.round(p.orcamento.sobra) : simCfg.mensal) || 0;
+  return {perfil: perfilEf(), estrategia, inicial: Math.round(p.total || 0), mensal: Math.round(mensal),
+    anos: mp?.prazo_anos || simCfg.anos || 10, meta: mp?.valor_alvo || 0};
+}
+async function agendarTestePessoal(forcar) {
+  const d = descricaoTp(); if (!d) return;
+  const sig = JSON.stringify(d);
+  if (!forcar && sig === st.tp.sig && (st.tp.dados || st.tp.busy)) return renderTp();
+  st.tp = {sig, dados: null, err: null, busy: true}; renderTp();
+  try { const r = await api('/api/teste_pessoal', d); if (st.tp.sig === sig) st.tp.dados = r; }
+  catch (e) { if (st.tp.sig === sig) st.tp.err = e.message; }
+  if (st.tp.sig === sig) { st.tp.busy = false; renderTp(); }
+}
+function ligarTp() { $$('#tpCard [data-estr]').forEach(b => b.onclick = ev => { ev.preventDefault(); escolherEstr(b.dataset.estr); }); }
+function renderTp() { const el = $('#tpCard'); if (el) { el.innerHTML = tpHtml(); ligarTp(); } }
+function tpHtml() {
+  const T = st.tp, d = T.dados;
+  if (!st.port) return '';
+  if (!d) return `<div class="card"><h2>Teste com a sua descrição</h2>${T.err ? `<p class="err-box">${esc(T.err)}</p><div class="btns"><button class="btn sm" type="button" onclick="agendarTestePessoal(true)">Tentar de novo</button></div>`
+    : busy('Testando a sua carteira com os seus números em todos os períodos reais desde 2013…')}</div>`;
+  const reais = v => M(v).replace(/,00$/, '');
+  return `<div class="card">
+    <h2>Teste com a sua descrição</h2>
+    <p class="lead sm">${esc(d.texto)}</p>
+    ${d.melhor ? `<div class="note good">${ICON.check}<div>${esc(d.melhor.texto)} <a href="#" data-estr="${esc(d.melhor.id)}">Seguir ${esc(d.melhor.nome)}</a></div></div>` : ''}
+    <div class="scroll-x"><table class="tbl ref-tbl" style="margin-top:8px"><thead><tr><th>Estratégia que cabe no seu perfil</th><th>No período do meio<small>no pior</small></th>${d.meta ? '<th>Chegou à meta</th>' : ''}<th>Venceu o CDI</th><th>Maior queda</th></tr></thead><tbody>
+      ${d.estrategias.map(x => `<tr class="${x.sua ? 'sua' : ''}"><td><b>${esc(x.nome)}</b>${x.sua ? `<small>a que você segue</small>` : ''}</td>
+        <td><b>${reais(x.mediana)}</b><small>${reais(x.pior)}</small></td>${d.meta ? `<td>${N(x.chance_meta)}% dos períodos</td>` : ''}
+        <td>${x.vence_cdi == null ? '—' : N(x.vence_cdi) + '%'}</td><td class="${cl(x.maior_queda)}">${P(x.maior_queda, 0)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="mut xs" style="margin-top:8px">${N(d.periodos)} períodos reais de ${N(d.anos)} ${d.anos === 1 ? 'ano' : 'anos'}, um começando a cada 3 meses desde ${esc(d.desde)}, com o seu valor inicial, o seu aporte por mês e as regras e os custos de operação do app. O teste é refeito sempre que você muda o perfil, o objetivo, o prazo, o aporte, a meta ou a estratégia. O passado não garante o futuro.</p>
+  </div>`;
 }
 
 /* ---------- estratégia: a recomendada pelo app, o modelo do perfil só com ETFs ou um plano consagrado ---------- */
@@ -1829,6 +1868,7 @@ function estrItem(e, d, pode, motivo) {
     <span class="sm ink2">${esc(e.ideia)}</span>
     <span class="estr-n"><span><b>${P(e.ret_aa, 1, false)}</b> ao ano</span><span>maior queda <b>${P(e.maior_queda, 0)}</b></span>
       ${e.pior_crise ? `<span>pior crise <b>${P(e.pior_crise[1], 0)}</b> (${esc(e.pior_crise[0])})</span>` : ''}
+      ${e.crise_sem_cambio ? `<span>se o real não tivesse se desvalorizado: <b>${P(e.crise_sem_cambio[1], 0)}</b></span>` : ''}
       ${sim ? `<span>no simulador: <b>${reais(sim.final)}</b></span>` : ''}</span>
     ${motivo ? `<span class="estr-motivo">${ICON.warn}<span>${esc(motivo)}</span></span>` : ''}
   </button>`;
@@ -1850,7 +1890,7 @@ function estrHtml() {
       <div class="estr-grid">${usaveis.map(e => estrItem(e, d, true, '')).join('')}</div>
       ${fora.length ? `<details class="estr-fora"><summary>${fora.length} ${fora.length === 1 ? 'não cabe' : 'não cabem'} no seu perfil${curto ? ' ou no prazo do seu objetivo' : ''}</summary>
         <div class="estr-grid">${fora.map(e => estrItem(e, d, false, motivoDe(e))).join('')}</div></details>` : ''}
-      <p class="mut xs" style="margin-top:10px">Números do teste com o passado de ${esc(d.periodo.desde)} a ${esc(d.periodo.ate)}, todas do mesmo jeito: rebalanceando uma vez por ano, sem custos e sem imposto. “Pior crise” é quanto teria caído na pior das crises reais testadas (2008, 2015, 2020…).${sm ? ` “No simulador” é quanto teria juntado quem começasse com ${M(sm.inicial).replace(/,00$/, '')} em ${esc(sm.desde)} e aplicasse ${M(sm.mensal).replace(/,00$/, '')} por mês até ${esc(sm.ate)}, com custos (detalhes em Mercado, Simulador do passado).` : ''} Só podem ser escolhidas as que, nesse teste, não caíram mais do que o perfil ${esc(PERFIS[d.perfil]?.[0].toLowerCase() || d.perfil)} aceita (${N(Math.abs(d.limite), 0)}%). O passado não garante o futuro.</p>
+      <p class="mut xs" style="margin-top:10px">Números do teste com o passado de ${esc(d.periodo.desde)} a ${esc(d.periodo.ate)}, todas do mesmo jeito: rebalanceando uma vez por ano, sem custos e sem imposto. “Pior crise” é quanto teria caído na pior das crises reais testadas (2008, 2015, 2020…). Nessas crises o dólar e o ouro subiram e seguraram a queda; “se o real não tivesse se desvalorizado” mostra a mesma crise com o exterior e o ouro pela variação em dólar, o risco que essa proteção escondeu.${sm ? ` “No simulador” é quanto teria juntado quem começasse com ${M(sm.inicial).replace(/,00$/, '')} em ${esc(sm.desde)} e aplicasse ${M(sm.mensal).replace(/,00$/, '')} por mês até ${esc(sm.ate)}, com custos (detalhes em Mercado, Simulador do passado).` : ''} Só podem ser escolhidas as que, nesse teste, não caíram mais do que o perfil ${esc(PERFIS[d.perfil]?.[0].toLowerCase() || d.perfil)} aceita (${N(Math.abs(d.limite), 0)}%). O passado não garante o futuro.</p>
     </details>`;
   }
   return `<div class="card">
@@ -2541,7 +2581,7 @@ async function loadPort(force) {
   st.portBusy = false;
   renderHero(); renderResumo(); renderInvestir();
   st.sim = null; renderSim();
-  if (st.port) runSim();
+  if (st.port) { runSim(); agendarTestePessoal(); }
 }
 async function loadPan() {
   st.panErr = null; renderMercado();

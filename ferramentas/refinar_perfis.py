@@ -207,6 +207,38 @@ def main():
     print(f"({time.time() - t0:.0f}s)")
 
 
+def etapa2(escolhas):
+    """Escolha de ações individuais nas carteiras finais, com a regra da etapa 2, versão 2 (rodadas_perfis.py): fica só se,
+    nos DOIS testes, o patrimônio final for maior e o retorno de 2013-2019 não for menor que só com ETFs e títulos."""
+    preparar()
+    out = {}
+    for p, v in escolhas.items():
+        rf, div, mix, camb = v
+        w = pesos(rf, div, mix, camb)
+        modelo = classes(w)
+        nucleo = {"renda_fixa": RF_DIV[div], **NUC, "cambio": CAMBIO[camb]}
+        r = {}
+        for nome, sat in (("so_etfs", False), ("escolhe_ativos", True)):
+            dec = S.decisor(D, modelo, nucleos=nucleo, satelites=sat)
+            cor = C.rodar(D, PM, DM, dec)
+            s_ = S._resumo(nome, S._rodar(D, dec, S.INICIAL, S.MENSAL))
+            r[nome] = {"corretora": {x: cor[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda", "ir_pago", "ir_se_resgatar")},
+                       "simulador": {x: s_[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda")}}
+        e_, s0 = r["escolhe_ativos"], r["so_etfs"]
+        fica = bool(all(e_[t]["final"] > s0[t]["final"] and e_[t]["metade1_aa"] >= s0[t]["metade1_aa"] for t in ("corretora", "simulador")))
+        print(f"\n== {p}: {modelo}")
+        for nome, x in r.items():
+            print(f"  {nome:15s} cor R$ {x['corretora']['final']:>9,.0f} {x['corretora']['metade1_aa']:5.1f}|{x['corretora']['metade2_aa']:5.1f}"
+                  f" queda {x['corretora']['maior_queda']:6.1f}, depois do resgate R$ {x['corretora']['final'] - x['corretora']['ir_se_resgatar']:,.0f}"
+                  f" | sim R$ {x['simulador']['final']:>9,.0f} {x['simulador']['metade1_aa']:5.1f}|{x['simulador']['metade2_aa']:5.1f}")
+        print(f"  -> escolha de ações: {'FICA' if fica else 'SAI (só ETFs e títulos)'}")
+        out[p] = {"modelo": modelo, "nucleo": nucleo, "satelites": fica}
+    print("\netapa2:", json.dumps(out, ensure_ascii=False))
+
+
 if __name__ == "__main__":
-    RODADA = int(sys.argv[1]) if len(sys.argv) > 1 else 4
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "etapa2":
+        etapa2({k: tuple(v) for k, v in json.loads(sys.argv[2]).items()})
+    else:
+        RODADA = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+        main()
