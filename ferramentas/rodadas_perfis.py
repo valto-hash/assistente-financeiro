@@ -33,6 +33,12 @@ ETAPA 2 (registrada depois da rodada 1 e antes de rodar): com a carteira escolhi
 individuais pelas regras de hoje (até 10% cada, um por setor) contra só ETFs e títulos. A escolha de ativos só fica se o
 retorno na corretora em 2013-2019 for maior por 0,2 ponto ou mais; a 2ª metade é só conferida.
 
+ETAPA 2, VERSÃO 2 (registrada depois da versão 1, em ferramentas/etapa2_v1_resultado.txt): a versão 1 deixaria a escolha
+de ativos no moderado, mas aí a recomendada perderia para o "modelo do perfil só com ETFs" no simulador mês a mês, e o
+critério de sucesso pede vencer todas as alternativas do app nos dois testes. Nova regra: a escolha de ativos só fica
+se, nos DOIS testes, o patrimônio final for maior e o retorno de 2013-2019 não for menor que só com ETFs e títulos.
+Mostra também o patrimônio depois do imposto que ainda seria pago se a pessoa resgatasse tudo no fim.
+
 Uso, na raiz do repositório: python3 ferramentas/rodadas_perfis.py [rodada]  (precisa de internet)
 """
 import itertools, json, os, sys, tempfile, time
@@ -150,12 +156,6 @@ def main(rodada=1):
     print(f"({time.time() - t0:.0f}s)")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "etapa2":
-        etapa2(json.loads(sys.argv[2]))
-    else:
-        main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
-
 
 def etapa2(escolhas):
     """escolhas: {perfil: chave do candidato escolhido}. Compara o app escolhendo ativos com só ETFs e títulos."""
@@ -173,16 +173,24 @@ def etapa2(escolhas):
             dec = S.decisor(D, modelo, nucleos=nucleo, satelites=sat)
             cor = C.rodar(D, PM, DM, dec)
             sim = S._resumo(nome, S._rodar(D, dec, S.INICIAL, S.MENSAL))
-            r[nome] = {"corretora": {x: cor[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda", "ir_pago")},
+            r[nome] = {"corretora": {x: cor[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda", "ir_pago", "ir_se_resgatar")},
                        "simulador": {x: sim[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda")}}
         fixo = C.rodar(D, PM, DM, lambda t, h, w=w: w)
-        adota = r["escolhe_ativos"]["corretora"]["metade1_aa"] >= r["so_etfs"]["corretora"]["metade1_aa"] + 0.2
+        e_, s_ = r["escolhe_ativos"], r["so_etfs"]
+        adota = bool(all(e_[t]["final"] > s_[t]["final"] and e_[t]["metade1_aa"] >= s_[t]["metade1_aa"] for t in ("corretora", "simulador")))
         print(f"\n== {p}: modelo {modelo}")
         for nome, x in r.items():
             print(f"  {nome:15s} cor R$ {x['corretora']['final']:>9,.0f} {x['corretora']['metade1_aa']:5.1f}|{x['corretora']['metade2_aa']:5.1f}"
-                  f" queda {x['corretora']['maior_queda']:6.1f} IR R$ {x['corretora']['ir_pago']:,.0f} | sim R$ {x['simulador']['final']:>9,.0f}"
+                  f" queda {x['corretora']['maior_queda']:6.1f} IR R$ {x['corretora']['ir_pago']:,.0f}, depois do resgate R$"
+                  f" {x['corretora']['final'] - x['corretora']['ir_se_resgatar']:,.0f} | sim R$ {x['simulador']['final']:>9,.0f}"
                   f" {x['simulador']['metade1_aa']:5.1f}|{x['simulador']['metade2_aa']:5.1f} queda {x['simulador']['maior_queda']:6.1f}")
         print(f"  (conferência: pesos fixos na corretora R$ {fixo['final']:,.0f}) -> escolha de ativos: {'FICA' if adota else 'SAI (só ETFs e títulos)'}")
         out[p] = {"modelo": modelo, "nucleo": nucleo, "satelites": adota, "resultados": r}
     print("\netapa2:", json.dumps({p: {k: v for k, v in x.items() if k != "resultados"} for p, x in out.items()}, ensure_ascii=False))
     return out
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "etapa2":
+        etapa2(json.loads(sys.argv[2]))
+    else:
+        main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
