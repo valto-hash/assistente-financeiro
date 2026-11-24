@@ -1,0 +1,37 @@
+639 candidatos + 3 modelos atuais + 11 planos
+
+===== conservador (limite -8%): 62 candidatos elegíveis; planos que cabem: ['cdi']
+  ESCOLHIDA rf70|pos|global|meio             cor R$   433,007  12.1| 11.5 queda   -5.6 | sim R$   446,199  12.3| 11.9 queda   -2.2 | crise -3.2
+  modelo atual (NÃO cabe)                    cor R$   402,108  12.7|  8.9 queda  -11.6 | sim R$   410,631  12.7|  9.1 queda   -4.8 | crise -9.4
+  plano|cdi                                  cor R$   377,609   9.7| 10.1 queda    0.0 | sim R$   378,847   9.7| 10.1 queda    0.0 | crise 0.0
+  5 melhores na 1ª metade: [('rf70|pos|global|meio', np.float64(12.1)), ('rf70|pos|global|ouro', np.float64(12.1)), ('rf75|pos|global|meio', np.float64(11.7)), ('rf75|pos|global|ouro', np.float64(11.6)), ('rf70|pos|tercos|meio', np.float64(11.6))]
+  classes: {'renda_fixa': 70.0, 'acao': 7.5, 'fii': 0, 'exterior': 13.5, 'cambio': 9.0} | pesos: {'TESOURO_SELIC': 49.0, 'LCI_LCA': 21.0, 'BOVA11': 4.5, 'DIVO11': 3.0, 'IVVB11': 13.5, 'DOLAR': 4.5, 'GOLD11': 4.5}
+  (a) vence todas as que cabem, nos dois testes: SIM | (b) 2ª metade não pior que o atual: SIM
+
+===== moderado (limite -18%): 168 candidatos elegíveis; planos que cabem: ['cdi', 'permanente', 'all_weather', 'wellesley']
+  ESCOLHIDA rf40|inflacao|global|meio        cor R$   495,492  15.8| 11.3 queda  -16.1 | sim R$   502,225  15.6| 11.5 queda   -7.6 | crise -14.3
+  modelo atual (NÃO cabe)                    cor R$   447,078  13.8| 10.3 queda  -16.8 | sim R$   455,011  13.7| 10.5 queda   -7.9 | crise -18.8
+  plano|all_weather                          cor R$   462,179  13.7| 10.6 queda  -15.4 | sim R$   472,230  13.6| 10.9 queda   -8.3 | crise -14.9
+  plano|permanente                           cor R$   438,452  11.1| 10.6 queda  -13.6 | sim R$   447,951  10.9| 11.0 queda  -12.6 | crise -14.7
+  plano|wellesley                            cor R$   437,672  14.0|  9.4 queda  -18.0 | sim R$   443,414  13.8|  9.6 queda  -10.3 | crise -17.8
+  plano|cdi                                  cor R$   377,609   9.7| 10.1 queda    0.0 | sim R$   378,847   9.7| 10.1 queda    0.0 | crise 0.0
+  5 melhores na 1ª metade: [('rf40|inflacao|global|meio', np.float64(15.8)), ('rf40|inflacao|global|ouro', np.float64(15.7)), ('rf45|inflacao|global|meio', np.float64(15.6)), ('rf45|inflacao|global|ouro', np.float64(15.4)), ('rf40|padrao|global|meio', np.float64(15.4))]
+  classes: {'renda_fixa': 40.0, 'acao': 15.0, 'fii': 0, 'exterior': 27.0, 'cambio': 18.0} | pesos: {'TESOURO_SELIC': 6.0, 'TESOURO_IPCA': 34.0, 'BOVA11': 9.0, 'DIVO11': 6.0, 'IVVB11': 27.0, 'DOLAR': 9.0, 'GOLD11': 9.0}
+  (a) vence todas as que cabem, nos dois testes: SIM | (b) 2ª metade não pior que o atual: SIM
+
+===== arrojado (limite -30%): 181 candidatos elegíveis; planos que cabem: ['cdi', 'permanente', 'all_weather', '60_40', 'tres_fundos', 'wellesley', 'golden_butterfly']
+  ESCOLHIDA rf20|inflacao|global|meio        cor R$   552,731  16.9| 13.2 queda  -16.3 | sim R$   549,758  16.7| 13.0 queda  -11.9 | crise -15.6
+  modelo atual (cabe)                        cor R$   502,586  16.1| 11.1 queda  -23.9 | sim R$   512,883  16.1| 11.4 queda  -13.6 | crise -25.6
+  plano|60_40                                cor R$   486,754  16.4| 10.0 queda  -27.6 | sim R$   496,909  16.2| 10.3 queda  -15.8 | crise -28.9
+  plano|all_weather                          cor R$   462,179  13.7| 10.6 queda  -15.4 | sim R$   472,230  13.6| 10.9 queda   -8.3 | crise -14.9
+  plano|tres_fundos                          cor R$   449,383  14.1|  9.7 queda  -26.4 | sim R$   463,151  13.9| 10.2 queda  -17.0 | crise -29.3
+  plano|permanente                           cor R$   438,452  11.1| 10.6 queda  -13.6 | sim R$   447,951  10.9| 11.0 queda  -12.6 | crise -14.7
+  plano|wellesley                            cor R$   437,672  14.0|  9.4 queda  -18.0 | sim R$   443,414  13.8|  9.6 queda  -10.3 | crise -17.8
+  plano|golden_butterfly                     cor R$   389,470  10.9|  7.8 queda  -20.8 | sim R$   388,374  10.7|  7.7 queda  -14.0 | crise -23.7
+  plano|cdi                                  cor R$   377,609   9.7| 10.1 queda    0.0 | sim R$   378,847   9.7| 10.1 queda    0.0 | crise 0.0
+  5 melhores na 1ª metade: [('rf35|inflacao|atual|meio', np.float64(16.9)), ('rf35|inflacao|60_40|meio', np.float64(16.9)), ('rf30|padrao|atual|meio', np.float64(16.9)), ('rf30|padrao|60_40|meio', np.float64(16.9)), ('rf20|inflacao|global|meio', np.float64(16.9))]
+  classes: {'renda_fixa': 20.0, 'acao': 20.0, 'fii': 0, 'exterior': 36.0, 'cambio': 24.0} | pesos: {'TESOURO_SELIC': 3.0, 'TESOURO_IPCA': 17.0, 'BOVA11': 12.0, 'DIVO11': 8.0, 'IVVB11': 36.0, 'DOLAR': 12.0, 'GOLD11': 12.0}
+  (a) vence todas as que cabem, nos dois testes: SIM | (b) 2ª metade não pior que o atual: SIM
+
+resultado: {"conservador": {"escolhida": "conservador|rf70|pos|global|meio", "ok": true, "classes": {"renda_fixa": 70.0, "acao": 7.5, "fii": 0, "exterior": 13.5, "cambio": 9.0}, "pesos": {"TESOURO_SELIC": 49.0, "LCI_LCA": 21.0, "BOVA11": 4.5, "DIVO11": 3.0, "IVVB11": 13.5, "DOLAR": 4.5, "GOLD11": 4.5}}, "moderado": {"escolhida": "moderado|rf40|inflacao|global|meio", "ok": true, "classes": {"renda_fixa": 40.0, "acao": 15.0, "fii": 0, "exterior": 27.0, "cambio": 18.0}, "pesos": {"TESOURO_SELIC": 6.0, "TESOURO_IPCA": 34.0, "BOVA11": 9.0, "DIVO11": 6.0, "IVVB11": 27.0, "DOLAR": 9.0, "GOLD11": 9.0}}, "arrojado": {"escolhida": "arrojado|rf20|inflacao|global|meio", "ok": true, "classes": {"renda_fixa": 20.0, "acao": 20.0, "fii": 0, "exterior": 36.0, "cambio": 24.0}, "pesos": {"TESOURO_SELIC": 3.0, "TESOURO_IPCA": 17.0, "BOVA11": 12.0, "DIVO11": 8.0, "IVVB11": 36.0, "DOLAR": 12.0, "GOLD11": 12.0}}}
+(57s)

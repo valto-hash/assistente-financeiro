@@ -26,6 +26,13 @@ CRITÉRIO DE SUCESSO (conferido depois):
 (b) retorno ao ano em 2020-hoje (fora da escolha) não menor que o do modelo atual do perfil, nos dois testes.
 Se falhar, a próxima rodada muda uma coisa só, registrada aqui antes de rodar.
 
+RODADA 1 (24/11/2026): passou nos três perfis (resultado em ferramentas/rodada1_resultado.txt). Empates no retorno da 1ª
+metade (arredondado em 0,1 ponto) foram decididos pela menor queda, como na regra.
+
+ETAPA 2 (registrada depois da rodada 1 e antes de rodar): com a carteira escolhida, o app escolhendo ações e FIIs
+individuais pelas regras de hoje (até 10% cada, um por setor) contra só ETFs e títulos. A escolha de ativos só fica se o
+retorno na corretora em 2013-2019 for maior por 0,2 ponto ou mais; a 2ª metade é só conferida.
+
 Uso, na raiz do repositório: python3 ferramentas/rodadas_perfis.py [rodada]  (precisa de internet)
 """
 import itertools, json, os, sys, tempfile, time
@@ -144,4 +151,38 @@ def main(rodada=1):
 
 
 if __name__ == "__main__":
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
+    if len(sys.argv) > 1 and sys.argv[1] == "etapa2":
+        etapa2(json.loads(sys.argv[2]))
+    else:
+        main(int(sys.argv[1]) if len(sys.argv) > 1 else 1)
+
+
+def etapa2(escolhas):
+    """escolhas: {perfil: chave do candidato escolhido}. Compara o app escolhendo ativos com só ETFs e títulos."""
+    preparar()
+    out = {}
+    for p, k in escolhas.items():
+        _, rf, div, mix, camb = k.split("|")
+        rf = int(rf[2:])
+        mx = mix_atual(p) if mix == "atual" else MIX[mix]
+        w = pesos_cand(rf, div, mx, camb)
+        modelo = classes_de(w)
+        nucleo = {"renda_fixa": RF_DIV[div], **NUC, "cambio": CAMBIO[camb]}
+        r = {}
+        for nome, sat in (("so_etfs", False), ("escolhe_ativos", True)):
+            dec = S.decisor(D, modelo, nucleos=nucleo, satelites=sat)
+            cor = C.rodar(D, PM, DM, dec)
+            sim = S._resumo(nome, S._rodar(D, dec, S.INICIAL, S.MENSAL))
+            r[nome] = {"corretora": {x: cor[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda", "ir_pago")},
+                       "simulador": {x: sim[x] for x in ("final", "metade1_aa", "metade2_aa", "maior_queda")}}
+        fixo = C.rodar(D, PM, DM, lambda t, h, w=w: w)
+        adota = r["escolhe_ativos"]["corretora"]["metade1_aa"] >= r["so_etfs"]["corretora"]["metade1_aa"] + 0.2
+        print(f"\n== {p}: modelo {modelo}")
+        for nome, x in r.items():
+            print(f"  {nome:15s} cor R$ {x['corretora']['final']:>9,.0f} {x['corretora']['metade1_aa']:5.1f}|{x['corretora']['metade2_aa']:5.1f}"
+                  f" queda {x['corretora']['maior_queda']:6.1f} IR R$ {x['corretora']['ir_pago']:,.0f} | sim R$ {x['simulador']['final']:>9,.0f}"
+                  f" {x['simulador']['metade1_aa']:5.1f}|{x['simulador']['metade2_aa']:5.1f} queda {x['simulador']['maior_queda']:6.1f}")
+        print(f"  (conferência: pesos fixos na corretora R$ {fixo['final']:,.0f}) -> escolha de ativos: {'FICA' if adota else 'SAI (só ETFs e títulos)'}")
+        out[p] = {"modelo": modelo, "nucleo": nucleo, "satelites": adota, "resultados": r}
+    print("\netapa2:", json.dumps({p: {k: v for k, v in x.items() if k != "resultados"} for p, x in out.items()}, ensure_ascii=False))
+    return out
