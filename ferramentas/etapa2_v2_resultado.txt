@@ -1,0 +1,17 @@
+
+== conservador: modelo {'renda_fixa': 70.0, 'acao': 7.5, 'fii': 0, 'exterior': 13.5, 'cambio': 9.0}
+  so_etfs         cor R$   433,015  12.1| 11.5 queda   -5.6 IR R$ 3,355, depois do resgate R$ 403,435 | sim R$   446,203  12.3| 11.9 queda   -2.2
+  escolhe_ativos  cor R$   433,015  12.1| 11.5 queda   -5.6 IR R$ 3,355, depois do resgate R$ 403,435 | sim R$   446,203  12.3| 11.9 queda   -2.2
+  (conferência: pesos fixos na corretora R$ 433,007) -> escolha de ativos: SAI (só ETFs e títulos)
+
+== moderado: modelo {'renda_fixa': 40.0, 'acao': 15.0, 'fii': 0, 'exterior': 27.0, 'cambio': 18.0}
+  so_etfs         cor R$   495,732  15.8| 11.3 queda  -16.2 IR R$ 9,402, depois do resgate R$ 455,323 | sim R$   502,498  15.6| 11.5 queda   -7.7
+  escolhe_ativos  cor R$   498,884  16.1| 11.3 queda  -16.1 IR R$ 10,807, depois do resgate R$ 459,207 | sim R$   497,771  15.5| 11.5 queda   -7.9
+  (conferência: pesos fixos na corretora R$ 495,492) -> escolha de ativos: SAI (só ETFs e títulos)
+
+== arrojado: modelo {'renda_fixa': 20.0, 'acao': 20.0, 'fii': 0, 'exterior': 36.0, 'cambio': 24.0}
+  so_etfs         cor R$   553,001  16.9| 13.2 queda  -16.4 IR R$ 7,530, depois do resgate R$ 502,464 | sim R$   549,987  16.7| 13.0 queda  -11.9
+  escolhe_ativos  cor R$   554,691  17.5| 13.2 queda  -14.8 IR R$ 19,145, depois do resgate R$ 513,310 | sim R$   557,280  16.7| 13.3 queda  -12.0
+  (conferência: pesos fixos na corretora R$ 552,731) -> escolha de ativos: FICA
+
+etapa2: {"conservador": {"modelo": {"renda_fixa": 70.0, "acao": 7.5, "fii": 0, "exterior": 13.5, "cambio": 9.0}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.7, "LCI_LCA": 0.3}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}, "satelites": false}, "moderado": {"modelo": {"renda_fixa": 40.0, "acao": 15.0, "fii": 0, "exterior": 27.0, "cambio": 18.0}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.15, "TESOURO_IPCA": 0.85}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}, "satelites": false}, "arrojado": {"modelo": {"renda_fixa": 20.0, "acao": 20.0, "fii": 0, "exterior": 36.0, "cambio": 24.0}, "nucleo": {"renda_fixa": {"TESOURO_SELIC": 0.15, "TESOURO_IPCA": 0.85}, "acao": {"BOVA11": 0.6, "DIVO11": 0.4}, "fii": {"KNCR11": 0.5, "HGLG11": 0.5}, "exterior": {"IVVB11": 1.0}, "cambio": {"DOLAR": 0.5, "GOLD11": 0.5}}, "satelites": true}}
