@@ -20,7 +20,18 @@ risco (ações, FIIs, exterior, dólar e ouro): global (25/0/45/30), mais exteri
 mais proteção (25/0/40/35), com FIIs (20/10/40/30), menos câmbio (30/0/50/20); dólar e ouro: metade cada, só ouro, ou um
 terço dólar e dois terços ouro.
 
-Uso, na raiz do repositório: python3 ferramentas/refinar_perfis.py  (precisa de internet)
+RODADA 3 (24/11/2026, ferramentas/rodada3_resultado.txt): sem a faixa de renda fixa da rodada 1, a busca levou moderado
+e arrojado à MESMA carteira (15% de renda fixa, 85% em risco, quase metade no S&P 500) e o conservador a 60% de renda
+fixa. Isso é o teste "ganhando no passado": de 2013 a 2026 o dólar e o ouro subiram justamente nas crises brasileiras e
+seguraram as quedas; numa crise em que o real não se desvalorize, 85% em risco cairia bem mais do que o moderado aceita.
+E dois perfis não podem ter a mesma carteira. Não foi aplicada.
+
+RODADA 4 (registrada antes de rodar): cada perfil passa a ter também uma renda fixa mínima, que entra na definição do
+perfil: conservador 70%, moderado 40%, arrojado 15% (as faixas da rodada 1 para conservador e moderado; o piso da rodada 3
+para o arrojado). Mesmo processo e mesmos critérios da rodada 3, partindo das carteiras de 24/11. Como informação, mostra
+também a pior crise real se o real não tivesse se desvalorizado (S&P 500 e ouro em dólar, dólar parado).
+
+Uso, na raiz do repositório: python3 ferramentas/refinar_perfis.py [3|4]  (precisa de internet)
 """
 import itertools, json, os, sys, tempfile, time
 os.environ["DATA_DIR"] = tempfile.mkdtemp(); os.environ["APP_TOKEN"] = ""
@@ -29,7 +40,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import multiprocessing as mp
 import numpy as np
 import pandas as pd
-import server, referencias, corretora as C, simulador as S  # noqa: E402
+import server, referencias, corretora as C, simulador as S, simulacao as sim  # noqa: E402
 
 RF_DIV = {"pos": {"TESOURO_SELIC": .7, "LCI_LCA": .3}, "padrao": {"TESOURO_SELIC": .3, "LCI_LCA": .15, "TESOURO_IPCA": .55},
           "inflacao": {"TESOURO_SELIC": .15, "TESOURO_IPCA": .85}, "meio": {"TESOURO_SELIC": .5, "TESOURO_IPCA": .5}}
@@ -40,6 +51,8 @@ NUC = {"acao": {"BOVA11": .6, "DIVO11": .4}, "fii": {"KNCR11": .5, "HGLG11": .5}
 INICIO = {"conservador": (70, "pos", "global", "meio"), "moderado": (40, "inflacao", "global", "meio"),
           "arrojado": (20, "inflacao", "global", "meio")}   # as carteiras de 24/11 (rodada 1)
 MARGEM, VOLTAS = 0.3, 4
+RF_MIN = {3: {"conservador": 15, "moderado": 15, "arrojado": 15}, 4: {"conservador": 70, "moderado": 40, "arrojado": 15}}
+RODADA = 4
 D = PM = DM = None
 
 
@@ -82,7 +95,7 @@ def avaliar(args):
 
 def vizinhas(p, atual):
     rf0 = atual[0]
-    niveis = sorted({min(max(rf0 + d, 15), 95) for d in (-10, -5, 0, 5, 10)})
+    niveis = sorted({min(max(rf0 + d, RF_MIN[RODADA][p]), 95) for d in (-10, -5, 0, 5, 10)})
     return [(rf, div, mix, camb) for rf, div, mix, camb in itertools.product(niveis, RF_DIV, MIX, CAMBIO)
             if not (MIX[mix][3] == 0 and camb != "meio")]
 
@@ -98,6 +111,31 @@ def janelas(w, anos=5, passo=3, decidir=None):
         out.append({"inicio": meses[i].strftime("%m/%Y"), "aa": (float(idx[-1]) ** (12 / len(r)) - 1) * 100,
                     "queda": float((idx / np.maximum.accumulate(np.concatenate([[1.0], idx]))[1:] - 1).min()) * 100})
     return out
+
+
+def crise_sem_cambio(w):
+    """A pior crise real se o real não tivesse se desvalorizado: exterior e ouro pela variação em dólar, dólar parado."""
+    sim.baixar(["IBOV", "SP500", "OURO", "IPCA_LONGO", *sim.FII_CESTA])
+    serie = lambda c: sim._hist[c][1]
+    def var(c, ini, fim):
+        s_ = serie(c)
+        a, b = s_.asof(pd.Timestamp(ini)), s_.asof(pd.Timestamp(fim))
+        return float(b / a - 1) if a == a and b == b and a > 0 else None
+    pior = None
+    for nome, ini, fim, cdi in sim.CRISES:
+        dias = (pd.Timestamp(fim) - pd.Timestamp(ini)).days
+        rf = (1 + cdi / 100) ** (dias / 365) - 1
+        fii = np.nanmean([x for x in (var(c, ini, fim) for c in sim.FII_CESTA) if x is not None] or [np.nan])
+        r_ = {"acao": var("IBOV", ini, fim), "exterior": var("SP500", ini, fim), "ouro": var("OURO", ini, fim), "ipca": var("IPCA_LONGO", ini, fim)}
+        tot = 0.0
+        for a, p_ in w.items():
+            c = server.UNIVERSO[a][0]
+            x = (rf if a in ("TESOURO_SELIC", "LCI_LCA", "CDB_CDI") else r_["ipca"] if a == "TESOURO_IPCA" else 0.0 if a == "DOLAR"
+                 else r_["ouro"] if a == "GOLD11" else r_["exterior"] if c == "exterior" else fii if c == "fii" else r_["acao"])
+            tot += p_ / 100 * (x if x is not None and x == x else 0.0)
+        if pior is None or tot < pior[1]:
+            pior = (nome, round(float(tot) * 100, 1))
+    return pior
 
 
 def main():
@@ -142,7 +180,7 @@ def main():
                     mudou = True
             if not mudou:
                 break
-    print("\n===== RESULTADO")
+    print(f"\n===== RESULTADO DA RODADA {RODADA}")
     final = {}
     for p, v in atual.items():
         lim = server.PIOR_CRISE[p]
@@ -164,10 +202,11 @@ def main():
         ok4 = vence_cdi >= 2 / 3 and pior_queda >= lim
         final[p] = {"carteira": v, "classes": classes(w), "pesos": w, "robusta": ok4, "voltas": historico[p],
                     "vence_cdi_janelas": round(vence_cdi, 3), "pior_queda_janelas": round(pior_queda, 1)}
-        print(f"  (4) robusta: {'SIM' if ok4 else 'NÃO'}")
+        print(f"  (4) robusta: {'SIM' if ok4 else 'NÃO'} | informação: pior crise se o real não tivesse se desvalorizado: {crise_sem_cambio(w)}")
     print("\nresultado:", json.dumps(final, ensure_ascii=False))
     print(f"({time.time() - t0:.0f}s)")
 
 
 if __name__ == "__main__":
+    RODADA = int(sys.argv[1]) if len(sys.argv) > 1 else 4
     main()

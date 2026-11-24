@@ -1,0 +1,63 @@
+Crumb fetch rate-limited (HTTP 429), continuing without crumb
+volta 1 | conservador: atual (70, 'pos', 'global', 'meio') (cor 1ª 12.1 2ª 11.5 R$ 431,528; queda dia -5.6) -> 19 vizinhas claramente melhores; nova: (60, 'pos', 'mais_exterior', 'meio')
+volta 1 | moderado: atual (40, 'inflacao', 'global', 'meio') (cor 1ª 15.8 2ª 11.2 R$ 492,317; queda dia -16.1) -> 48 vizinhas claramente melhores; nova: (30, 'inflacao', 'mais_exterior', 'meio')
+volta 1 | arrojado: atual (20, 'inflacao', 'global', 'meio') (cor 1ª 16.9 2ª 13.0 R$ 547,863; queda dia -16.3) -> 57 vizinhas claramente melhores; nova: (15, 'inflacao', 'mais_exterior', 'meio')
+volta 2 | conservador: atual (60, 'pos', 'mais_exterior', 'meio') (cor 1ª 13.5 2ª 12.4 R$ 468,022; queda dia -7.7) -> 0 vizinhas claramente melhores
+volta 2 | moderado: atual (30, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 17.4 2ª 12.9 R$ 549,081; queda dia -16.8) -> 8 vizinhas claramente melhores; nova: (20, 'inflacao', 'mais_exterior', 'meio')
+volta 2 | arrojado: atual (15, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.3 2ª 14.4 R$ 600,920; queda dia -17.1) -> 0 vizinhas claramente melhores
+volta 3 | conservador: atual (60, 'pos', 'mais_exterior', 'meio') (cor 1ª 13.5 2ª 12.4 R$ 468,022; queda dia -7.7) -> 0 vizinhas claramente melhores
+volta 3 | moderado: atual (20, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.0 2ª 13.9 R$ 585,140; queda dia -17.0) -> 2 vizinhas claramente melhores; nova: (15, 'inflacao', 'mais_exterior', 'meio')
+volta 3 | arrojado: atual (15, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.3 2ª 14.4 R$ 600,920; queda dia -17.1) -> 0 vizinhas claramente melhores
+volta 4 | conservador: atual (60, 'pos', 'mais_exterior', 'meio') (cor 1ª 13.5 2ª 12.4 R$ 468,022; queda dia -7.7) -> 0 vizinhas claramente melhores
+volta 4 | moderado: atual (15, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.3 2ª 14.4 R$ 600,920; queda dia -17.1) -> 0 vizinhas claramente melhores
+volta 4 | arrojado: atual (15, 'inflacao', 'mais_exterior', 'meio') (cor 1ª 18.3 2ª 14.4 R$ 600,920; queda dia -17.1) -> 0 vizinhas claramente melhores
+
+===== RESULTADO
+
+CONSERVADOR (limite -8%): (60, 'pos', 'mais_exterior', 'meio') -> classes {'renda_fixa': 60.0, 'acao': 8.0, 'fii': 0.0, 'exterior': 22.0, 'cambio': 10.0}
+  corretora R$ 468,022 (13.5% | 12.4%), queda dia -7.7%; simulador R$ 483,062, queda -5.3%; pior crise ['Pandemia de Covid-19', -4.7]
+  janelas de 5 anos (36): vence o CDI em 92%; pior janela 10.5% ao ano; mediana 12.6% ao ano; maior queda numa janela -5.2%
+    contra permanente      : vence em 50% das janelas
+    contra all_weather     : vence em 39% das janelas
+    contra 60_40           : vence em 31% das janelas
+    contra tres_fundos     : vence em 50% das janelas
+    contra wellesley       : vence em 50% das janelas
+    contra golden_butterfly: vence em 64% das janelas
+    contra coffeehouse     : vence em 72% das janelas
+    contra swensen         : vence em 67% das janelas
+    contra core_four       : vence em 53% das janelas
+    contra bolsa           : vence em 78% das janelas
+  (4) robusta: SIM
+
+MODERADO (limite -18%): (15, 'inflacao', 'mais_exterior', 'meio') -> classes {'renda_fixa': 15.0, 'acao': 17.0, 'fii': 0.0, 'exterior': 46.75, 'cambio': 21.25}
+  corretora R$ 600,920 (18.3% | 14.4%), queda dia -17.1%; simulador R$ 605,528, queda -14.8%; pior crise ['Crise financeira global', -15.9]
+  janelas de 5 anos (36): vence o CDI em 92%; pior janela 10.3% ao ano; mediana 17.1% ao ano; maior queda numa janela -14.5%
+    contra permanente      : vence em 89% das janelas
+    contra all_weather     : vence em 94% das janelas
+    contra 60_40           : vence em 89% das janelas
+    contra tres_fundos     : vence em 97% das janelas
+    contra wellesley       : vence em 97% das janelas
+    contra golden_butterfly: vence em 100% das janelas
+    contra coffeehouse     : vence em 100% das janelas
+    contra swensen         : vence em 97% das janelas
+    contra core_four       : vence em 94% das janelas
+    contra bolsa           : vence em 94% das janelas
+  (4) robusta: SIM
+
+ARROJADO (limite -30%): (15, 'inflacao', 'mais_exterior', 'meio') -> classes {'renda_fixa': 15.0, 'acao': 17.0, 'fii': 0.0, 'exterior': 46.75, 'cambio': 21.25}
+  corretora R$ 600,920 (18.3% | 14.4%), queda dia -17.1%; simulador R$ 605,528, queda -14.8%; pior crise ['Crise financeira global', -15.9]
+  janelas de 5 anos (36): vence o CDI em 92%; pior janela 10.3% ao ano; mediana 17.1% ao ano; maior queda numa janela -14.5%
+    contra permanente      : vence em 89% das janelas
+    contra all_weather     : vence em 94% das janelas
+    contra 60_40           : vence em 89% das janelas
+    contra tres_fundos     : vence em 97% das janelas
+    contra wellesley       : vence em 97% das janelas
+    contra golden_butterfly: vence em 100% das janelas
+    contra coffeehouse     : vence em 100% das janelas
+    contra swensen         : vence em 97% das janelas
+    contra core_four       : vence em 94% das janelas
+    contra bolsa           : vence em 94% das janelas
+  (4) robusta: SIM
+
+resultado: {"conservador": {"carteira": [60, "pos", "mais_exterior", "meio"], "classes": {"renda_fixa": 60.0, "acao": 8.0, "fii": 0.0, "exterior": 22.0, "cambio": 10.0}, "pesos": {"TESOURO_SELIC": 42.0, "LCI_LCA": 18.0, "BOVA11": 4.8, "DIVO11": 3.2, "IVVB11": 22.0, "DOLAR": 5.0, "GOLD11": 5.0}, "robusta": true, "voltas": [{"volta": 1, "atual": [70, "pos", "global", "meio"], "melhores": 19}, {"volta": 2, "atual": [60, "pos", "mais_exterior", "meio"], "melhores": 0}, {"volta": 3, "atual": [60, "pos", "mais_exterior", "meio"], "melhores": 0}, {"volta": 4, "atual": [60, "pos", "mais_exterior", "meio"], "melhores": 0}], "vence_cdi_janelas": 0.917, "pior_queda_janelas": -5.2}, "moderado": {"carteira": [15, "inflacao", "mais_exterior", "meio"], "classes": {"renda_fixa": 15.0, "acao": 17.0, "fii": 0.0, "exterior": 46.75, "cambio": 21.25}, "pesos": {"TESOURO_SELIC": 2.25, "TESOURO_IPCA": 12.75, "BOVA11": 10.2, "DIVO11": 6.8, "IVVB11": 46.75, "DOLAR": 10.625, "GOLD11": 10.625}, "robusta": true, "voltas": [{"volta": 1, "atual": [40, "inflacao", "global", "meio"], "melhores": 48}, {"volta": 2, "atual": [30, "inflacao", "mais_exterior", "meio"], "melhores": 8}, {"volta": 3, "atual": [20, "inflacao", "mais_exterior", "meio"], "melhores": 2}, {"volta": 4, "atual": [15, "inflacao", "mais_exterior", "meio"], "melhores": 0}], "vence_cdi_janelas": 0.917, "pior_queda_janelas": -14.5}, "arrojado": {"carteira": [15, "inflacao", "mais_exterior", "meio"], "classes": {"renda_fixa": 15.0, "acao": 17.0, "fii": 0.0, "exterior": 46.75, "cambio": 21.25}, "pesos": {"TESOURO_SELIC": 2.25, "TESOURO_IPCA": 12.75, "BOVA11": 10.2, "DIVO11": 6.8, "IVVB11": 46.75, "DOLAR": 10.625, "GOLD11": 10.625}, "robusta": true, "voltas": [{"volta": 1, "atual": [20, "inflacao", "global", "meio"], "melhores": 57}, {"volta": 2, "atual": [15, "inflacao", "mais_exterior", "meio"], "melhores": 0}, {"volta": 3, "atual": [15, "inflacao", "mais_exterior", "meio"], "melhores": 0}, {"volta": 4, "atual": [15, "inflacao", "mais_exterior", "meio"], "melhores": 0}], "vence_cdi_janelas": 0.917, "pior_queda_janelas": -14.5}}
+(110s)
