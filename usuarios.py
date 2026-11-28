@@ -7,13 +7,13 @@
 - Se o servidor perder os dados (ex.: hospedagem sem disco permanente), a pessoa recria a conta com o mesmo e-mail
   e o aparelho informa o id antigo: a conta volta com o mesmo id e o app reenvia a cópia guardada no aparelho.
 """
-import hashlib, hmac, os, re, secrets, time, uuid
+import base64, hashlib, hmac, os, re, secrets, time, uuid
 
 import armazem
 
 SESSAO_DIAS = 180
 COLECOES_DO_USUARIO = ["carteira", "contas", "financas", "avisos", "avisos_cfg", "avisos_estado", "niveis", "push",
-                       "perfil_teste", "plano", "gastos", "b3", "memoria"]
+                       "perfil_teste", "plano", "gastos", "b3", "memoria", "operacoes", "whatsapp_usuario"]
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,}$")
 UID = re.compile(r"^[0-9a-f]{32}$")
 CODIGO_VALIDADE = 30 * 60
@@ -172,7 +172,69 @@ def publico(uid):
         return None
     d = u["dados"]
     return {"id": uid, "nome": d["nome"], "email": d["email"], "google": bool(d.get("google")),
-            "tem_senha": bool(d.get("senha")), "admin": d["email"] in admins(), "criado": d.get("criado")}
+            "tem_senha": bool(d.get("senha")), "admin": d["email"] in admins(), "criado": d.get("criado"),
+            "dois_fatores": bool(d.get("totp_ativo"))}
+
+
+# ---------------------------------------------------------------- verificação em duas etapas (app autenticador, TOTP)
+
+def _b32(n=20):
+    return base64.b32encode(secrets.token_bytes(n)).decode().rstrip("=")
+
+
+def totp(segredo, t=None, passo=30):
+    """Código de 6 dígitos do RFC 6238 (o mesmo do Google Authenticator, Authy e similares)."""
+    chave = base64.b32decode(segredo + "=" * (-len(segredo) % 8))
+    cont = int((t if t is not None else time.time()) // passo)
+    h = hmac.new(chave, cont.to_bytes(8, "big"), hashlib.sha1).digest()
+    o = h[-1] & 15
+    return f"{(int.from_bytes(h[o:o + 4], 'big') & 0x7FFFFFFF) % 1000000:06d}"
+
+
+def _codigo_ok(segredo, codigo):
+    c = re.sub(r"\D", "", str(codigo or ""))
+    agora = time.time()
+    return len(c) == 6 and any(hmac.compare_digest(totp(segredo, agora + d), c) for d in (-30, 0, 30))
+
+
+def dois_fatores_ativo(uid):
+    u = armazem.ler("usuario", uid)
+    return bool(u and u["dados"].get("totp_ativo"))
+
+
+def iniciar_2fa(uid):
+    u = armazem.ler("usuario", uid)
+    seg = _b32()
+    armazem.gravar("usuario", uid, {**u["dados"], "totp_novo": seg})
+    rotulo = f"Assistente Financeiro:{u['dados']['email']}"
+    return {"segredo": seg, "uri": f"otpauth://totp/{rotulo.replace(' ', '%20')}?secret={seg}&issuer=Assistente%20Financeiro"}
+
+
+def ativar_2fa(uid, codigo):
+    u = armazem.ler("usuario", uid)
+    seg = u["dados"].get("totp_novo")
+    if not seg or not _codigo_ok(seg, codigo):
+        raise ValueError("Código incorreto. Confira o horário do celular e digite o código que aparece agora.")
+    d = {**u["dados"], "totp": seg, "totp_ativo": True}
+    d.pop("totp_novo", None)
+    armazem.gravar("usuario", uid, d)
+
+
+def desativar_2fa(uid, codigo):
+    u = armazem.ler("usuario", uid)
+    if not u["dados"].get("totp_ativo") or not _codigo_ok(u["dados"]["totp"], codigo):
+        raise ValueError("Código incorreto.")
+    d = {**u["dados"], "totp_ativo": False}
+    d.pop("totp", None)
+    armazem.gravar("usuario", uid, d)
+
+
+def conferir_2fa(uid, codigo):
+    """True se a conta não usa duas etapas ou se o código confere."""
+    u = armazem.ler("usuario", uid)
+    if not u or not u["dados"].get("totp_ativo"):
+        return True
+    return _codigo_ok(u["dados"]["totp"], codigo)
 
 
 def trocar_senha(uid, atual, nova):
@@ -243,6 +305,9 @@ def excluir(uid):
     u = armazem.ler("usuario", uid)
     if not u:
         return
+    wa = ((armazem.ler("whatsapp_usuario", uid) or {}).get("dados") or {}).get("numero")
+    if wa:
+        armazem.apagar("whatsapp", wa)
     for col in COLECOES_DO_USUARIO:
         armazem.apagar(col, uid)
     encerrar_todas(uid)

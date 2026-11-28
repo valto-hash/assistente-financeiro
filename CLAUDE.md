@@ -28,9 +28,11 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 | `corretora.py` | Corretora simulada: o app dia a dia com ordens, custos, proventos e IR (estilo testador do MetaTrader) |
 | `perfil.py` | Teste de perfil e a definição de cada tipo de investidor (`DEFINICOES`) |
 | `checagem.py` | Confere se cada número citado pela IA existe nos dados que ela recebeu |
-| `investimentos.py` | Rentabilidade (Dietz modificado), proventos e leitura das planilhas da B3 |
+| `investimentos.py` | Rentabilidade (Dietz modificado), proventos, agenda de proventos e leitura das planilhas da B3 |
+| `ir.py` | Imposto de renda: operações registradas, apuração mensal com DARF e declaração anual |
+| `rendafixa.py` | Comparador de renda fixa líquido (IR, custódia) e vencimentos |
 | `fundamentos.py` | Indicadores de balanço e ranking (Yahoo, com conferências) |
-| `gastos.py`, `contas.py` | Gastos por categoria, contas do mês, boletos, extratos |
+| `gastos.py`, `contas.py` | Gastos por categoria, lançamento por frase (também pelo WhatsApp), cartões e faturas, contas do mês, boletos, extratos |
 | `planos.py`, `usuarios.py`, `armazem.py` | Assinatura, contas de usuário, armazenamento (arquivo ou PostgreSQL) |
 | `ativos.py` | Lista de ativos que o app pode recomendar, setores, ETFs e units |
 
@@ -85,4 +87,5 @@ PostgreSQL do Neon (`DATABASE_URL`). Os valores das variáveis de ambiente ficam
 
 - Branch de trabalho, commit com mensagem em português explicando o porquê, pull request para a `main`.
 - Juntar na `main` publica no ar (Render). Antes disso, confira os testes e, para mudanças visíveis, a interface.
-- Não colocar segredos (chaves, `CODIGO_MESTRE`, `DATABASE_URL`) em arquivos do repositório.
+- Não colocar segredos (chaves, `CODIGO_MESTRE`, `DATABASE_URL`, `WHATSAPP_*`) em arquivos do repositório.
+- Regras de imposto em `ir.py` (isenção de R$ 20 mil, alíquotas, DARF): mudou a lei, mude o código e `testes/test_novidades.py`.

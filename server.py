@@ -23,6 +23,8 @@ import contas as cmod
 import fundamentos
 import gastos as gmod
 import investimentos as inv
+import ir as irmod
+import rendafixa
 import memoria
 import referencias
 import simulador
@@ -104,6 +106,7 @@ class Pos(BaseModel):
     saldo: float = 0
     pct: float = 100
     renda: float = 0  # quanto a pessoa diz que recebe por mês de proventos com o ativo (R$), em ações e FIIs
+    venc: str | None = None  # vencimento do título de renda fixa (AAAA-MM-DD), se a pessoa informar
 
 
 class AnReq(BaseModel):
@@ -1609,7 +1612,9 @@ def limpar_carteira(d):
         t = norm(t)
         if OKT.match(t):
             pos[t] = {k: round(min(max(float(v), 0), 1e12), 6) for k, v in p.model_dump(exclude_defaults=True).items()
-                      if v == v}
+                      if k != "venc" and v == v}
+            if p.venc and re.fullmatch(r"20\d{2}-\d{2}-\d{2}", p.venc):
+                pos[t]["venc"] = p.venc
     extra = list(dict.fromkeys(t for t in (norm(x) for x in d.extra[:300]) if OKT.match(t)))
     perfil = d.perfil if d.perfil in PERFIS else "não informado"
     est = {"estrategia": d.estrategia} if d.estrategia in ESTRATEGIA_NOMES and d.estrategia != estrategias.PADRAO else {}
@@ -1899,6 +1904,8 @@ class GastoReq(BaseModel):
     descricao: str
     valor: float
     categoria: str | None = None
+    cartao: str | None = None  # id do cartão: a compra entra na fatura certa
+    parcelas: int = 1
 
 
 class GastoEdReq(BaseModel):
@@ -1921,10 +1928,71 @@ def gastos_criar(req: Request, r: list[GastoReq], authorization: str = Header(""
     uid = auth(req, authorization)
     if not 0 < len(r) <= 200: raise HTTPException(400, "Envie de 1 a 200 lançamentos.")
     try:
-        criados, _ = gmod.adicionar(uid, [x.model_dump() for x in r])
+        comuns = [x.model_dump(exclude={"cartao", "parcelas"}) for x in r if not x.cartao]
+        criados = gmod.adicionar(uid, comuns)[0] if comuns else []
+        for x in r:
+            if x.cartao:
+                criados += gmod.adicionar_compra(uid, x.model_dump())
     except ValueError as e:
         raise HTTPException(400, str(e))
     return {"criados": criados}
+
+
+class RapidoReq(BaseModel):
+    texto: str
+    confirmar: bool = True  # False: só mostra como o app entendeu, sem lançar
+
+
+def lancar_texto(uid, texto, confirmar=True):
+    """Frase livre ("gastei 50 no mercado", "comprei TV 2400 em 10x no Nubank") -> lançamento."""
+    x = gmod.interpretar(texto, date.today(), gmod.cartoes(uid))
+    if not x:
+        raise ValueError("Não encontrei o valor. Exemplo: \"gastei 52,90 no mercado ontem\".")
+    if not confirmar:
+        return {"entendido": x, "criados": []}
+    criados = gmod.adicionar_compra(uid, {**x, "origem": "rapido"}) if x.get("cartao") else gmod.adicionar(uid, [x], origem="rapido")[0]
+    return {"entendido": x, "criados": criados}
+
+
+@app.post("/api/gastos/rapido")
+def gastos_rapido(req: Request, r: RapidoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if not 0 < len(r.texto.strip()) <= 300: raise HTTPException(400, "Escreva o gasto em até 300 letras.")
+    try:
+        return lancar_texto(uid, r.texto, r.confirmar)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+class CartaoReq(BaseModel):
+    id: str | None = None
+    nome: str = ""
+    fecha: int = 1
+    vence: int = 10
+    limite: float = 0
+
+
+@app.get("/api/cartoes")
+def cartoes_ver(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    return {"cartoes": gmod.faturas(uid)}
+
+
+@app.post("/api/cartoes")
+def cartoes_salvar(req: Request, r: CartaoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try:
+        return gmod.salvar_cartao(uid, r.model_dump())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/cartoes/{cid}")
+def cartoes_apagar(cid: str, req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try: gmod.apagar_cartao(uid, cid)
+    except KeyError: raise HTTPException(404, "Cartão não encontrado.")
+    return {"ok": True}
 
 
 @app.put("/api/gastos/{gid}")
@@ -2059,6 +2127,153 @@ def b3_apagar(req: Request, authorization: str = Header("")):
     uid = auth(req, authorization)
     armazem.apagar("b3", uid)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- operações, imposto de renda e declaração
+
+class OperacaoReq(BaseModel):
+    data: str
+    ticker: str
+    tipo: str
+    qtd: float
+    preco: float
+
+
+@app.get("/api/operacoes")
+def operacoes_ver(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    return {"itens": irmod.operacoes(uid), "b3": len([m for m in _b3(uid).get("movs", []) if m.get("tipo") in ("compra", "venda")])}
+
+
+@app.post("/api/operacoes")
+def operacoes_criar(req: Request, r: OperacaoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    t = norm(r.ticker)
+    if not OKT.match(t): raise HTTPException(400, "Código de ativo inválido.")
+    try:
+        return irmod.registrar(uid, r.data, t, r.tipo, r.qtd, r.preco)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/operacoes/{oid}")
+def operacoes_apagar(oid: str, req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try: irmod.apagar(uid, oid)
+    except KeyError: raise HTTPException(404, "Operação não encontrada.")
+    return {"ok": True}
+
+
+def _rf_saldos(uid):
+    pos = (((armazem.ler("carteira", uid) or {}).get("dados")) or {}).get("pos") or {}
+    return {t: p.get("saldo", 0) for t, p in pos.items() if t in RF and p.get("saldo")}
+
+
+def imposto(uid, ano=None):
+    b3 = _b3(uid)
+    movs = irmod.todas(uid, b3.get("movs", []))
+    ano = ano or date.today().year - 1
+    ap = irmod.apurar(movs)
+    pend = [m for m in ap["meses"] if m["darf"] > 0 and m["vencimento"] >= date.today().isoformat()]
+    return {"meses": ap["meses"][-24:], "a_pagar": pend, "prejuizo_a_compensar": ap["prejuizo_a_compensar"],
+            "declaracao": irmod.declaracao(movs, b3.get("proventos", []), ano, _rf_saldos(uid)),
+            "operacoes": len(movs), "tem_b3": bool(b3.get("movs")),
+            "aviso": "Conta feita com as operações que o app conhece (planilha da B3 e as registradas aqui). Confira com o informe "
+                     "de rendimentos da corretora antes de pagar ou declarar: o app não substitui um contador."}
+
+
+@app.get("/api/ir")
+def ir_ver(req: Request, ano: int = 0, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if ano and not 2000 <= ano <= date.today().year: raise HTTPException(400, "Ano inválido.")
+    return imposto(uid, ano or None)
+
+
+class AgendaReq(BaseModel):
+    pos: dict[str, Pos] = {}
+
+
+@app.post("/api/agenda_proventos")
+def agenda_proventos(req: Request, r: AgendaReq, authorization: str = Header("")):
+    auth(req, authorization)
+    pos = {norm(t): p.model_dump() for t, p in list(r.pos.items())[:80] if OKT.match(norm(t))}
+    chave = "agenda:" + hashlib.sha1(json.dumps(sorted((t, p["qtd"]) for t, p in pos.items())).encode()).hexdigest()
+    try:
+        return cached(chave, 6 * 3600, lambda: {**inv.agenda(pos, excluir=frozenset(ETF_ACAO) | frozenset(ETF_EXT) | frozenset(ETF_RF)),
+                                                 "aviso": "As próximas datas são estimadas pelo costume de cada empresa ou fundo; "
+                                                          "a data e o valor de verdade saem no anúncio oficial."})
+    except Exception as e:
+        raise HTTPException(502, "Não consegui ler os proventos agora: " + str(e)[:120])
+
+
+class RFOpcao(BaseModel):
+    tipo: str
+    taxa: float = 0
+
+
+class RFReq(BaseModel):
+    valor: float = 10000
+    dias: int = 720
+    opcoes: list[RFOpcao] = []
+
+
+@app.post("/api/rendafixa/comparar")
+def rf_comparar(r: RFReq):
+    tx = rates()
+    cdi = tx.get("cdi") or tx.get("selic") or 10.0
+    ipca = tx.get("ipca_esperado") or tx.get("ipca12") or 4.0
+    ops = [o.model_dump() for o in r.opcoes] or [{"tipo": "cdb", "taxa": 100}, {"tipo": "lci", "taxa": 90}, {"tipo": "selic"},
+                                                 {"tipo": "ipca", "taxa": tx.get("juro_real_longo") or 6}]
+    if any(o["tipo"] not in rendafixa.TIPOS for o in ops): raise HTTPException(400, "Tipo de renda fixa inválido.")
+    try:
+        out = rendafixa.comparar(ops, r.valor, r.dias, cdi, ipca, tx.get("selic"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    out["aviso"] = ("Taxas de hoje do Banco Central (CDI e Selic) e IPCA esperado pelo Focus. IPCA e CDI mudam no caminho: "
+                    "é uma comparação, não uma promessa. IOF de resgates antes de 30 dias não entra.")
+    return out
+
+
+@app.get("/api/rendafixa/vencimentos")
+def rf_vencimentos(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    pos = (((armazem.ler("carteira", uid) or {}).get("dados")) or {}).get("pos") or {}
+    return {"itens": rendafixa.vencimentos(pos)}
+
+
+def _csv(linhas, cab):
+    import csv, io
+    b = io.StringIO()
+    w = csv.writer(b, delimiter=";")
+    w.writerow(cab)
+    for l in linhas:
+        w.writerow([str(x).replace(".", ",") if isinstance(x, float) else x for x in l])
+    return "\ufeff" + b.getvalue()  # BOM: o Excel abre com acentos
+
+
+@app.get("/api/exportar/{tipo}")
+def exportar(tipo: str, req: Request, authorization: str = Header("")):
+    """Planilha (CSV, abre no Excel e no Google Planilhas) com os dados da pessoa."""
+    uid = auth(req, authorization)
+    if tipo == "carteira":
+        pos = (((armazem.ler("carteira", uid) or {}).get("dados")) or {}).get("pos") or {}
+        txt = _csv([[t, p.get("qtd", ""), p.get("pm", ""), p.get("saldo", ""), p.get("renda", ""), p.get("venc", "")]
+                    for t, p in sorted(pos.items())], ["ativo", "quantidade", "preco_medio", "saldo_rs", "proventos_mes_rs", "vencimento"])
+    elif tipo == "operacoes":
+        movs = irmod.todas(uid, _b3(uid).get("movs", []))
+        txt = _csv([[m["data"], m["ticker"], m["tipo"], m["qtd"], m.get("preco") or "", m.get("origem", "b3")] for m in movs],
+                   ["data", "ativo", "tipo", "quantidade", "preco", "origem"])
+    elif tipo == "ir":
+        x = imposto(uid)
+        txt = _csv([[m["mes"], m["vendas_acoes"], m["lucro_isento"], m["imposto"], m["darf"], m["vencimento"], m["codigo"]]
+                    for m in x["meses"]], ["mes", "vendas_acoes_rs", "lucro_isento_rs", "imposto_rs", "darf_rs", "vencimento", "codigo_darf"])
+    elif tipo == "gastos":
+        txt = _csv([[g["data"], g["descricao"], g["valor"], g.get("categoria", ""), g.get("parcela", "")]
+                    for g in gmod.ler(uid)["itens"]], ["data", "descricao", "valor_rs", "categoria", "parcela"])
+    else:
+        raise HTTPException(404, "Tipo de exportação desconhecido.")
+    return HTMLResponse(txt, media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{tipo}-{date.today().isoformat()}.csv"'})
 
 
 # ---------------------------------------------------------------- simulador do passado (e se alguém tivesse seguido o app?)
@@ -2630,6 +2845,7 @@ class GoogleReq(BaseModel):
     convite: str = ""
     uid_anterior: str = ""
     somente_entrar: bool = False
+    codigo: str = ""
 
 
 class EsqueciReq(BaseModel):
@@ -2640,11 +2856,25 @@ class RedefinirReq(BaseModel):
     email: str = ""
     codigo: str = ""
     senha: str = ""
+    codigo_2fa: str = ""
 
 
 class LoginReq(BaseModel):
     email: str = ""
     senha: str = ""
+    codigo: str = ""  # código do app autenticador, se a conta usa duas etapas
+
+
+class CodigoReq(BaseModel):
+    codigo: str = ""
+
+
+def _exigir_2fa(req, uid, codigo):
+    if usuarios.conferir_2fa(uid, codigo):
+        return
+    if codigo: falhou(req)
+    raise HTTPException(401, {"precisa_2fa": True, "msg": "Código incorreto." if codigo else
+                              "Digite o código de 6 números do seu app autenticador."})
 
 
 class SenhaReq(BaseModel):
@@ -2696,6 +2926,7 @@ def conta_google(req: Request, r: GoogleReq):
         idx = armazem.ler("email", usuarios.normalizar_email(info.get("email")))
         uid = (g or idx or {}).get("dados", {}).get("uid")
         if not uid or not armazem.ler("usuario", uid): raise HTTPException(404, "Não há conta do app para este Google.")
+        _exigir_2fa(req, uid, r.codigo)
         return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid), "nova": False}
     try:
         uid, nova = usuarios.entrar_google(info, r.convite, r.uid_anterior)
@@ -2703,6 +2934,7 @@ def conta_google(req: Request, r: GoogleReq):
         raise HTTPException(403, {"precisa_convite": True, "msg": str(e) if r.convite else "Para criar a conta, informe o código de convite."})
     except ValueError as e:
         raise HTTPException(400, str(e))
+    if not nova: _exigir_2fa(req, uid, r.codigo)
     return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid), "nova": nova}
 
 
@@ -2748,6 +2980,11 @@ def conta_esqueci(req: Request, r: EsqueciReq):
 @app.post("/api/conta/redefinir")
 def conta_redefinir(req: Request, r: RedefinirReq):
     limitar(req)
+    idx = armazem.ler("email", usuarios.normalizar_email(r.email))
+    uid_ = ((idx or {}).get("dados") or {}).get("uid")
+    if uid_ and not usuarios.conferir_2fa(uid_, r.codigo_2fa):  # confere antes de trocar a senha
+        if r.codigo_2fa: falhou(req)
+        raise HTTPException(401, {"precisa_2fa": True, "msg": "Digite também o código do seu app autenticador."})
     try:
         uid = usuarios.redefinir_senha(r.email, r.codigo, r.senha)
     except ValueError as e:
@@ -2763,6 +3000,7 @@ def conta_entrar(req: Request, r: LoginReq):
     if not uid:
         falhou(req)
         raise HTTPException(401, "E-mail ou senha incorretos.")
+    _exigir_2fa(req, uid, r.codigo)
     return {"token": usuarios.criar_sessao(uid), "usuario": usuarios.publico(uid)}
 
 
@@ -2776,6 +3014,133 @@ def conta_sair(req: Request, authorization: str = Header("")):
     auth(req, authorization)
     usuarios.encerrar_sessao(token_de(authorization))
     return {"ok": True}
+
+
+@app.post("/api/conta/2fa/iniciar")
+def dois_fatores_iniciar(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if usuarios.dois_fatores_ativo(uid): raise HTTPException(400, "A verificação em duas etapas já está ligada.")
+    return usuarios.iniciar_2fa(uid)
+
+
+@app.post("/api/conta/2fa/ativar")
+def dois_fatores_ativar(req: Request, r: CodigoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try: usuarios.ativar_2fa(uid, r.codigo)
+    except ValueError as e:
+        falhou(req)
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.post("/api/conta/2fa/desativar")
+def dois_fatores_desativar(req: Request, r: CodigoReq, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    try: usuarios.desativar_2fa(uid, r.codigo)
+    except ValueError as e:
+        falhou(req)
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- WhatsApp: lançar gastos por mensagem (API oficial da Meta)
+
+WA_TOKEN, WA_PHONE_ID = os.getenv("WHATSAPP_TOKEN", ""), os.getenv("WHATSAPP_PHONE_ID", "")
+WA_VERIFY, WA_SECRET = os.getenv("WHATSAPP_VERIFY_TOKEN", ""), os.getenv("WHATSAPP_APP_SECRET", "")
+WA_NUMERO = os.getenv("WHATSAPP_NUMERO", "")  # número mostrado na tela, ex.: 5511999999999
+
+
+def whatsapp_ligado():
+    return bool(WA_TOKEN and WA_PHONE_ID and WA_VERIFY and WA_SECRET)
+
+
+def wa_enviar(para, texto):
+    try:
+        requests.post(f"https://graph.facebook.com/v21.0/{WA_PHONE_ID}/messages", timeout=15,
+                      headers={"Authorization": f"Bearer {WA_TOKEN}"},
+                      json={"messaging_product": "whatsapp", "to": para, "type": "text", "text": {"body": texto[:4000]}})
+    except Exception as e:
+        print("falha ao responder no WhatsApp:", repr(e)[:200], flush=True)
+
+
+def wa_mensagem(numero, texto):
+    """Uma mensagem recebida -> resposta (texto). Separado para os testes."""
+    texto = " ".join(str(texto).split())[:300]
+    m = re.fullmatch(r"(?i)vincular\s+(\d{6})", texto)
+    if m:
+        c = armazem.ler("whatsapp_codigo", m.group(1))
+        d = (c or {}).get("dados") or {}
+        if not d or d.get("expira", 0) < time.time():
+            return "Código inválido ou vencido. Gere outro no app, em Gastos > WhatsApp."
+        armazem.gravar("whatsapp", numero, {"uid": d["uid"]})
+        armazem.gravar("whatsapp_usuario", d["uid"], {"numero": numero})
+        armazem.apagar("whatsapp_codigo", m.group(1))
+        return "Pronto! Agora é só mandar seus gastos aqui. Exemplo: gastei 52,90 no mercado ontem"
+    v = armazem.ler("whatsapp", numero)
+    uid = ((v or {}).get("dados") or {}).get("uid")
+    if not uid or not armazem.ler("usuario", uid):
+        return "Este número não está ligado a uma conta. No app, abra Gastos > WhatsApp e mande aqui: vincular <código>"
+    if texto.lower() in ("desvincular", "sair"):
+        armazem.apagar("whatsapp", numero)
+        armazem.apagar("whatsapp_usuario", uid)
+        return "Número desligado da sua conta."
+    try:
+        r = lancar_texto(uid, texto)
+    except ValueError as e:
+        return str(e)
+    x = r["entendido"]
+    cat = (r["criados"][0].get("categoria") if r["criados"] else None) or "sem categoria"
+    val = regras.br(abs(x["valor"]), 2)
+    parc = f" em {x['parcelas']}x" if x.get("parcelas", 1) > 1 else ""
+    return (f"Anotado: {'receita' if x['valor'] > 0 else 'gasto'} de R$ {val}{parc}, {x['descricao']} "
+            f"({cat}), dia {x['data'][8:10]}/{x['data'][5:7]}. Para desfazer, apague no app.")
+
+
+@app.get("/api/whatsapp/webhook")
+def wa_verificar(request: Request):
+    q = request.query_params
+    if whatsapp_ligado() and q.get("hub.mode") == "subscribe" and hmac.compare_digest(q.get("hub.verify_token", ""), WA_VERIFY):
+        return HTMLResponse(q.get("hub.challenge", ""))
+    raise HTTPException(403, "não autorizado")
+
+
+@app.post("/api/whatsapp/webhook")
+async def wa_receber(request: Request):
+    if not whatsapp_ligado(): raise HTTPException(404, "WhatsApp não configurado.")
+    corpo = await request.body()
+    assin = request.headers.get("x-hub-signature-256", "")
+    esperado = "sha256=" + hmac.new(WA_SECRET.encode(), corpo, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(assin, esperado): raise HTTPException(403, "assinatura inválida")
+    try:
+        dados = json.loads(corpo)
+        for ent in dados.get("entry", []):
+            for ch in ent.get("changes", []):
+                for msg in (ch.get("value") or {}).get("messages", []) or []:
+                    if msg.get("type") == "text":
+                        de = re.sub(r"\D", "", str(msg.get("from", "")))[:16]
+                        if de:
+                            threading.Thread(target=wa_enviar, args=(de, wa_mensagem(de, msg["text"].get("body", ""))), daemon=True).start()
+    except Exception as e:
+        print("webhook do WhatsApp com erro:", repr(e)[:200], flush=True)
+    return {"ok": True}
+
+
+@app.get("/api/whatsapp")
+def wa_estado(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    v = ((armazem.ler("whatsapp_usuario", uid) or {}).get("dados") or {}).get("numero")
+    return {"ligado": whatsapp_ligado(), "numero_app": WA_NUMERO or None,
+            "vinculado": ("final " + v[-4:]) if v else None}
+
+
+@app.post("/api/whatsapp/codigo")
+def wa_codigo(req: Request, authorization: str = Header("")):
+    uid = auth(req, authorization)
+    if not whatsapp_ligado(): raise HTTPException(404, "O WhatsApp ainda não foi configurado neste servidor.")
+    import secrets as _s
+    c = f"{_s.randbelow(10 ** 6):06d}"
+    armazem.gravar("whatsapp_codigo", c, {"uid": uid, "expira": time.time() + 900})
+    return {"codigo": c, "numero_app": WA_NUMERO or None, "validade_min": 15}
 
 
 @app.post("/api/conta/senha")

@@ -37,6 +37,7 @@ Todas estão em [.env.example](.env.example), com explicação. As principais:
 | `CODIGO_CONVITE` (ou `APP_TOKEN`) | Código exigido para criar conta. Vazio = cadastro aberto (o normal na Play Store). |
 | `GOOGLE_CLIENT_ID` | Liga o "Entrar com o Google" (ID do cliente OAuth do tipo Aplicativo da Web, no Google Cloud). |
 | `SMTP_HOST`, `SMTP_PORTA`, `SMTP_USUARIO`, `SMTP_SENHA`, `SMTP_REMETENTE` | E-mail para o "esqueci minha senha" (código de 6 dígitos). |
+| `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_NUMERO` | Lançar gastos pelo WhatsApp (API oficial da Meta, WhatsApp Cloud). Sem as quatro primeiras, o recurso fica desligado e não aparece na tela. Webhook: `/api/whatsapp/webhook`. |
 | `ASSINATURA`, `TESTE_GRATIS_DIAS`, `PRECO_MENSAL`, `PRECO_ANUAL`, `CODIGOS_PREMIUM` | Planos: `ASSINATURA=nao` deixa todos Premium (uso pessoal); dias de teste (7); preços (14,90 e 119,90); códigos promocionais `CODIGO:dias`. |
 | `CODIGO_MESTRE` | Seu código de acesso completo, sem pagar (mínimo 8 caracteres). No app: menu da conta, toque 5 vezes em "Versão" e digite o código. Nunca coloque o valor no código ou no GitHub; trocar o código revoga quem usou o antigo. |
 | `ANDROID_PACKAGE`, `ANDROID_SHA256`, `PLAY_PRODUTO_MENSAL`, `PLAY_PRODUTO_ANUAL`, `GOOGLE_PLAY_CONTA_SERVICO`, `RTDN_CHAVE` | App Android e assinatura pelo Google Play (veja o guia de publicação). |
@@ -174,6 +175,34 @@ ETFs ficam de fora, porque não distribuem). Mostra ao lado o que o histórico d
 são muito diferentes; o cartão de cada ativo mostra o rendimento sobre o que foi pago. A carteira recomendada usa isso: a
 IA recebe o informado e o estimado, e toda sugestão de venda ou redução diz quanto de renda por mês a pessoa deixaria de
 receber.
+
+## O que veio da comparação com os concorrentes (28/11/2026)
+
+- **Imposto de renda** (`ir.py`, aba Meus ativos): apuração mês a mês das vendas de ações, ETFs, BDRs e FIIs com as regras da
+  Receita (ações isentas quando as vendas do mês somam até R$ 20 mil; 15% em ações, ETFs e BDRs; 20% em FIIs e day trade;
+  prejuízo guardado por tipo e abatido depois; DARF código 6015 até o último dia útil do mês seguinte; abaixo de R$ 10 fica
+  para o mês seguinte). Monta a declaração anual: bens e direitos pelo custo, dividendos e rendimentos de FIIs isentos, JCP
+  em tributação exclusiva. Usa a planilha da B3 e as compras e vendas registradas no app (`/api/operacoes`). Avisa que
+  não substitui um contador.
+- **Lançamento rápido** por frase ou voz ("gastei 52,90 no mercado ontem", "comprei TV 2400 em 10x no cartão"):
+  `gastos.interpretar`, `/api/gastos/rapido`. A voz usa o reconhecimento do navegador.
+- **Cartões de crédito**: fechamento, vencimento e limite; compra parcelada vira uma parcela em cada fatura
+  (`gastos.adicionar_compra`, `gastos.faturas`, `/api/cartoes`).
+- **WhatsApp**: a pessoa liga o número com um código de 6 dígitos ("vincular 123456") e manda os gastos como mensagem;
+  o app confere a assinatura da Meta em cada mensagem e responde o que anotou. Precisa de uma conta do WhatsApp Business
+  (variáveis acima).
+- **Agenda de proventos** (`investimentos.agenda`): o que cada FII e ação pagou em 12 meses e a próxima data-com,
+  estimada pelo costume de cada um (a tela diz que é estimativa).
+- **Comparador de renda fixa** (`rendafixa.py`, aba Mercado): CDB, LCI/LCA, Tesouro Selic, prefixado e IPCA+ pelo valor
+  líquido no fim do prazo (tabela regressiva de IR, isenção de LCI/LCA, custódia de 0,20% ao ano no Tesouro) e quanto
+  cada um equivale em CDB % do CDI. **Vencimentos**: a pessoa informa a data de cada título e o app mostra o que vence.
+- **Planilhas** (CSV para Excel e Google Planilhas): carteira, compras e vendas, imposto e gastos (`/api/exportar/{tipo}`).
+- **Verificação em duas etapas** com app autenticador (TOTP, RFC 6238, em `usuarios.py`): com ela ligada, entrar com
+  senha, com Google ou criar nova senha pede também o código.
+
+Não feito, porque depende de contrato ou conta de quem publica: Open Finance (sincronizar bancos e corretoras
+automaticamente, por um agregador como Pluggy ou Belvo), app nas lojas (contas de desenvolvedor Google Play e Apple),
+fundos de investimento, criptomoedas e conta compartilhada da família.
 
 ## Auditoria das recomendações, planos consagrados e memória
 

@@ -228,6 +228,13 @@ details.estr-fora{margin-top:12px}
 .rep-l small{flex-basis:100%;font-size:12px;color:var(--mut)}
 .renda-linha{margin:6px 0 0}
 .renda-lista{display:grid;gap:8px;margin-top:10px}
+.rap{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}.rap .inp{flex:1 1 220px}.rap .btn{flex:0 0 auto}
+#rapMic.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.cartao{border-top:1px solid var(--line2);padding-top:10px;margin-top:10px}.cartao:first-of-type{border-top:0;margin-top:4px;padding-top:0}
+.cartao-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.cartao-h .mut{flex:1}
+code.chave{display:inline-block;font-size:15px;letter-spacing:.06em;padding:4px 8px;border-radius:6px;background:var(--line2);word-break:break-all;user-select:all}
+.rf-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;margin-top:8px}.rf-form .btns{grid-column:1/-1;margin:0}
+.tbl-wrap{overflow-x:auto;margin:6px 0}.rf-form .inp i{white-space:nowrap;font-size:12px}.tbl td.dir{text-align:right}
 .renda-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line2)}
 .renda-nm{min-width:0}.renda-nm small{display:block;color:var(--mut);font-size:12px}
 .renda-inp{flex:0 0 140px;max-width:140px;display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;background:var(--sf);padding:0 10px;min-height:42px}
@@ -531,6 +538,7 @@ body.travado{overflow:hidden}
     </div>
     <div id="rendaCard"></div>
     <div id="list" class="grid2"></div>
+    <div id="novAtivos"></div>
   </section>
   <p class="disc">Ferramenta educacional: sugestões e simulações são estimativas automáticas, não recomendação profissional nem garantia de resultado. Rentabilidade passada não garante rentabilidade futura. Valores antes de impostos e taxas.</p>
 </main>
@@ -611,6 +619,7 @@ function canon(d) {
       const v = Number(p[k]);
       if (p[k] != null && isFinite(v) && v !== def) o[k] = Math.round(Math.max(v, 0) * 1e6) / 1e6;
     }
+    if (typeof p.venc === 'string' && /^20\d\d-\d\d-\d\d$/.test(p.venc)) o.venc = p.venc;
     if (Object.keys(o).length) pp[t] = o;
   });
   const est = typeof d.estrategia === 'string' && /^[a-z0-9_]{1,40}$/.test(d.estrategia) && d.estrategia !== 'app' ? {estrategia: d.estrategia} : {};
@@ -1213,7 +1222,7 @@ function gastosHtml() {
   const cab = `<div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Gastos de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>`;
   if (!g) return `<div class="card">${cab}${st.gastosErr ? `<p class="err-box">${esc(st.gastosErr)}</p>` : busy('Somando seus gastos…') + sk(3)}</div>`;
   const btns = `<div class="btns"><button class="btn primary" type="button" data-gnovo="-1">+ Gasto</button><button class="btn" type="button" data-gnovo="1">+ Receita</button>
-    <button class="btn" type="button" id="gImp">${premium() ? '' : ICON.cadeado}Importar extrato ou fatura</button><button class="btn" type="button" id="gLim">Limites por categoria</button></div>`;
+    <button class="btn" type="button" id="gImp">${premium() ? '' : ICON.cadeado}Importar extrato ou fatura</button><button class="btn" type="button" id="gLim">Limites por categoria</button><button class="btn" type="button" data-exp="gastos">Baixar planilha</button></div>`;
   if (!g.tem_dados) return `<div class="card">${cab}<p class="lead">Anote o que entra e o que sai e veja para onde vai o seu dinheiro. O app separa por categoria sozinho (iFood vai para Alimentação fora, Uber para Transporte…) e aprende quando você corrige.</p>
     <ul class="ink2 sm" style="padding-left:18px"><li><b>+ Gasto</b> ou <b>+ Receita</b>: lance à mão, em segundos.</li><li><b>Importar extrato ou fatura</b> (OFX ou CSV do banco ou do cartão): tudo de uma vez, sem duplicar.</li><li><b>Limites por categoria</b>: o app avisa quando você passa de 80% e de 100% no mês.</li></ul>${btns}</div>`;
   const maxV = Math.max(...g.categorias.map(c => Math.max(c.valor, c.limite || 0)), 1);
@@ -1499,6 +1508,7 @@ function go(t) {
   $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
   $$('main>section').forEach(s => s.hidden = s.id !== 't-' + t);
   if (t === 'sim') { if (!st.sim && !st.simBusy) runSim(); else drawChart(); }
+  if (t === 'ativos') loadNovAtivos();
   window.scrollTo({top: 0});
 }
 $$('nav.tabs button').forEach(b => b.onclick = () => go(b.dataset.t));
@@ -2233,7 +2243,10 @@ function renderMercado() {
   <div class="sect-t">Simulador do passado</div>
   <div id="simulCard">${simulHtml()}</div>
   <div class="sect-t">Corretora simulada</div>
-  <div id="corrCard">${corrHtml()}</div>`;
+  <div id="corrCard">${corrHtml()}</div>
+  <div class="sect-t">Comparar renda fixa</div>
+  <div id="rfCard">${rfHtml()}</div>`;
+  ligarRf();
   ligarRank(); if (!st.rk.dados[st.rk.tipo]) loadRank(st.rk.tipo);
   ligarSimul(); if (!st.simul.dados && !st.simul.busy) loadSimul();
   ligarCorr(); if (!st.corr.dados && !st.corr.busy) loadCorr();
@@ -2426,7 +2439,8 @@ function addRow(t) {
 async function order(t, side, preco) {
   const v = await ask({title: `${side === 'COMPRAR' ? 'Registrar compra' : 'Registrar venda'} de ${t}`, desc: 'Anote aqui o que você fez na corretora.',
     fields: [{name: 'q', label: `Quantidade ${side === 'COMPRAR' ? 'comprada' : 'vendida'}`, mode: 'decimal'},
-             {name: 'p', label: 'Preço por unidade', mode: 'decimal', value: N(preco, 2), prefix: t === 'VOO' ? 'US$' : 'R$'}],
+             {name: 'p', label: 'Preço por unidade', mode: 'decimal', value: N(preco, 2), prefix: t === 'VOO' ? 'US$' : 'R$'},
+             {name: 'dt', label: 'Data da operação', type: 'date', value: isoLocal(hojeD()), hint: 'Usada no cálculo do imposto de renda.'}],
     ok: 'Registrar',
     validate: v => { const q = num(v.q), p = num(v.p); if (!(q > 0)) return 'Informe uma quantidade maior que zero.'; if (!(p > 0)) return 'Informe um preço válido.';
       if (side === 'VENDER' && q > (pos[t]?.qtd || 0) + 1e-9) return 'Você não tem essa quantidade registrada.'; }});
@@ -2434,7 +2448,11 @@ async function order(t, side, preco) {
   const q = num(v.q), pr = num(v.p), p = pos[t] || {qtd: 0, pm: 0};
   if (side === 'COMPRAR') { p.pm = (p.pm * p.qtd + pr * q) / (p.qtd + q); p.qtd += q; } else p.qtd -= q;
   p.qtd = Math.round(p.qtd * 1e6) / 1e6; p.pm = Math.round(p.pm * 1e4) / 1e4;
-  pos[t] = p; sv(); await load(t); posChanged();
+  pos[t] = p; sv();
+  if (!['VOO', 'DOLAR'].includes(t) && !RF[t])  // vai para a apuração do imposto (aba Meus ativos)
+    api('/api/operacoes', {data: v.dt || isoLocal(hojeD()), ticker: t, tipo: side === 'COMPRAR' ? 'compra' : 'venda', qtd: q, preco: pr})
+      .then(() => { st.ir = null; loadNovAtivos.chave = null; }).catch(e => toast('A operação ficou na carteira, mas não entrou no imposto: ' + e.message));
+  await load(t); posChanged();
 }
 async function edit(t, classe) {
   let v;
@@ -2446,10 +2464,12 @@ async function edit(t, classe) {
       : poup ? null
       : {name: 'p', label: t === 'TESOURO_SELIC' ? '% da Selic' : '% do CDI', suffix: '%', mode: 'decimal', value: N(cur.pct ?? (t === 'LCI_LCA' ? 90 : 100), 0),
          hint: t === 'PORQUINHO' ? 'Veja no app do Inter.' : t === 'LCI_LCA' ? 'Normalmente de 85% a 95%. LCI e LCA são isentas de IR.' : 'Normalmente 100.'};
-    v = await ask({title: `Editar ${RF[t] || t}`, fields: [{name: 's', label: 'Saldo atual', prefix: 'R$', mode: 'decimal', value: cur.saldo ? N(cur.saldo, 2) : ''}, ...(taxa ? [taxa] : [])],
+    const temVenc = !['POUPANCA', 'PORQUINHO'].includes(t);
+    v = await ask({title: `Editar ${RF[t] || t}`, fields: [{name: 's', label: 'Saldo atual', prefix: 'R$', mode: 'decimal', value: cur.saldo ? N(cur.saldo, 2) : ''}, ...(taxa ? [taxa] : []),
+      ...(temVenc ? [{name: 'vc', label: 'Vencimento (opcional)', type: 'date', value: cur.venc || '', hint: 'O app avisa 30 dias antes e mostra o que vence em Meus ativos.'}] : [])],
       validate: v => isNaN(num(v.s)) || num(v.s) < 0 ? 'Informe o saldo (pode ser 0).' : taxa && !(num(v.p) > 0) ? 'Informe a taxa.' : ''});
     if (!v) return;
-    pos[t] = {saldo: num(v.s), pct: taxa ? num(v.p) : 100};
+    pos[t] = {saldo: num(v.s), pct: taxa ? num(v.p) : 100, ...(temVenc && v.vc ? {venc: v.vc} : {})};
   } else {
     const cur = pos[t] || {};
     if (!premium() && !(cur.qtd > 0) && nPosicoes() >= limiteAtivos()) return abrirPlanos(`No plano grátis dá para acompanhar até ${limiteAtivos()} investimentos com posição. Assine o Premium para registrar todos.`);
@@ -2520,7 +2540,7 @@ function rm(t) {
   extra = extra.filter(x => x !== t); delete pos[t]; delete st.an[t]; sv();
   document.getElementById('r-' + t)?.remove(); posChanged();
 }
-let pcT; function posChanged() { clearTimeout(pcT); pcT = setTimeout(() => loadPort(true), 400); }
+let pcT; function posChanged() { clearTimeout(pcT); pcT = setTimeout(() => { loadPort(true); if (st.tab === 'ativos') loadNovAtivos(); }, 400); }
 
 /* ---------- perfil, configurações e backup ---------- */
 $('#btnPerfil').onclick = async () => {
@@ -2620,6 +2640,13 @@ function telaEntrar(msg = '') {
     const postar = async (u, corpo) => {
       const r = await fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(corpo)});
       const j = await r.json().catch(() => ({}));
+      if (r.status === 401 && j.detail?.precisa_2fa) {
+        const v = await ask({title: 'Verificação em duas etapas', desc: j.detail.msg, ok: 'Continuar',
+          fields: [{name: 'c', label: 'Código do app autenticador', mode: 'numeric', ph: '000000'}],
+          validate: v => /^\d{6}$/.test(v.c.trim()) ? '' : 'Digite os 6 números que aparecem no app.'});
+        if (v) return postar(u, {...corpo, [u.endsWith('/redefinir') ? 'codigo_2fa' : 'codigo']: v.c.trim()});
+        const e = new Error('Entrada cancelada.'); e.status = 401; throw e;
+      }
       if (!r.ok) { const e = new Error(typeof j.detail === 'string' ? j.detail : j.detail?.msg || `Erro ${r.status}`); e.status = r.status; e.detail = j.detail; throw e; }
       return j;
     };
@@ -2749,6 +2776,10 @@ document.addEventListener('click', async e => {
   if (acao === 'planos') return abrirPlanos();
   if (acao === 'teste') return abrirTestePerfil(false);
   if (acao === 'exportar') return exportarTudo();
+  if (acao === '2fa') return doisFatores();
+  if (acao === 'planilhas') return ask({title: 'Baixar planilhas', desc: 'Arquivos CSV, que abrem no Excel e no Google Planilhas.', ok: 'Fechar', cancelar: false,
+    extraHtml: `<div class="menu-conta">${[['carteira', 'Carteira'], ['operacoes', 'Compras e vendas'], ['ir', 'Imposto de renda mês a mês'], ['gastos', 'Gastos e receitas']]
+      .map(([k, l]) => `<button class="btn" type="button" data-exp="${k}">${l}</button>`).join('')}</div>`});
   if (acao === 'senha') {
     const semSenha = eu?.tem_senha === false;
     const v = await ask({title: semSenha ? 'Criar uma senha' : 'Trocar senha', desc: semSenha ? 'Você entra com o Google. Com uma senha, também dá para entrar com e-mail e senha.' : '',
@@ -2775,6 +2806,8 @@ $('#btnConta').onclick = () => ask({title: eu?.nome || 'Minha conta', desc: eu?.
     <button class="btn" type="button" data-conta="teste">Refazer o teste de perfil</button>
     <button class="btn" type="button" data-conta="backup">Backup da carteira</button>
     <button class="btn" type="button" data-conta="senha">${eu?.tem_senha === false ? 'Criar uma senha' : 'Trocar senha'}</button>
+    <button class="btn" type="button" data-conta="2fa">Verificação em duas etapas: ${eu?.dois_fatores ? 'ligada' : 'desligada'}</button>
+    <button class="btn" type="button" data-conta="planilhas">Baixar planilhas (Excel)</button>
     ${eu?.admin ? '<button class="btn" type="button" data-conta="exportar">Exportar todos os dados (admin)</button>' : ''}
     <button class="btn" type="button" data-conta="sair">Sair</button>
     <button class="btn" type="button" data-conta="sair-limpar">Sair e apagar meus dados deste aparelho</button>
@@ -2889,6 +2922,259 @@ function renderResumoContas() {
     ${st.fin?.reserva_alvo ? `<p class="sm ink2" style="margin:6px 0 0">Reserva de emergência: <b>${M0(reservaLocal())}</b> de ${M0(st.fin.reserva_alvo)} (${st.fin.reserva_meses} meses de contas)${st.fin.sobra != null ? ` · sobra por mês: <b class="${st.fin.sobra < 0 ? 'dn' : ''}">${M0(st.fin.sobra)}</b>` : ''}.</p>` : ''}
     ${atras ? `<div class="note warn">${ICON.warn}<div>${atras} ${atras === 1 ? 'conta venceu' : 'contas venceram'} e ainda não ${atras === 1 ? 'foi marcada' : 'foram marcadas'} como paga${atras === 1 ? '' : 's'}.</div></div>` : ''}</div>`;
 }
+
+/* ---------- lançamento rápido (texto ou voz), cartões, WhatsApp ---------- */
+st.cartoes = null; st.wa = null; st.rapMsg = '';
+const FALA = window.SpeechRecognition || window.webkitSpeechRecognition;
+const MIC = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+const mesNome = ym => `${MESES[+ym.slice(5, 7) - 1]} de ${ym.slice(0, 4)}`;
+function rapidoHtml() {
+  return `<div class="card"><h2>Lançar rápido</h2>
+    <p class="lead sm">Escreva${FALA ? ' ou fale' : ''} como numa mensagem: “gastei 52,90 no mercado ontem”, “comprei TV 2400 em 10x no cartão”, “recebi 1500 de salário”.</p>
+    <form id="rapForm" class="rap" novalidate><div class="inp"><input id="rapTxt" autocomplete="off" maxlength="300" placeholder="gastei 35 no uber hoje" aria-label="Gasto ou receita em uma frase"></div>
+      ${FALA ? `<button class="btn" type="button" id="rapMic" aria-label="Falar o gasto">${MIC}</button>` : ''}<button class="btn primary" type="submit">Lançar</button></form>
+    <p class="sm" id="rapInfo" aria-live="polite" style="margin:8px 0 0">${st.rapMsg ? esc(st.rapMsg) : ''}</p>
+    ${FALA ? '<p class="mut xs" style="margin:4px 0 0">Ao falar, o reconhecimento de voz é feito pelo navegador do seu aparelho.</p>' : ''}</div>`;
+}
+function ligarRapido() {
+  const f = $('#rapForm'); if (!f) return;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const t = $('#rapTxt').value.trim(), info = $('#rapInfo');
+    if (!t) return;
+    info.textContent = 'Lançando…';
+    try {
+      const r = await api('/api/gastos/rapido', {texto: t}), x = r.entendido, c0 = r.criados[0] || {};
+      st.rapMsg = `Anotado: ${x.valor > 0 ? 'receita' : 'gasto'} de ${M(Math.abs(x.valor))}${x.parcelas > 1 ? ` em ${x.parcelas}x de ${M(Math.abs(x.valor) / x.parcelas)}` : ''}, ${x.descricao} (${c0.categoria || 'sem categoria'}), ${diaBR(x.data)}. Para corrigir, toque no lançamento abaixo.`;
+      st.mesContas = {ano: +x.data.slice(0, 4), mes: +x.data.slice(5, 7) - 1}; st.gastos = {}; st.cartoes = null; renderContas();
+    } catch (er) { info.textContent = er.message; }
+  };
+  const mic = $('#rapMic');
+  if (mic) mic.onclick = () => {
+    const r = new FALA(); r.lang = 'pt-BR'; r.interimResults = false; r.maxAlternatives = 1;
+    r.onresult = ev => { $('#rapTxt').value = ev.results[0][0].transcript; f.requestSubmit(); };
+    r.onerror = ev => toast(ev.error === 'not-allowed' ? 'Permita o uso do microfone para falar o gasto.' : 'Não entendi. Tente de novo ou escreva.');
+    r.onend = () => mic.classList.remove('on');
+    mic.classList.add('on'); $('#rapInfo').textContent = 'Pode falar…'; r.start();
+  };
+}
+async function loadCartoes() { try { st.cartoes = (await api('/api/cartoes')).cartoes; } catch (e) { st.cartoes = {err: e.message}; } renderCartoes(); }
+function renderCartoes() { const el = $('#cartoesCard'); if (el) { el.innerHTML = cartoesHtml(); ligarCartoes(); } }
+function cartoesHtml() {
+  const cs = st.cartoes, h = '<h2>Cartões de crédito</h2>';
+  if (!cs) return `<div class="card">${h}${busy('Somando as faturas…')}</div>`;
+  if (cs.err) return `<div class="card">${h}<p class="err-box">${esc(cs.err)}</p></div>`;
+  const um = c => {
+    const at = c.faturas.find(f => f.mes === c.fatura_atual), prox = c.faturas.filter(f => f.mes > c.fatura_atual);
+    return `<div class="cartao"><div class="cartao-h"><b>${esc(c.nome)}</b><span class="mut xs">fecha dia ${c.fecha} · vence dia ${c.vence}</span>
+        <button class="btn sm ghost" type="button" data-ced="${c.id}">Editar</button><button class="btn sm ghost" type="button" data-cdel="${c.id}">Apagar</button></div>
+      <div class="tiles"><div class="tile main"><div class="l">Fatura de ${MESES[+c.fatura_atual.slice(5) - 1]}</div><div class="v tn">${M(at?.total || 0)}</div><div class="d">vence ${at?.vencimento ? diaBR(at.vencimento) : 'dia ' + c.vence}</div></div>
+        <div class="tile"><div class="l">Próximas faturas</div><div class="v tn">${M(prox.reduce((x, f) => x + f.total, 0))}</div><div class="d">parcelas já compradas</div></div>
+        ${c.limite ? `<div class="tile"><div class="l">Limite livre</div><div class="v tn ${c.limite_disponivel < 0 ? 'dn' : ''}">${M(c.limite_disponivel)}</div><div class="d">de ${M(c.limite)}</div></div>` : ''}</div>
+      ${at?.itens.length ? `<details><summary>Compras na fatura atual (${at.itens.length})</summary>${at.itens.map(i => `<div class="lanc"><div class="ds"><b>${esc(i.descricao)}</b><span class="mut xs">${diaBR(i.data)}</span></div><span class="vl">${M(-i.valor)}</span></div>`).join('')}</details>` : ''}
+      ${prox.length ? `<details><summary>Próximos meses (${prox.length})</summary><table class="tbl"><tbody>${prox.map(f => `<tr><td>${esc(mesNome(f.mes))}</td><td>${M(f.total)}</td><td class="mut">${f.itens.length} ${f.itens.length === 1 ? 'parcela' : 'parcelas'}</td></tr>`).join('')}</tbody></table></details>` : ''}</div>`;
+  };
+  return `<div class="card">${h}${cs.length ? cs.map(um).join('')
+      : '<p class="lead sm">Cadastre seu cartão para ver a fatura do mês e as parcelas que ainda vão chegar. Uma compra parcelada vira uma parcela em cada fatura, no mês certo.</p>'}
+    <div class="btns">${cs.length ? '<button class="btn primary" type="button" id="cartCompra">+ Compra no cartão</button>' : ''}<button class="btn" type="button" id="cartNovo">+ Cartão</button></div></div>`;
+}
+function ligarCartoes() {
+  const el = $('#cartoesCard'); if (!el || !Array.isArray(st.cartoes)) return;
+  $('#cartNovo', el).onclick = () => editarCartao();
+  const cp = $('#cartCompra', el); if (cp) cp.onclick = compraCartao;
+  $$('[data-ced]', el).forEach(b => b.onclick = () => editarCartao(st.cartoes.find(c => c.id === b.dataset.ced)));
+  $$('[data-cdel]', el).forEach(b => b.onclick = async () => {
+    const c = st.cartoes.find(x => x.id === b.dataset.cdel);
+    if (!c || !await ask({title: `Apagar o cartão ${c.nome}?`, desc: 'As compras já lançadas continuam nos gastos, só deixam de aparecer na fatura.', ok: 'Apagar'})) return;
+    try { await api('/api/cartoes/' + c.id, null, 'DELETE'); st.cartoes = null; loadCartoes(); toast('Cartão apagado'); } catch (e) { toast(e.message); }
+  });
+}
+async function editarCartao(c = {}) {
+  const v = await ask({title: c.id ? 'Editar cartão' : 'Novo cartão', ok: c.id ? 'Salvar' : 'Adicionar',
+    fields: [{name: 'n', label: 'Nome', value: c.nome || '', ph: 'Ex.: Nubank'},
+      {name: 'f', label: 'Dia em que a fatura fecha', mode: 'numeric', value: c.fecha || '', hint: 'Compras a partir desse dia vão para a fatura seguinte.'},
+      {name: 'v', label: 'Dia do vencimento', mode: 'numeric', value: c.vence || ''},
+      {name: 'l', label: 'Limite (opcional)', prefix: 'R$', mode: 'decimal', value: c.limite ? N(c.limite, 2) : ''}],
+    validate: v => !v.n.trim() ? 'Dê um nome ao cartão.' : !(+v.f >= 1 && +v.f <= 31 && +v.v >= 1 && +v.v <= 31) ? 'Os dias vão de 1 a 31.' : v.l && isNaN(num(v.l)) ? 'Limite inválido.' : ''});
+  if (!v) return;
+  try { await api('/api/cartoes', {id: c.id || null, nome: v.n, fecha: +v.f, vence: +v.v, limite: num(v.l) || 0}); st.cartoes = null; loadCartoes(); toast(c.id ? 'Cartão salvo' : 'Cartão adicionado'); }
+  catch (e) { toast(e.message); }
+}
+async function compraCartao() {
+  const cs = st.cartoes || [];
+  const v = await ask({title: 'Compra no cartão', ok: 'Adicionar',
+    fields: [{name: 'd', label: 'Descrição', ph: 'Ex.: Geladeira'}, {name: 'v', label: 'Valor total', prefix: 'R$', mode: 'decimal'},
+      {name: 'p', label: 'Parcelas', type: 'select', value: '1', options: Array.from({length: 24}, (_, i) => [String(i + 1), i ? `${i + 1}x` : 'À vista'])},
+      {name: 'c', label: 'Cartão', type: 'select', value: cs[0]?.id, options: cs.map(c => [c.id, c.nome])},
+      {name: 'dt', label: 'Data da compra', type: 'date', value: isoLocal(hojeD())}],
+    validate: v => !v.d.trim() ? 'Escreva uma descrição.' : !(num(v.v) > 0) ? 'Informe o valor.' : !v.dt ? 'Informe a data.' : ''});
+  if (!v) return;
+  try {
+    await api('/api/gastos', [{data: v.dt, descricao: v.d, valor: -num(v.v), cartao: v.c, parcelas: +v.p}]);
+    st.gastos = {}; st.cartoes = null; renderContas(); toast(+v.p > 1 ? `${v.p} parcelas de ${M(num(v.v) / +v.p)} lançadas` : 'Compra lançada');
+  } catch (e) { toast(e.message); }
+}
+async function loadWa() { try { st.wa = await api('/api/whatsapp'); } catch { st.wa = {ligado: false}; } const el = $('#waCard'); if (el) { el.innerHTML = waHtml(); ligarWa(); } }
+function waHtml() {
+  const w = st.wa;
+  if (!w?.ligado) return '';  // só aparece quando o WhatsApp foi configurado no servidor
+  return `<div class="card"><h2>Lançar pelo WhatsApp</h2>${w.vinculado
+    ? `<p class="lead sm">Seu WhatsApp (${esc(w.vinculado)}) está ligado. Mande os gastos como mensagem${w.numero_app ? ` para <b>+${esc(w.numero_app)}</b>` : ''}, do jeito que você fala: “gastei 30 no almoço”. Para desligar, mande “desvincular”.</p>`
+    : `<p class="lead sm">Mande os gastos por mensagem, do jeito que você fala (“gastei 30 no almoço”), e o app anota e responde.</p><div class="btns"><button class="btn" type="button" id="waLig">Ligar meu WhatsApp</button></div>`}</div>`;
+}
+function ligarWa() {
+  const b = $('#waLig'); if (!b) return;
+  b.onclick = async () => {
+    let r; try { r = await api('/api/whatsapp/codigo', {}); } catch (e) { return toast(e.message); }
+    const link = r.numero_app ? `https://wa.me/${encodeURIComponent(r.numero_app)}?text=${encodeURIComponent('vincular ' + r.codigo)}` : '';
+    await ask({title: 'Ligar o WhatsApp', ok: 'Pronto', cancelar: false, desc: `Do seu celular, mande a mensagem abaixo${r.numero_app ? ` para +${r.numero_app}` : ''}. O código vale por ${r.validade_min} minutos e só uma vez.`,
+      extraHtml: `<p><code class="chave">vincular ${esc(r.codigo)}</code></p>${link ? `<div class="btns"><a class="btn primary" href="${esc(link)}" target="_blank" rel="noopener">Abrir no WhatsApp</a></div>` : ''}`});
+    st.wa = null; loadWa();
+  };
+}
+
+/* ---------- imposto de renda, agenda de proventos e vencimentos (aba Meus ativos) ---------- */
+st.ir = null; st.agenda = null;
+async function loadNovAtivos() {
+  const comQtd = Object.fromEntries(Object.entries(pos).filter(([t, p]) => p?.qtd > 0 && !RF[t] && !['VOO', 'DOLAR'].includes(t)).map(([t, p]) => [t, {qtd: p.qtd}]));
+  const chave = JSON.stringify(comQtd);
+  renderNovAtivos();
+  if (loadNovAtivos.chave === chave && st.ir) return;
+  loadNovAtivos.chave = chave;
+  st.agenda = Object.keys(comQtd).length ? {busy: true} : null; renderNovAtivos();
+  const [ir, ag] = await Promise.allSettled([api('/api/ir'), st.agenda ? api('/api/agenda_proventos', {pos: comQtd}) : Promise.resolve(null)]);
+  st.ir = ir.status === 'fulfilled' ? ir.value : {err: ir.reason.message};
+  st.agenda = ag.status === 'fulfilled' ? ag.value : {err: ag.reason.message};
+  renderNovAtivos();
+}
+function renderNovAtivos() {
+  const el = $('#novAtivos'); if (!el) return;
+  el.innerHTML = vencHtml() + agendaHtml() + irHtml();
+  $('#irOps', el)?.addEventListener('click', verOperacoes);
+}
+function vencHtml() {
+  const h = hojeD(), rfs = Object.keys(pos).filter(t => RF[t] && pos[t]?.saldo > 0 && !['POUPANCA', 'PORQUINHO'].includes(t));
+  const it = rfs.filter(t => pos[t].venc).map(t => ({t, d: pos[t].venc, dias: Math.round((new Date(pos[t].venc + 'T12:00:00') - h) / 864e5), saldo: pos[t].saldo})).sort((a, b) => a.dias - b.dias);
+  if (!rfs.length) return '';
+  if (!it.length) return `<div class="card"><h2>Vencimentos da renda fixa</h2><p class="mut sm">Informe a data de vencimento em “Editar posição” de cada título para ver aqui o que vence e ser avisado antes.</p></div>`;
+  return `<div class="card"><h2>Vencimentos da renda fixa</h2><div class="tbl-wrap"><table class="tbl"><tbody>${it.map(x => `<tr><td><b>${esc(RF[x.t] || x.t)}</b><div class="mut xs">vence ${diaBR(x.d)}</div></td>
+      <td class="dir">${M(x.saldo)}<div>${x.dias < 0 ? pill('bad', 'warn', 'Venceu') : x.dias <= 30 ? pill('warn', '', `Em ${x.dias} ${x.dias === 1 ? 'dia' : 'dias'}`) : `<span class="mut xs">em ${N(x.dias / 30.4, 0)} meses</span>`}</div></td></tr>`).join('')}</tbody></table></div>
+    ${it.some(x => x.dias <= 30) ? '<p class="mut xs">No vencimento, o dinheiro cai na conta da corretora já com o imposto descontado. Se não precisar dele, a aba Investir mostra onde ele se encaixa no seu perfil.</p>' : ''}</div>`;
+}
+function agendaHtml() {
+  const a = st.agenda, h = '<h2>Agenda de proventos</h2>';
+  if (!a) return '';
+  if (a.busy) return `<div class="card">${h}${busy('Lendo os pagamentos dos últimos 12 meses…')}</div>`;
+  if (a.err) return `<div class="card">${h}<p class="err-box">${esc(a.err)}</p></div>`;
+  if (!a.ativos.length) return '';
+  const meses = Object.entries(a.proximos_meses).slice(0, 12), mx = Math.max(...meses.map(m => m[1]), 1);
+  return `<div class="card">${h}<p class="lead sm">Nos últimos 12 meses, seus FIIs e ações pagaram <b>${M(a.total_12m)}</b> pela quantidade que você tem hoje. Próximas datas, estimadas pelo costume de cada um:</p>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Ativo</th><th>Próxima data-com</th><th>Valor estimado</th></tr></thead><tbody>${a.ativos.slice(0, 25).map(x => `<tr><td>${esc(x.ticker)}<div class="mut xs">paga ${esc(x.frequencia)}</div></td><td>${diaBR(x.proxima_estimada)}</td><td>${M(x.valor_estimado)}</td></tr>`).join('')}</tbody></table></div>
+    ${meses.length > 1 ? `<h3>Próximos 12 meses (estimativa)</h3><div class="barras" role="img" aria-label="Proventos estimados por mês">${meses.map(([m, v]) => `<div class="b" title="${esc(mesNome(m))}: ${M(v)}"><div class="par"><i style="height:${(v / mx * 100).toFixed(1)}%;background:var(--up)"></i></div><small>${MESES[+m.slice(5) - 1].slice(0, 3)}</small></div>`).join('')}</div>` : ''}
+    <p class="mut xs">${esc(a.aviso)} Data-com: quem tem o ativo no fim desse dia recebe; o pagamento costuma cair dias ou semanas depois.</p></div>`;
+}
+function irHtml() {
+  const x = st.ir, h = '<h2>Imposto de renda</h2>';
+  if (!x) return `<div class="card">${h}${busy('Fazendo as contas do imposto…')}</div>`;
+  if (x.err) return `<div class="card">${h}<p class="err-box">${esc(x.err)}</p></div>`;
+  if (!x.operacoes) return `<div class="card">${h}<p class="lead sm">O app calcula o imposto das vendas de ações, FIIs e ETFs mês a mês (com a isenção de vendas até R$ 20 mil por mês em ações, os prejuízos para abater e o DARF) e monta o que vai na declaração anual. Para isso, ele precisa das suas compras e vendas: importe a Negociação da B3 (botão Importar da B3) ou use “Registrei compra” e “Registrei venda” em cada ativo.</p></div>`;
+  const d = x.declaracao, NT = {comum: 'ações, ETFs e BDRs', fii: 'FIIs', day: 'day trade'};
+  const preju = Object.entries(x.prejuizo_a_compensar).filter(([, v]) => v > 0);
+  const meses = x.meses.filter(m => Object.values(m.vendas).some(v => v > 0) || m.darf > 0).slice(-12).reverse();
+  const tab = (o, cab) => `<div class="tbl-wrap"><table class="tbl">${cab}<tbody>${o}</tbody></table></div>`;
+  return `<div class="card">${h}
+    ${x.a_pagar.length ? x.a_pagar.map(m => `<div class="note warn">${ICON.warn}<div><b>DARF de ${M(m.darf)}</b> pelas vendas de ${esc(mesNome(m.mes))}: pague até ${diaBR(m.vencimento)}, código ${m.codigo}. Gere o DARF no Sicalc, no site da Receita Federal.</div></div>`).join('')
+      : `<div class="note good">${ICON.check}<div>Nenhum DARF a pagar agora pelas operações que o app conhece.</div></div>`}
+    ${preju.length ? `<p class="sm">Prejuízo para abater de lucros futuros: ${preju.map(([k, v]) => `${M(v)} em ${NT[k]}`).join(', ')}.</p>` : ''}
+    ${meses.length ? `<details><summary>Mês a mês (${meses.length})</summary>${tab(meses.map(m => `<tr><td>${esc(mesNome(m.mes))}</td><td>${M(Object.values(m.vendas).reduce((a, b) => a + b, 0))}${m.isento_acoes ? ' <span class="mut xs">ações isentas</span>' : ''}</td><td>${M(m.imposto)}</td><td>${m.darf ? M(m.darf) : '—'}</td></tr>`).join(''),
+        '<thead><tr><th>Mês</th><th>Vendas</th><th>Imposto</th><th>DARF</th></tr></thead>')}</details>` : ''}
+    <details><summary>Declaração de ${d.ano}: o que informar</summary>
+      <h3>Bens e direitos</h3><p class="mut xs">Pelo custo de compra, não pelo valor de hoje.</p>
+      ${d.bens.length ? tab(d.bens.map(b => `<tr><td><b>${esc(b.ticker)}</b><div class="mut xs">${esc(b.discriminacao)}</div></td><td>${esc(b.grupo)}/${esc(b.codigo)}</td><td>${b.custo_ano_anterior == null ? '—' : M(b.custo_ano_anterior)}</td><td>${M(b.custo_31_12)}</td></tr>`).join(''),
+          `<thead><tr><th>Ativo</th><th>Grupo/código</th><th>31/12/${d.ano - 1}</th><th>31/12/${d.ano}</th></tr></thead>`) : '<p class="mut sm">Nada em 31/12.</p>'}
+      <h3>Rendimentos isentos e não tributáveis</h3>${tab(Object.entries(d.isentos).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${M(v)}</td></tr>`).join(''), '')}
+      <h3>Tributação exclusiva</h3>${tab(Object.entries(d.tributacao_exclusiva).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${M(v)}</td></tr>`).join(''), '')}
+      <p class="mut xs">DARF pagos no ano: ${M(d.darf_pagos_no_ano)}. Os proventos vêm da planilha da B3; sem ela, ficam zerados.</p></details>
+    <p class="mut xs">${esc(x.aviso)}</p>
+    <div class="btns"><button class="btn sm" type="button" data-exp="ir">Baixar planilha do imposto</button><button class="btn sm ghost" type="button" id="irOps">Compras e vendas registradas</button></div></div>`;
+}
+async function verOperacoes() {
+  let r; try { r = await api('/api/operacoes'); } catch (e) { return toast(e.message); }
+  const it = r.itens.slice().reverse();
+  const v = await ask({title: 'Compras e vendas registradas no app', ok: 'Fechar', cancelar: false,
+    desc: `${r.b3 ? `Mais ${r.b3} operações vindas da planilha da B3. ` : ''}Apague uma operação se ela foi anotada errado: o imposto é refeito.`,
+    extraHtml: it.length ? `<div class="tbl-wrap"><table class="tbl"><tbody>${it.slice(0, 200).map(m => `<tr><td>${diaBR(m.data)}</td><td>${m.tipo === 'compra' ? 'Compra' : 'Venda'} ${esc(m.ticker)}</td><td>${N(m.qtd, 6)} × ${M(m.preco)}</td>
+        <td><label class="sm"><input type="checkbox" name="del" value="${esc(m.id)}"> apagar</label></td></tr>`).join('')}</tbody></table></div>` : '<p class="mut sm">Nenhuma operação registrada no app.</p>'});
+  const apagar = [...document.querySelectorAll('#dlg input[name=del]:checked')].map(i => i.value);
+  if (v && apagar.length) {
+    for (const id of apagar) await api('/api/operacoes/' + id, null, 'DELETE').catch(() => {});
+    st.ir = null; loadNovAtivos.chave = null; loadNovAtivos(); toast(`${apagar.length} ${apagar.length === 1 ? 'operação apagada' : 'operações apagadas'}`);
+  }
+}
+
+/* ---------- comparador de renda fixa (aba Mercado) ---------- */
+const RFT = {cdb: 'CDB', lci: 'LCI ou LCA (isenta)', selic: 'Tesouro Selic', pre: 'Prefixado', ipca: 'Tesouro IPCA+'};
+st.rf = {valor: 10000, dias: 730, opcoes: [{tipo: 'cdb', taxa: 100}, {tipo: 'lci', taxa: 90}, {tipo: 'selic', taxa: 0}, {tipo: 'pre', taxa: 13}, {tipo: 'ipca', taxa: 6.5}], res: null};
+function rfHtml() {
+  const r = st.rf.res, un = {cdb: '% do CDI', lci: '% do CDI', pre: '% a.a.', ipca: '% + IPCA'};
+  const ord = r?.opcoes ? r.opcoes.slice().sort((a, b) => b.liquido - a.liquido) : [];
+  return `<div class="card"><h2>Quanto sobra em cada renda fixa</h2>
+    <p class="lead sm">Compara o valor no fim do prazo já descontados o imposto e a custódia. Mostra, por exemplo, se uma LCI de 90% do CDI ganha de um CDB de 110%.</p>
+    <form id="rfForm" class="rf-form" novalidate>
+      <label class="fld"><span>Valor aplicado</span><div class="inp"><i>R$</i><input name="valor" inputmode="decimal" value="${N(st.rf.valor, 2)}"></div></label>
+      <label class="fld"><span>Prazo</span><div class="inp"><select name="dias">${[[180, '6 meses'], [365, '1 ano'], [730, '2 anos'], [1095, '3 anos'], [1825, '5 anos'], [3650, '10 anos']].map(([d, l]) => `<option value="${d}" ${d === st.rf.dias ? 'selected' : ''}>${l}</option>`).join('')}</select></div></label>
+      ${st.rf.opcoes.map((o, i) => o.tipo === 'selic' ? '' : `<label class="fld"><span>${esc(RFT[o.tipo])}</span><div class="inp"><input name="t${i}" inputmode="decimal" value="${N(o.taxa, 2)}"><i>${un[o.tipo]}</i></div></label>`).join('')}
+      <div class="btns"><button class="btn primary" type="submit">Comparar</button></div></form>
+    ${r?.busy ? busy('Calculando…') : r?.err ? `<p class="err-box">${esc(r.err)}</p>` : r ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Opção</th><th>No fim, líquido</th></tr></thead><tbody>
+      ${ord.map(o => `<tr><td><b>${esc(RFT[o.tipo])}</b>${o.melhor ? ' ' + pill('good', '', 'Maior valor') : ''}<div class="mut xs">${o.tipo === 'selic' ? 'taxa Selic de hoje' : `${N(o.taxa, 2)}${un[o.tipo]}`} · imposto ${o.ir ? M(o.ir) : 'isento'}${o.custodia ? ` · custódia ${M(o.custodia)}` : ''} · igual a um CDB de ${N(o.equivale_cdb_pct_cdi, 1)}% do CDI</div></td>
+        <td class="dir"><b>${M(o.liquido)}</b><div class="mut xs">${P(o.liquido_aa, 2, false)} ao ano</div></td></tr>`).join('')}</tbody></table></div>
+      <p class="mut xs">${esc(r.aviso)} CDI de hoje: ${A(r.cdi)}; IPCA esperado: ${P(r.ipca, 2, false)} ao ano. Imposto pela tabela regressiva (${r.dias <= 180 ? '22,5%' : r.dias <= 360 ? '20%' : r.dias <= 720 ? '17,5%' : '15%'} neste prazo). CDB, LCI e LCA têm a garantia do FGC até R$ 250 mil por banco; Tesouro é garantido pelo governo.</p>` : ''}
+  </div>`;
+}
+function ligarRf() {
+  const f = $('#rfForm'); if (!f) return;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const fd = new FormData(f);
+    st.rf.valor = num(fd.get('valor')) || 0; st.rf.dias = +fd.get('dias');
+    st.rf.opcoes.forEach((o, i) => { if (fd.has('t' + i)) o.taxa = num(fd.get('t' + i)) || 0; });
+    st.rf.res = {busy: true}; $('#rfCard').innerHTML = rfHtml(); ligarRf();
+    try { st.rf.res = await api('/api/rendafixa/comparar', {valor: st.rf.valor, dias: st.rf.dias, opcoes: st.rf.opcoes}); } catch (er) { st.rf.res = {err: er.message}; }
+    $('#rfCard').innerHTML = rfHtml(); ligarRf();
+  };
+}
+
+/* ---------- planilhas e verificação em duas etapas ---------- */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-exp]'); if (!b) return;
+  try {
+    const r = await fetch('/api/exportar/' + b.dataset.exp, {headers: {Authorization: 'Bearer ' + sess}});
+    if (!r.ok) throw new Error('Não consegui gerar a planilha agora.');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `${b.dataset.exp}-${isoLocal(hojeD())}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    toast('Planilha baixada: abre no Excel e no Google Planilhas');
+  } catch (er) { toast(er.message); }
+});
+async function doisFatores() {
+  const cod = {name: 'c', label: 'Código de 6 números', mode: 'numeric', ph: '000000'}, val = v => /^\d{6}$/.test(v.c.trim()) ? '' : 'Digite os 6 números que aparecem no app.';
+  const salvarEu = on => { eu.dois_fatores = on; rawSet('eu', JSON.stringify(eu)); };
+  if (eu?.dois_fatores) {
+    const v = await ask({title: 'Desligar a verificação em duas etapas', desc: 'Digite o código do seu app autenticador para confirmar.', fields: [cod], ok: 'Desligar', validate: val});
+    if (!v) return;
+    try { await api('/api/conta/2fa/desativar', {codigo: v.c.trim()}); salvarEu(false); toast('Verificação em duas etapas desligada'); } catch (er) { toast(er.message); }
+    return;
+  }
+  let ini; try { ini = await api('/api/conta/2fa/iniciar', {}); } catch (er) { return toast(er.message); }
+  const cel = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const v = await ask({title: 'Verificação em duas etapas', ok: 'Ligar', validate: val, fields: [cod],
+    desc: 'Além da senha, o app vai pedir um código que muda a cada 30 segundos, gerado no seu celular. Quem descobrir sua senha não entra sem ele.',
+    extraHtml: `<ol class="sm ink2" style="padding-left:18px;margin:0 0 8px"><li>Instale um app autenticador (Google Authenticator, Microsoft Authenticator ou Authy).</li>
+      <li>${cel ? `Toque em <a href="${esc(ini.uri)}">adicionar ao app autenticador</a> ou, no app, adicione uma conta com esta chave:` : 'No app, escolha adicionar conta com uma chave e digite:'}<br><code class="chave">${esc(ini.segredo.replace(/(.{4})/g, '$1 ').trim())}</code></li>
+      <li>Digite abaixo o código que aparecer.</li></ol><p class="mut xs" style="margin:0">Guarde a chave num lugar seguro: se perder o celular, ela recupera o acesso. Sem ela, o suporte precisa confirmar que a conta é sua.</p>`});
+  if (!v) return;
+  try { await api('/api/conta/2fa/ativar', {codigo: v.c.trim()}); salvarEu(true); toast('Verificação em duas etapas ligada'); } catch (er) { toast(er.message); }
+}
+
 function renderContas() {
   const el = $('#t-contas');
   if (!el) return;
@@ -2914,7 +3200,7 @@ function renderContas() {
         ${c.linha ? `<button class="btn sm" type="button" data-cp="${esc(c.linha)}">Copiar código</button>` : ''}
         <button class="btn sm ghost" type="button" data-ed="${c.id}">Editar</button><button class="btn sm ghost" type="button" data-rm="${c.id}">Excluir</button></div></div>`;
   };
-  el.innerHTML = `<div id="gastosCard">${gastosHtml()}</div>${orcamentoHtml()}<div class="card">
+  el.innerHTML = `<div id="rapidoCard">${rapidoHtml()}</div><div id="gastosCard">${gastosHtml()}</div><div id="cartoesCard">${cartoesHtml()}</div><div id="waCard">${waHtml()}</div>${orcamentoHtml()}<div class="card">
       <div class="mes-nav"><button class="btn" type="button" data-mes="-1" aria-label="Mês anterior">‹</button><h2>Contas de ${MESES[mes]} de ${ano}</h2><button class="btn" type="button" data-mes="1" aria-label="Próximo mês">›</button></div>
       <div class="tiles"><div class="tile"><div class="l">Total do mês</div><div class="v tn">${M(total)}</div><div class="d">${lista.length} ${lista.length === 1 ? 'conta' : 'contas'}</div></div>
         <div class="tile"><div class="l">Já pago</div><div class="v tn">${M(pago)}</div><div class="d">${(n => `${n} ${n === 1 ? 'paga' : 'pagas'}`)(lista.filter(c => c.pago).length)}</div></div>
@@ -2931,6 +3217,7 @@ function renderContas() {
         <li><b>Enviar PDF ou foto</b> do boleto ou da fatura.</li><li><b>Achar contas no extrato:</b> envie o extrato do banco (OFX ou CSV) e o app identifica o que se repete todo mês.</li></ul></div>`}`;
   $$('[data-mes]', el).forEach(b => b.onclick = () => mudarMes(+b.dataset.mes));
   ligarGastos(); if (!st.gastos[ymG(st.mesContas)]) loadGastos();
+  ligarRapido(); ligarCartoes(); if (!st.cartoes) loadCartoes(); if (!st.wa) loadWa();
   $('#cNova', el).onclick = () => editarConta();
   $('#fEd', el)?.addEventListener('click', editarFinancas);
   $('#cBoleto', el).onclick = lerBoleto;

@@ -279,3 +279,169 @@ def do_extrato(transacoes):
     """Transações do extrato (contas.ler_extrato) no formato de lançamento."""
     return [{"data": t["data"].isoformat(), "descricao": contas.nome_bonito(t["descricao"]) or t["descricao"], "valor": t["valor"]}
             for t in transacoes if t.get("valor")]
+
+
+# ---------------------------------------------------------------- lançamento rápido por texto ou voz (e pelo WhatsApp)
+
+_NUM = r"(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)"
+_RECEITA = r"\b(recebi|ganhei|entrou|caiu|recebido|salario|reembolso|vendi)\b"
+_RUIDO = (r"\b(gastei|paguei|comprei|recebi|ganhei|entrou|caiu|foi|de|do|da|no|na|em|com|pra|para|um|uma|o|a|os|as|reais|real|"
+          r"conto|contos|hoje|ontem|anteontem|r\$|mil|vezes|parcelado|parcelada|cartao|credito|x)\b")
+
+
+def _mais_meses(d, n):
+    m = d.month - 1 + n
+    a, m = d.year + m // 12, m % 12 + 1
+    return date(a, m, min(d.day, calendar.monthrange(a, m)[1]))
+
+
+def interpretar(texto, hoje=None, cartoes=None):
+    """'gastei 52,90 no mercado ontem' -> {data, descricao, valor, parcelas, cartao}. Sem valor, ValueError."""
+    hoje = hoje or date.today()
+    bruto = " ".join(str(texto or "").split())[:300]
+    t = contas.sem_acento(bruto).lower()
+    sem_datas = re.sub(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", " ", t)
+    m = re.search(r"r\$\s*" + _NUM, sem_datas) or re.search(_NUM + r"\s*(mil|reais|real|contos?)?\b", sem_datas)
+    if not m:
+        raise ValueError("Não achei o valor. Escreva, por exemplo: gastei 50 no mercado.")
+    v = float(m.group(1).replace(".", "").replace(",", ".")) if "," in m.group(1) or re.search(r"\.\d{3}", m.group(1)) \
+        else float(m.group(1).replace(",", "."))
+    if len(m.groups()) > 1 and m.group(2) == "mil":
+        v *= 1000
+    if not 0 < v <= 1e7:
+        raise ValueError("Valor inválido.")
+    dt = hoje
+    if re.search(r"\banteontem\b", t):
+        dt = date.fromordinal(hoje.toordinal() - 2)
+    elif re.search(r"\bontem\b", t):
+        dt = date.fromordinal(hoje.toordinal() - 1)
+    md = re.search(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?\b", t)
+    if md:
+        a = int(md.group(3)) if md.group(3) else hoje.year
+        a = a + 2000 if a < 100 else a
+        try:
+            dt = date(a, int(md.group(2)), int(md.group(1)))
+        except ValueError:
+            pass
+    mp = re.search(r"\b(?:em\s*)?(\d{1,2})\s*(?:x|vezes)\b", t)
+    parcelas = int(mp.group(1)) if mp and 1 < int(mp.group(1)) <= 48 else 1
+    cartao = None
+    if cartoes and re.search(r"\bcartao\b|\bcredito\b|\d\s*x\b|vezes", t):
+        cartao = next((c["id"] for c in cartoes if contas.sem_acento(c["nome"]).lower() in t), cartoes[0]["id"])
+    receita = bool(re.search(_RECEITA, t)) and not cartao
+    # descrição: as palavras que sobram, com os acentos originais
+    nomes_cartao = {contas.sem_acento(w).lower() for c in (cartoes or []) for w in c["nome"].split()}
+    palavras = []
+    for w in bruto.split():
+        n = re.sub(r"[^\w$/]", "", contas.sem_acento(w).lower())
+        if (not n or len(n) < 2 or re.search(r"\d", n) or re.fullmatch(_RUIDO, n) or n in nomes_cartao
+                or n in ("dia", "dias", "cartao", "x", "r$", "r")):
+            continue
+        palavras.append(re.sub(r"[^\w\-]", "", w, flags=re.UNICODE))
+    desc = " ".join(p for p in palavras if p)
+    desc = (desc[:1].upper() + desc[1:])[:80] if desc else ("Recebimento" if receita else "Gasto")
+    return {"data": dt.isoformat(), "descricao": desc, "valor": round(v if receita else -v, 2), "parcelas": parcelas,
+            "cartao": cartao}
+
+
+# ---------------------------------------------------------------- cartões de crédito: fatura e parcelas
+
+def cartoes(uid):
+    return ler(uid).get("cartoes", [])
+
+
+def salvar_cartao(uid, c):
+    nome = " ".join(str(c.get("nome", "")).split())[:40]
+    try:
+        fecha, vence = int(c.get("fecha")), int(c.get("vence"))
+        limite = round(float(c.get("limite") or 0), 2)
+    except (TypeError, ValueError):
+        raise ValueError("Informe o dia de fechamento, o de vencimento e o limite.")
+    if not nome or not (1 <= fecha <= 31 and 1 <= vence <= 31) or limite < 0:
+        raise ValueError("Informe o nome e dias entre 1 e 31.")
+    d = ler(uid)
+    lst = d.setdefault("cartoes", [])
+    cid = c.get("id")
+    atual = next((x for x in lst if x["id"] == cid), None) if cid else None
+    if atual:
+        atual.update(nome=nome, fecha=fecha, vence=vence, limite=limite)
+    else:
+        if len(lst) >= 10:
+            raise ValueError("No máximo 10 cartões.")
+        atual = {"id": uuid.uuid4().hex[:10], "nome": nome, "fecha": fecha, "vence": vence, "limite": limite}
+        lst.append(atual)
+    _gravar(uid, d)
+    return atual
+
+
+def apagar_cartao(uid, cid):
+    d = ler(uid)
+    n = len(d.get("cartoes", []))
+    d["cartoes"] = [c for c in d.get("cartoes", []) if c["id"] != cid]
+    if len(d["cartoes"]) == n:
+        raise KeyError(cid)
+    for x in d["itens"]:
+        if x.get("cartao") == cid:
+            x.pop("cartao", None)
+    _gravar(uid, d)
+
+
+def fatura_de(cartao, dt):
+    """Mês (AAAA-MM) e dia de vencimento da fatura em que cai uma compra feita em dt."""
+    fecha = min(cartao["fecha"], calendar.monthrange(dt.year, dt.month)[1])
+    fechamento = dt if dt.day < fecha else _mais_meses(dt, 1)
+    fechamento = date(fechamento.year, fechamento.month, min(cartao["fecha"], calendar.monthrange(fechamento.year, fechamento.month)[1]))
+    venc = fechamento if cartao["vence"] > cartao["fecha"] else _mais_meses(fechamento, 1)
+    venc = date(venc.year, venc.month, min(cartao["vence"], calendar.monthrange(venc.year, venc.month)[1]))
+    return venc.strftime("%Y-%m"), venc
+
+
+def adicionar_compra(uid, x):
+    """Compra no cartão, à vista ou parcelada: cada parcela vira um lançamento no mês dela, ligado à fatura."""
+    d = ler(uid)
+    c = next((k for k in d.get("cartoes", []) if k["id"] == x.get("cartao")), None)
+    if not c:
+        raise ValueError("Cartão não encontrado.")
+    dt, desc, valor = _valida(x)
+    n = int(x.get("parcelas") or 1)
+    if not 1 <= n <= 48:
+        raise ValueError("Parcelas entre 1 e 48.")
+    total = abs(valor)
+    base = round(total / n, 2)
+    grupo = uuid.uuid4().hex[:10]
+    novos = []
+    for k in range(n):
+        v = base if k < n - 1 else round(total - base * (n - 1), 2)
+        dk = _mais_meses(dt, k)
+        fat, venc = fatura_de(c, _mais_meses(dt, k))
+        novos.append({"data": dk.isoformat(), "descricao": desc + (f" ({k + 1}/{n})" if n > 1 else ""), "valor": -v,
+                      "categoria": x.get("categoria"), "_extra": {"cartao": c["id"], "fatura": fat, "vencimento": venc.isoformat(),
+                                                                  "parcela": f"{k + 1}/{n}", "grupo": grupo}})
+    criados, _ = adicionar(uid, novos, origem=x.get("origem") or "cartao")
+    d = ler(uid)
+    por_id = {i["id"]: i for i in d["itens"]}
+    for it, nv in zip(criados, novos):
+        por_id[it["id"]].update(nv["_extra"])
+        it.update(nv["_extra"])
+    _gravar(uid, d)
+    return criados
+
+
+def faturas(uid, hoje=None):
+    """Por cartão: fatura atual e as próximas (com as parcelas futuras), total, vencimento e limite usado."""
+    hoje = hoje or date.today()
+    d = ler(uid)
+    out = []
+    for c in d.get("cartoes", []):
+        atual, _ = fatura_de(c, hoje)
+        grupos = {}
+        for x in d["itens"]:
+            if x.get("cartao") == c["id"] and x.get("fatura"):
+                g = grupos.setdefault(x["fatura"], {"mes": x["fatura"], "vencimento": x.get("vencimento"), "total": 0.0, "itens": []})
+                g["total"] = round(g["total"] - x["valor"], 2)
+                g["itens"].append({k: x[k] for k in ("data", "descricao", "valor", "parcela") if k in x})
+        abertas = [g for m, g in sorted(grupos.items()) if m >= atual]
+        usado = round(sum(g["total"] for g in abertas), 2)
+        out.append({**c, "fatura_atual": atual, "faturas": abertas[:12], "limite_usado": usado,
+                    "limite_disponivel": round(c["limite"] - usado, 2) if c["limite"] else None})
+    return out

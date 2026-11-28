@@ -483,3 +483,48 @@ def proventos_b3(lista, pos, hoje=None):
             "desde": lista[0]["data"] if lista else None, "projecao_12m": est["projecao_12m"],
             "por_mes": [{"mes": m, "valor": round(por_mes.get(m, 0), 2)} for m in meses],
             "por_ativo": sorted(por_ativo.values(), key=lambda x: -x["valor"])}
+
+
+# ---------------------------------------------------------------- agenda de proventos (próximos pagamentos estimados)
+
+def agenda(pos, hoje=None, excluir=frozenset()):
+    """Para cada ação ou FII com quantidade: os proventos dos últimos 12 meses (data-com e valor por cota, do Yahoo) e a
+    próxima data-com ESTIMADA pelo intervalo de costume, com o valor do último pagamento. É estimativa pelo histórico:
+    a empresa ou o fundo é que anuncia a data e o valor de verdade."""
+    hoje = pd.Timestamp(hoje or date.today())
+    out = []
+    for t, p in pos.items():
+        q = float((p or {}).get("qtd") or 0)
+        if q <= 0 or t in excluir:
+            continue
+        dv = sim.dividendos(t)
+        if dv is None or not len(dv):
+            continue
+        dv = dv[dv.index <= hoje]
+        ult12 = dv[dv.index > hoje - pd.DateOffset(years=1)]
+        if not len(ult12):
+            continue
+        datas = list(dv.index[-13:])
+        gaps = [(b - a).days for a, b in zip(datas, datas[1:])]
+        intervalo = int(np.median(gaps)) if gaps else 365
+        intervalo = 30 if intervalo < 45 else 91 if intervalo < 120 else 182 if intervalo < 250 else 365
+        prox = dv.index[-1] + pd.Timedelta(days=intervalo)
+        while prox < hoje:
+            prox += pd.Timedelta(days=intervalo)
+        ultimo = float(dv.iloc[-1])
+        out.append({"ticker": t, "qtd": q, "frequencia": {30: "mensal", 91: "trimestral", 182: "semestral", 365: "anual"}[intervalo],
+                    "pagamentos_12m": [{"data_com": d.strftime("%Y-%m-%d"), "por_cota": round(float(v), 4), "total": round(float(v) * q, 2)}
+                                       for d, v in ult12.items()][::-1],
+                    "total_12m": round(float(ult12.sum()) * q, 2),
+                    "proxima_estimada": prox.strftime("%Y-%m-%d"), "valor_estimado": round(ultimo * q, 2), "ultimo_por_cota": round(ultimo, 4)})
+    out.sort(key=lambda x: x["proxima_estimada"])
+    total_mes = {}
+    for x in out:
+        passo = {"mensal": 1, "trimestral": 3, "semestral": 6, "anual": 12}[x["frequencia"]]
+        for k in range(12):  # projeção de 12 meses pelo costume (um pagamento por mês, a cada trimestre...)
+            d = pd.Timestamp(x["proxima_estimada"]) + pd.DateOffset(months=passo * k)
+            if d > hoje + pd.DateOffset(years=1):
+                break
+            total_mes[d.strftime("%Y-%m")] = round(total_mes.get(d.strftime("%Y-%m"), 0) + x["valor_estimado"], 2)
+    return {"ativos": out, "proximos_meses": dict(sorted(total_mes.items())),
+            "total_12m": round(sum(x["total_12m"] for x in out), 2)}
